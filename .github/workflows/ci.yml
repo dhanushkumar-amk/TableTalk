@@ -21,14 +21,27 @@ jobs:
         with:
           components: rustfmt, clippy
 
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+
       - name: Format check
         run: cargo fmt --check
 
       - name: Clippy lint check
         run: cargo clippy -- -D warnings
 
-      - name: Run tests
+      - name: Run unit and integration tests
         run: cargo test
+
+      - name: Set up Node.js for Inspector CLI
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Run Inspector CLI and protocol smoke tests
+        run: |
+          chmod +x scripts/smoke-test.sh
+          ./scripts/smoke-test.sh
 
   frontend:
     name: Frontend (React / Vite)

@@ -171,17 +171,71 @@ cp .env.example .env
 
 For verbatim commands and recorded responses, see [docs/MCP_VERIFICATION.md](docs/MCP_VERIFICATION.md).
 
-### Testing with MCP Inspector CLI
+---
 
-Connect the official `@modelcontextprotocol/inspector` CLI directly to the running server:
+## Testing
+
+TableTalk includes a comprehensive test suite covering protocol conformance, edge cases, streaming resilience, concurrency, and automated smoke testing.
+
+### 1. Rust Test Suite (`cargo test`)
+
+Run all unit and integration tests across the workspace:
+```bash
+cargo test
+```
+
+This executes:
+- **Unit Tests**: Parameter validation and response formatting for tools (`ping_restaurant`).
+- **Protocol Edge-Case Tests** (`tests/mcp_edge_cases_test.rs`): 13 spec conformance tests covering malformed JSON, invalid JSON-RPC, unknown methods, pre-initialization calls, protocol version negotiation, session lifecycle, Content-Type/Accept negotiation, JSON-RPC batching, oversized payloads, client notifications, Origin validation, and cancellations/pings.
+- **Concurrency & Streaming Tests** (`tests/mcp_concurrency_and_stream_test.rs`): SSE stream lifecycle with mid-stream client disconnects, 50 concurrent session handshakes + tool calls with latency tracking (p50/p95), and request timeout cutoffs.
+
+### 2. Automated Smoke Test Script (`scripts/smoke-test.sh`)
+
+An end-to-end bash script that boots the server in the background, waits for `/health`, executes the MCP Inspector CLI (`@modelcontextprotocol/inspector --cli`) and protocol validation checks, asserts PASS/FAIL per check, and traps on exit:
 
 ```bash
-# List available tools
-npx @modelcontextprotocol/inspector --cli --server-url http://localhost:8080/mcp --method tools/list
+# Run with default port (8088)
+./scripts/smoke-test.sh
 
-# Invoke the ping_restaurant tool
-npx @modelcontextprotocol/inspector --cli --server-url http://localhost:8080/mcp --method tools/call --tool-name ping_restaurant --tool-arg name="Alice"
+# Or run with custom port and timeout
+PORT=8090 MAX_RETRIES=15 ./scripts/smoke-test.sh
 ```
+
+The script exits `0` on success and non-zero on any failure.
+
+### 3. MCP Inspector Testing
+
+#### A. Automated CLI Mode
+```bash
+# Discover tools
+npx @modelcontextprotocol/inspector --cli http://localhost:8080/mcp --method tools/list
+
+# Invoke tool with argument
+npx @modelcontextprotocol/inspector --cli http://localhost:8080/mcp --method tools/call --tool-name ping_restaurant --tool-arg name="Alice"
+
+# Invoke tool with default argument
+npx @modelcontextprotocol/inspector --cli http://localhost:8080/mcp --method tools/call --tool-name ping_restaurant
+```
+
+#### B. Interactive Web UI Mode
+1. Start the TableTalk backend server:
+   ```bash
+   cargo run --bin tabletalk-backend
+   ```
+2. In a separate terminal, launch the MCP Inspector web UI:
+   ```bash
+   npx @modelcontextprotocol/inspector
+   ```
+3. Open the browser URL displayed in the terminal (e.g. `http://127.0.0.1:6274`).
+4. Select transport **Streamable HTTP**.
+5. Enter Server URL: `http://localhost:8080/mcp`.
+6. Click **Connect**. Verify that server capabilities and metadata (`tabletalk`, `v0.1.0`) appear.
+7. Navigate to the **Tools** tab. Click **List Tools** to observe `ping_restaurant`.
+8. Test tool calls:
+   - Provide `{"name": "Alice"}` and click **Run Tool**. Verify response contains `Hello, Alice!`.
+   - Leave `name` blank and click **Run Tool**. Verify response defaults to `Hello, Guest!`.
+   - Provide an invalid schema type (e.g. numeric name) and click **Run Tool**. Verify error response.
+9. Click **Disconnect**, then **Connect** again to verify seamless session resumption.
 
 ---
 

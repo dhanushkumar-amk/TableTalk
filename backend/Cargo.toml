@@ -15,6 +15,7 @@ rmcp = { version = "3.5", features = ["server", "macros", "schemars", "transport
 schemars = "1"
 tower = { version = "0.5", features = ["util"] }
 tower-http = { version = "0.6", features = ["cors", "trace", "timeout", "limit"] }
+uuid = { version = "1", features = ["v4"] }
 
 [dev-dependencies]
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }

@@ -6,6 +6,8 @@ use serde::{Deserialize, Serialize};
 pub struct PingInput {
     /// Optional guest or client name to include in greeting
     pub name: Option<String>,
+    /// Optional simulation delay in milliseconds to test client/server timeout behavior
+    pub sleep_ms: Option<u64>,
 }
 
 /// Structured response from the `ping_restaurant` tool.
@@ -38,7 +40,10 @@ mod tests {
 
     #[test]
     fn test_handle_ping_default() {
-        let output = handle_ping(PingInput { name: None });
+        let output = handle_ping(PingInput {
+            name: None,
+            sleep_ms: None,
+        });
         assert_eq!(
             output.message,
             "Hello, Guest! TableTalk restaurant MCP server is online."
@@ -51,6 +56,7 @@ mod tests {
     fn test_handle_ping_named() {
         let output = handle_ping(PingInput {
             name: Some("Alice".to_string()),
+            sleep_ms: None,
         });
         assert_eq!(
             output.message,

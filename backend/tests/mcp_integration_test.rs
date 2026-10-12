@@ -37,6 +37,7 @@ async fn spawn_test_server() -> (String, tokio::task::JoinHandle<()>) {
             format!("http://{}", addr),
         ],
         rust_log: "warn".to_string(),
+        request_timeout_secs: 30,
     };
 
     let router = build_router(&config);

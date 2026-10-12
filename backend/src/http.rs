@@ -1,7 +1,7 @@
 use crate::config::Config;
 use crate::server::TableTalkServer;
 use axum::{
-    extract::{DefaultBodyLimit, Request, State},
+    extract::{Request, State},
     http::{header, HeaderName, HeaderValue, Method, StatusCode},
     middleware::{from_fn_with_state, Next},
     response::{IntoResponse, Json, Response},
@@ -14,10 +14,9 @@ use rmcp::transport::streamable_http_server::{
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::time::Duration;
-use tower_http::{cors::CorsLayer, timeout::TimeoutLayer};
+use tower_http::{cors::CorsLayer, limit::RequestBodyLimitLayer, timeout::TimeoutLayer};
 
 const MAX_BODY_SIZE_BYTES: usize = 2 * 1024 * 1024; // 2 MB
-const REQUEST_TIMEOUT_SECS: u64 = 30;
 
 pub const SUPPORTED_PROTOCOL_VERSIONS: &[&str] = &["2025-11-25", "2024-11-05"];
 
@@ -61,6 +60,69 @@ async fn validate_origin(
     next.run(req).await
 }
 
+/// Middleware to assign or propagate a unique Request ID and enter a tracing span.
+/// Ensures request bodies are never logged at info level, and tracing spans track every request.
+async fn request_id_and_tracing(req: Request, next: Next) -> Response {
+    let request_id = req
+        .headers()
+        .get("x-request-id")
+        .and_then(|v| v.to_str().ok())
+        .map(|s| s.to_string())
+        .unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
+
+    let method = req.method().clone();
+    let uri = req.uri().clone();
+
+    let span = tracing::info_span!(
+        "http_request",
+        request_id = %request_id,
+        method = %method,
+        uri = %uri,
+    );
+    let _guard = span.enter();
+
+    let mut response = next.run(req).await;
+    if let Ok(val) = HeaderValue::from_str(&request_id) {
+        response
+            .headers_mut()
+            .insert(HeaderName::from_static("x-request-id"), val);
+    }
+    response
+}
+
+/// Middleware to validate Content-Length header against maximum body size limit.
+/// Responds cleanly with HTTP 413 Payload Too Large before body streaming.
+async fn validate_body_size(req: Request, next: Next) -> Response {
+    if let Some(content_length) = req.headers().get(header::CONTENT_LENGTH) {
+        if let Ok(len_str) = content_length.to_str() {
+            if let Ok(len) = len_str.parse::<usize>() {
+                if len > MAX_BODY_SIZE_BYTES {
+                    return (
+                        StatusCode::PAYLOAD_TOO_LARGE,
+                        "Payload Too Large: Request body exceeds 2MB limit\n",
+                    )
+                        .into_response();
+                }
+            }
+        }
+    }
+
+    next.run(req).await
+}
+
+/// Diagnostic middleware for testing timeout cut-off under controlled latency simulation.
+async fn simulate_delay_for_test(req: Request, next: Next) -> Response {
+    if let Some(delay_val) = req.headers().get("x-test-simulate-delay-ms") {
+        if let Ok(delay_str) = delay_val.to_str() {
+            if let Ok(delay_ms) = delay_str.parse::<u64>() {
+                tokio::time::sleep(Duration::from_millis(delay_ms)).await;
+            }
+        }
+    }
+
+    next.run(req).await
+}
+
 /// Middleware to validate `MCP-Protocol-Version` header on requests if present.
 /// If an unsupported version is sent, rejects with HTTP 400 Bad Request per spec.
 async fn validate_protocol_version(req: Request, next: Next) -> Response {
@@ -77,6 +139,12 @@ async fn validate_protocol_version(req: Request, next: Next) -> Response {
                 )
                     .into_response();
             }
+        } else {
+            return (
+                StatusCode::BAD_REQUEST,
+                "Bad Request: Malformed MCP-Protocol-Version header\n".to_string(),
+            )
+                .into_response();
         }
     }
 
@@ -112,10 +180,12 @@ pub fn build_router(config: &Config) -> Router {
             header::AUTHORIZATION,
             HeaderName::from_static("mcp-protocol-version"),
             HeaderName::from_static("mcp-session-id"),
+            HeaderName::from_static("x-request-id"),
         ])
         .expose_headers([
             HeaderName::from_static("mcp-session-id"),
             HeaderName::from_static("mcp-protocol-version"),
+            HeaderName::from_static("x-request-id"),
         ])
         .max_age(Duration::from_secs(3600));
 
@@ -124,10 +194,13 @@ pub fn build_router(config: &Config) -> Router {
         .nest_service("/mcp", mcp_service)
         .layer(from_fn_with_state(allowed_origins_state, validate_origin))
         .layer(axum::middleware::from_fn(validate_protocol_version))
+        .layer(axum::middleware::from_fn(validate_body_size))
+        .layer(axum::middleware::from_fn(simulate_delay_for_test))
+        .layer(axum::middleware::from_fn(request_id_and_tracing))
         .layer(cors)
-        .layer(DefaultBodyLimit::max(MAX_BODY_SIZE_BYTES))
+        .layer(RequestBodyLimitLayer::new(MAX_BODY_SIZE_BYTES))
         .layer(TimeoutLayer::with_status_code(
             StatusCode::REQUEST_TIMEOUT,
-            Duration::from_secs(REQUEST_TIMEOUT_SECS),
+            Duration::from_secs(config.request_timeout_secs),
         ))
 }

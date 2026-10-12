@@ -5,6 +5,7 @@ pub struct Config {
     pub port: u16,
     pub allowed_origins: Vec<String>,
     pub rust_log: String,
+    pub request_timeout_secs: u64,
 }
 
 impl Config {
@@ -34,10 +35,16 @@ impl Config {
         let rust_log =
             env::var("RUST_LOG").unwrap_or_else(|_| "info,tabletalk_backend=debug".to_string());
 
+        let request_timeout_secs: u64 = env::var("REQUEST_TIMEOUT_SECS")
+            .ok()
+            .and_then(|t| t.parse().ok())
+            .unwrap_or(30);
+
         Self {
             port,
             allowed_origins,
             rust_log,
+            request_timeout_secs,
         }
     }
 }
