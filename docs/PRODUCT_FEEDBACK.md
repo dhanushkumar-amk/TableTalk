@@ -10,10 +10,13 @@ Feedback and evaluation of core developer tools and platform components used in 
 - **What worked well**: 
   - Direct integration with Axum via `StreamableHttpService` using standard Tower service mounting.
   - Clean procedural macros (`#[tool]`, `#[tool_handler]`, `#[tool_router]`) that derive JSON Schema Draft 2020-12 automatically with `schemars`.
+  - Built-in support for tool annotations (`read_only_hint`, `idempotent_hint`, `destructive_hint`) and `outputSchema`.
+  - Structured output (`Json<T>`) cleanly populates both `structuredContent` and JSON serialized `content` text.
   - First-class support for `2025-11-25` via `ProtocolVersion::V_2025_11_25` and built-in session generation (`mcp-session-id`).
   - Out-of-the-box compatibility with the official `@modelcontextprotocol/inspector` test suite.
 - **What needs work**: 
   - Lack of a standard `prelude` module causes trial-and-error discovery of trait and macro imports.
+  - Non-exhaustive structs like `InitializeResult` and `Implementation` must be instantiated via builder/new methods rather than struct literals, which is standard Rust design but needs better rustdoc discovery examples.
   - Documentation around feature flags (`transport-streamable-http-server`, `schemars`, `macros`) could provide clearer end-to-end Axum examples in the README.
 - **Onboarding experience**: Fast once crate features are understood. Compiles quickly and error messages from macro expansions are readable.
 - **Would I build with it again**: **Yes** — The crate handles complex JSON-RPC transport framing, SSE chunking, and session state cleanly, saving dozens of hours of custom protocol scaffolding.

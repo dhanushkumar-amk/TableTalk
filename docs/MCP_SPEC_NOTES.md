@@ -235,15 +235,15 @@ data: {"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2025-11-25","capabili
 
 Use this checklist to verify compliance as Phase 3+ builds the server:
 
-- [ ] **Streamable HTTP Endpoint**: Server exposes `/mcp` accepting HTTP POST and GET.
-- [ ] **Protocol Version Agreement**: Server accepts and negotiates `2025-11-25`.
-- [ ] **Protocol Header**: Rejects requests specifying unsupported protocol versions with HTTP 400.
-- [ ] **Session Handling**: Generates secure `Mcp-Session-Id` and tracks sessions across requests.
-- [ ] **Session Re-initialization**: Responds with HTTP 404 for terminated/expired sessions.
-- [ ] **SSE Priming**: Emits initial event with ID and `retry` field on streaming responses.
-- [ ] **Origin Validation**: Rejects invalid `Origin` headers with HTTP 403 Forbidden.
-- [ ] **Tool Naming**: All tool names follow `[A-Za-z0-9_.-]` within 1–128 characters.
-- [ ] **JSON Schema Dialect**: Tools export schemas in Draft 2020-12 format.
-- [ ] **Parameterless Tools**: Zero-parameter tools declare `{ "type": "object", "additionalProperties": false }`.
-- [ ] **Domain Error Separation**: Input/business errors return `isError: true` inside tool results, not JSON-RPC protocol errors.
-- [ ] **Runtime Invocation**: MCP server is imported and called at runtime in executable code.
+- [x] **Streamable HTTP Endpoint**: Server exposes `/mcp` accepting HTTP POST and GET.
+- [x] **Protocol Version Agreement**: Server accepts and negotiates `2025-11-25`.
+- [x] **Protocol Header**: Rejects requests specifying unsupported protocol versions with HTTP 400.
+- [x] **Session Handling**: Generates secure `Mcp-Session-Id` and tracks sessions across requests.
+- [x] **Session Re-initialization**: Responds with HTTP 404 for terminated/expired sessions.
+- [x] **SSE Priming**: Emits initial event with ID and `retry` field on streaming responses.
+- [x] **Origin Validation**: Rejects invalid `Origin` headers with HTTP 403 Forbidden.
+- [x] **Tool Naming**: All tool names follow `[A-Za-z0-9_.-]` within 1–128 characters.
+- [x] **JSON Schema Dialect**: Tools export schemas in Draft 2020-12 format.
+- [x] **Parameterless Tools**: Zero-parameter tools declare `{ "type": "object", "additionalProperties": false }`.
+- [x] **Domain Error Separation**: Input/business errors return `isError: true` inside tool results, not JSON-RPC protocol errors.
+- [x] **Runtime Invocation**: MCP server is imported and called at runtime in executable code.

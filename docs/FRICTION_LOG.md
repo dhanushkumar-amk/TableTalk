@@ -60,3 +60,32 @@ A running log of unexpected friction, hurdles, bugs, or developer experience iss
 - **Severity**: Low
 - **Workaround**: Used `--tool-arg message="hello"` (which avoids JSON quoting) and curl with `--data-binary @file.json`
 - **Suggestion**: Document platform-specific shell invocation recommendations for the MCP Inspector CLI on Windows.
+
+### Windows 11 Smart App Control Blocking Build Script Executables
+- **Date**: 2026-10-12
+- **Task attempted**: Compiling crate dependencies with custom build commands (`rustversion`, `encoding_rs`) under `cargo test`
+- **Steps taken**:
+  1. Added `reqwest` and `rmcp` to `backend/Cargo.toml`
+  2. Executed `cargo test`
+- **Expected vs actual**:
+  - *Expected*: Build scripts execute and emit configuration flags
+  - *Actual*: Compilation aborted with `error: failed to run custom build command: An Application Control policy has blocked this file. (os error 4551)`
+- **Severity**: High
+- **Workaround**:
+  1. Redirected `target-dir` via `.cargo/config.toml` to `C:/Users/dhanu/AppData/Local/cargo-target/tabletalk`.
+  2. Configured `reqwest` with `default-features = false, features = ["json", "rustls-tls"]` to eliminate unnecessary dependencies (`encoding_rs`) whose build scripts triggered policy blocks.
+- **Suggestion**: Use pure-Rust build dependencies without build scripts where possible when targeting Windows environments with active Smart App Control.
+
+### Axum 0.8 Disallowing Service Nesting at Root Path (`/`)
+- **Date**: 2026-10-12
+- **Task attempted**: Nesting `StreamableHttpService` onto a sub-router using `.nest_service("/", mcp_service)` and then mounting it on `/mcp`
+- **Steps taken**:
+  1. Configured sub-router with `.nest_service("/", mcp_service)`
+  2. Mounted sub-router onto parent router with `.nest("/mcp", sub_router)`
+- **Expected vs actual**:
+  - *Expected*: Router mounts service at `/mcp`
+  - *Actual*: Runtime panic: `Nesting at the root is no longer supported. Use fallback_service instead.`
+- **Severity**: Medium
+- **Workaround**: Mounted `mcp_service` directly on the main router via `Router::new().nest_service("/mcp", mcp_service)`.
+- **Suggestion**: Be aware of Axum 0.8 routing deprecations; avoid nesting sub-routers at `"/"`.
+
