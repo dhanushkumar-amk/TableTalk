@@ -35,10 +35,28 @@ echo "=================================================="
 echo " Starting TableTalk MCP Server on port ${PORT}..."
 echo "=================================================="
 
-# Start server via cargo run to respect cargo config target directory on all platforms
-echo "Starting backend via cargo run --bin tabletalk-backend..."
-PORT="${PORT}" RUST_LOG="warn" cargo run --bin tabletalk-backend &
-SERVER_PID=$!
+BIN_PATH=""
+if [[ -n "${CARGO_TARGET_DIR:-}" && -x "${CARGO_TARGET_DIR}/debug/tabletalk-backend" ]]; then
+  BIN_PATH="${CARGO_TARGET_DIR}/debug/tabletalk-backend"
+elif [[ -n "${CARGO_TARGET_DIR:-}" && -x "${CARGO_TARGET_DIR}/debug/tabletalk-backend.exe" ]]; then
+  BIN_PATH="${CARGO_TARGET_DIR}/debug/tabletalk-backend.exe"
+elif [[ -x "/c/Users/dhanu/AppData/Local/cargo-target/tabletalk/debug/tabletalk-backend.exe" ]]; then
+  BIN_PATH="/c/Users/dhanu/AppData/Local/cargo-target/tabletalk/debug/tabletalk-backend.exe"
+elif [[ -x "target/debug/tabletalk-backend" ]]; then
+  BIN_PATH="target/debug/tabletalk-backend"
+elif [[ -x "target/debug/tabletalk-backend.exe" ]]; then
+  BIN_PATH="target/debug/tabletalk-backend.exe"
+fi
+
+if [[ -n "${BIN_PATH}" ]]; then
+  echo "Starting backend via pre-built binary: ${BIN_PATH}..."
+  PORT="${PORT}" RUST_LOG="warn" "${BIN_PATH}" &
+  SERVER_PID=$!
+else
+  echo "Starting backend via cargo run --bin tabletalk-backend..."
+  PORT="${PORT}" RUST_LOG="warn" cargo run --bin tabletalk-backend &
+  SERVER_PID=$!
+fi
 
 # Wait for /health
 echo "Waiting for server to become healthy at ${BASE_URL}/health..."
