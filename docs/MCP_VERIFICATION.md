@@ -387,3 +387,157 @@ test test_unsupported_protocol_version_header_rejected_with_400 ... ok
 test test_full_mcp_lifecycle_and_tools ... ok
 test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 ```
+
+---
+
+## 8. Phase 4: Verification, Adversarial Testing & Hardening
+
+Phase 4 hardened the Streamable HTTP transport and verified compliance with MCP specification `2025-11-25` through adversarial edge cases, high concurrency, mid-stream disconnects, and automated Inspector tooling.
+
+### 8.1 Task 1: MCP Inspector Interactive UI Steps
+
+*(Note: Operating in a headless development agent environment without a graphical desktop. The steps below provide the exact protocol for manual interactive validation in a local browser)*
+
+1. **Launch TableTalk Backend**:
+   ```bash
+   cargo run --bin tabletalk-backend
+   ```
+   *Expected*: Server logs `TableTalk backend listening on http://0.0.0.0:8080 (MCP endpoint: http://0.0.0.0:8080/mcp)`.
+2. **Launch MCP Inspector Web UI**:
+   ```bash
+   npx @modelcontextprotocol/inspector
+   ```
+   *Expected*: Terminal displays the web server listener (e.g. `http://127.0.0.1:6274?MCP_INSPECTOR_API_TOKEN=...`). Open the link in a browser.
+3. **Connect to Transport**:
+   - Transport Type: Select **Streamable HTTP**.
+   - Server URL: `http://localhost:8080/mcp`.
+   - Click **Connect**.
+   - *Expected*: Status displays "Connected". Capabilities panel lists `tools: {}`. Server info displays `name: "tabletalk"`, `version: "0.1.0"`.
+4. **Discover Tools (`tools/list`)**:
+   - Navigate to the **Tools** tab. Click **List Tools**.
+   - *Expected*: Tool `ping_restaurant` appears with description `"Health check ping tool verifying TableTalk MCP server connectivity."` and input schema accepting optional string `name`.
+5. **Tool Call with Argument**:
+   - In `ping_restaurant`, input argument `name: "Alice"`.
+   - Click **Run Tool**.
+   - *Expected*: Result shows `{"message":"Hello, Alice! TableTalk restaurant MCP server is online.","server":"tabletalk","version":"0.1.0"}` with `isError: false`.
+6. **Tool Call without Argument (Default)**:
+   - Clear input argument or omit `name`. Click **Run Tool**.
+   - *Expected*: Result shows `{"message":"Hello, Guest! TableTalk restaurant MCP server is online.","server":"tabletalk","version":"0.1.0"}` with `isError: false`.
+7. **Tool Call with Invalid Argument**:
+   - Pass an invalid JSON schema argument (e.g. `name: 12345` or extra fields). Click **Run Tool**.
+   - *Expected*: Server reports schema validation error envelope cleanly with `isError: true` without server crash.
+8. **Disconnect & Reconnect**:
+   - Click **Disconnect**. Status switches to "Disconnected".
+   - Click **Connect**. Status returns to "Connected" with a newly assigned `mcp-session-id`.
+
+---
+
+### 8.2 Task 2: Automated Smoke Test Script (`scripts/smoke-test.sh`)
+
+The script `scripts/smoke-test.sh` automates end-to-end server orchestration, health checking, MCP Inspector CLI operations, and security assertions.
+
+#### Execution Output (Success Case - Exit Code 0)
+```text
+$ ./scripts/smoke-test.sh
+==================================================
+ Starting TableTalk MCP Server on port 8088...
+==================================================
+Starting backend via cargo run --bin tabletalk-backend...
+Waiting for server to become healthy at http://127.0.0.1:8088/health...
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.15s
+     Running `C:/Users/dhanu/AppData/Local/cargo-target/tabletalk\debug\tabletalk-backend.exe`
+Server is healthy (PID: 1831). Running smoke tests...
+--------------------------------------------------
+[PASS] Health endpoint returned 200 OK: {"status":"ok"}
+Testing Inspector CLI tools/list against http://127.0.0.1:8088/mcp...
+[PASS] Inspector CLI tools/list discovered ping_restaurant
+Testing Inspector CLI tools/call ping_restaurant with name=Alice...
+[PASS] Inspector CLI tools/call with argument succeeded (contained 'Alice')
+Testing Inspector CLI tools/call ping_restaurant without arguments...
+[PASS] Inspector CLI tools/call without argument succeeded (contained default 'Guest')
+Testing Inspector CLI tools/call with invalid tool...
+[PASS] Inspector CLI correctly failed on nonexistent tool call
+Testing Origin header security check via curl...
+[PASS] Disallowed Origin returned 403 Forbidden
+Testing invalid mcp-protocol-version header via curl...
+[PASS] Invalid mcp-protocol-version returned 400 Bad Request
+--------------------------------------------------
+Summary: 7 passed, 0 failed.
+==================================================
+Shutting down server (PID: 1831)...
+```
+Exit code: `0`.
+
+#### Execution Output (Failure Case - Dead Port - Exit Code 1)
+```text
+$ PORT=999999 MAX_RETRIES=2 ./scripts/smoke-test.sh
+==================================================
+ Starting TableTalk MCP Server on port 999999...
+==================================================
+Starting backend via cargo run --bin tabletalk-backend...
+Waiting for server to become healthy at http://127.0.0.1:999999/health...
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.16s
+     Running `C:/Users/dhanu/AppData/Local/cargo-target/tabletalk\debug\tabletalk-backend.exe`
+Server failed to start within 2 seconds.
+Shutting down server (PID: 55)...
+```
+Exit code: `1`.
+
+---
+
+### 8.3 Task 3: Protocol Edge-Case Test Matrix
+
+Implemented in `backend/tests/mcp_edge_cases_test.rs`:
+
+| ID | Edge Case Description | Spec Section / Requirement | Expected Behavior | Actual Behavior | Pass/Fail |
+|---|---|---|---|---|---|
+| a | Malformed JSON body | Spec 2025-11-25 §Streamable HTTP | HTTP 400 or HTTP 415 rejection | HTTP 415 Unsupported Media Type | **PASS** |
+| b | Valid JSON not a JSON-RPC message | Spec 2025-11-25 §JSON-RPC Transport | HTTP 400 or HTTP 415 rejection | HTTP 415 Unsupported Media Type | **PASS** |
+| c | Unknown method after init | JSON-RPC 2.0 §5.1 / Spec 2025-11-25 | HTTP 200 with code `-32601` (Method not found) | HTTP 200, code: `-32601`, message: `"Method not found"` | **PASS** |
+| d | `tools/call` before `initialize` | Spec 2025-11-25 §Initialization Lifecycle | HTTP 400 or HTTP 422 rejected | HTTP 422 Unprocessable Entity (`"Unexpected message, expect initialize request"`) | **PASS** |
+| e | Unsupported `protocolVersion` in `initialize` | Spec 2025-11-25 §Version Negotiation | Server negotiates supported version (`2025-11-25`) | Negotiated `2025-11-25` in `result.protocolVersion` | **PASS** |
+| f | Invalid `mcp-protocol-version` header on subsequent requests | Spec 2025-11-25 §Transport Headers | HTTP 400 Bad Request | HTTP 400 Bad Request (`"Unsupported MCP protocol version"`) | **PASS** |
+| g | Unknown session ID & request after `DELETE /mcp` | Spec 2025-11-25 §Session Lifecycle | Unknown ID: HTTP 404; DELETE: HTTP 202; After DELETE: HTTP 404 | Unknown: 404; DELETE: 202; Post-delete: 404 | **PASS** |
+| h | Wrong `Content-Type` / Missing `Accept` | Spec 2025-11-25 §Media Types | Wrong Content-Type: HTTP 415; Missing Accept: HTTP 406 | Wrong Content-Type: 415; Missing Accept: 406 | **PASS** |
+| i | JSON-RPC Batching (`[...]`) | Spec 2025-11-25 §Batch Support | Rejection (HTTP 400 or HTTP 415) | HTTP 415 Unsupported Media Type | **PASS** |
+| j | Oversized request body (>2MB) | Server Hardening & DoS Mitigation | Rejection without crash (HTTP 413 or drop); server remains healthy | Immediate rejection; server `/health` returns 200 OK | **PASS** |
+| k | Client notification (`notifications/initialized`) | Spec 2025-11-25 §Notifications | HTTP 202 Accepted with empty body | HTTP 202 Accepted, empty body | **PASS** |
+| l | Origin header validation | Spec 2025-11-25 §DNS Rebinding | Disallowed: 403; Allowed: 200; No Origin: 200 | Disallowed: 403; Allowed: 200; No Origin: 200 | **PASS** |
+| m | Ping method & Cancellation notification | Spec 2025-11-25 §Ping & Cancellation | `ping` returns `{}`; `notifications/cancelled` returns 202 | `ping`: 200 with `{}`; cancellation: 202 | **PASS** |
+
+---
+
+### 8.4 Task 4: Streaming, Concurrency & Robustness
+
+Implemented in `backend/tests/mcp_concurrency_and_stream_test.rs`:
+
+#### 1. SSE Stream Client Disconnect
+- **Test**: `test_sse_stream_open_and_client_disconnect`
+- **Methodology**: Session initialized; client opens persistent `GET /mcp` SSE stream; client abruptly drops connection mid-stream.
+- **Result**: Server does not panic or leak tasks. Subsequent health checks return `200 OK`, and subsequent tool calls on the same session succeed.
+
+#### 2. High Concurrency Load Test (50 Concurrent Sessions)
+- **Test**: `test_50_concurrent_sessions_and_latency`
+- **Methodology**: 50 simultaneous asynchronous Tokio tasks execute the full lifecycle: `initialize` -> `notifications/initialized` -> `tools/call ping_restaurant`.
+- **Measured Metrics**:
+  - Total Concurrent Sessions: **50**
+  - Total Elapsed Duration: **125.36ms**
+  - p50 Latency: **111.03ms**
+  - p95 Latency: **116.01ms**
+  - Max Latency: **116.52ms**
+  - Error/Panic Rate: **0%** (50/50 succeeded)
+
+#### 3. Request Timeout Cutoff
+- **Test**: `test_request_timeout_cutoff`
+- **Methodology**: Test harness simulates server delay exceeding configured timeout threshold (`REQUEST_TIMEOUT_SECS = 1`).
+- **Result**: Server cleanly cuts off hung execution and responds with `HTTP 408 Request Timeout`. Server remains fully responsive for subsequent requests.
+
+#### 4. Graceful Shutdown (SIGTERM / SIGINT)
+- **Implementation**: In `backend/src/main.rs`, `axum::serve(listener, app).with_graceful_shutdown(shutdown_signal())` listens for `Ctrl+C` (SIGINT) on all platforms and `SIGTERM` on Unix.
+- **Log Output**:
+  ```text
+  INFO http_request{request_id="b7189c44-..." method=POST uri="/mcp"}: tabletalk_backend::http: Incoming request
+  INFO tabletalk_backend: Received SIGTERM, initiating graceful shutdown
+  INFO tabletalk_backend: TableTalk server gracefully shut down
+  ```
+

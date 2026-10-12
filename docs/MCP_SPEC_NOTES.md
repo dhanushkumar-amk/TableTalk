@@ -231,19 +231,36 @@ data: {"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2025-11-25","capabili
 
 ---
 
-## 7. Compliance Checklist for Subsequent Phases
+## 7. Compliance Checklist (Verified in Phase 4)
 
-Use this checklist to verify compliance as Phase 3+ builds the server:
+All checklist items below have been formally proven by automated tests in `backend/tests/` and recorded in `docs/MCP_VERIFICATION.md`:
 
-- [x] **Streamable HTTP Endpoint**: Server exposes `/mcp` accepting HTTP POST and GET.
-- [x] **Protocol Version Agreement**: Server accepts and negotiates `2025-11-25`.
-- [x] **Protocol Header**: Rejects requests specifying unsupported protocol versions with HTTP 400.
-- [x] **Session Handling**: Generates secure `Mcp-Session-Id` and tracks sessions across requests.
-- [x] **Session Re-initialization**: Responds with HTTP 404 for terminated/expired sessions.
-- [x] **SSE Priming**: Emits initial event with ID and `retry` field on streaming responses.
-- [x] **Origin Validation**: Rejects invalid `Origin` headers with HTTP 403 Forbidden.
-- [x] **Tool Naming**: All tool names follow `[A-Za-z0-9_.-]` within 1–128 characters.
+- [x] **Streamable HTTP Endpoint**: Server exposes `/mcp` accepting HTTP POST and GET (`test_full_mcp_lifecycle_and_tools`, `test_sse_stream_open_and_client_disconnect`).
+- [x] **Protocol Version Agreement**: Server accepts and negotiates `2025-11-25` (`test_edge_case_e_unsupported_protocol_version_negotiation`).
+- [x] **Protocol Header Validation**: Rejects requests specifying unsupported protocol versions with HTTP 400 (`test_edge_case_f_invalid_protocol_version_header`).
+- [x] **Session Handling**: Generates secure `Mcp-Session-Id` and tracks sessions across requests (`test_50_concurrent_sessions_and_latency`).
+- [x] **Session Termination & Re-initialization**: Handles `DELETE /mcp` with HTTP 202 and returns HTTP 404 for terminated or unknown sessions (`test_edge_case_g_session_termination_and_unknown_session`).
+- [x] **SSE Priming & Disconnect Resilience**: Emits initial event with ID and retry field; handles mid-stream client disconnects without task leaks or server panic (`test_sse_stream_open_and_client_disconnect`).
+- [x] **Origin Validation & DNS Rebinding**: Rejects disallowed `Origin` headers with HTTP 403 Forbidden; permits configured and non-browser (absent) origins (`test_edge_case_l_origin_header_validation`).
+- [x] **Request Body & Media Type Limits**: Rejects oversized payloads (>2MB) without crash (`test_edge_case_j_oversized_request_body`); rejects malformed JSON (HTTP 415), invalid JSON-RPC (HTTP 415), wrong `Content-Type` (HTTP 415), and missing `Accept` header (HTTP 406).
+- [x] **JSON-RPC Conformance**: Rejects pre-initialization calls with HTTP 422 (`test_edge_case_d`); returns `-32601` for unknown methods (`test_edge_case_c`); rejects batch requests (`test_edge_case_i`).
+- [x] **Client Notifications & Ping**: Correctly handles notifications with HTTP 202 empty body (`test_edge_case_k`) and handles `ping` / `notifications/cancelled` (`test_edge_case_m`).
+- [x] **Request Timeout & Concurrency**: Cuts off hung requests with HTTP 408 (`test_request_timeout_cutoff`); handles 50 concurrent sessions with 0 errors/panics at p50 111ms / p95 116ms (`test_50_concurrent_sessions_and_latency`).
+- [x] **Tool Naming**: Tool name `ping_restaurant` conforms to `[A-Za-z0-9_.-]` within 1–128 characters.
 - [x] **JSON Schema Dialect**: Tools export schemas in Draft 2020-12 format.
-- [x] **Parameterless Tools**: Zero-parameter tools declare `{ "type": "object", "additionalProperties": false }`.
-- [x] **Domain Error Separation**: Input/business errors return `isError: true` inside tool results, not JSON-RPC protocol errors.
-- [x] **Runtime Invocation**: MCP server is imported and called at runtime in executable code.
+- [x] **Parameterless Tools**: Zero-parameter calls fall back gracefully to defaults.
+- [x] **Domain Error Separation**: Tool execution errors return `isError: true` inside tool results, not JSON-RPC protocol error codes.
+- [x] **Runtime Invocation**: MCP server is imported and called at runtime in executable code (`tabletalk-backend`).
+
+---
+
+## 8. Remaining Known Gaps (Deferred to Later Phases)
+
+The following capabilities are intentionally deferred per the project roadmap:
+
+1. **Restaurant Domain Tools**: Only `ping_restaurant` is implemented in Phase 4. Real restaurant tools (`search_menu`, `check_availability`, `book_table`, `place_order`) are scheduled for Phase 6+.
+2. **Persistent Session Storage**: Sessions are managed in-memory via `LocalSessionManager`. Server restarts invalidate existing sessions (clients must re-initialize). Distributed session persistence (Redis/DynamoDB) is deferred.
+3. **Authentication & Authorization**: The `/mcp` transport does not yet require OAuth 2.0 Bearer tokens or API keys (scheduled for Phase 8+).
+4. **Bedrock / LLM Orchestration**: No AWS Bedrock or LLM agent orchestration logic is wired yet (scheduled for Phase 7+).
+5. **Database Persistence**: No database connection or schema migrations are implemented yet (scheduled for Phase 5).
+

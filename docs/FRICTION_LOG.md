@@ -89,3 +89,55 @@ A running log of unexpected friction, hurdles, bugs, or developer experience iss
 - **Workaround**: Mounted `mcp_service` directly on the main router via `Router::new().nest_service("/mcp", mcp_service)`.
 - **Suggestion**: Be aware of Axum 0.8 routing deprecations; avoid nesting sub-routers at `"/"`.
 
+### Axum DefaultBodyLimit Bypass on Raw Tower Services
+- **Date**: 2026-10-12
+- **Task attempted**: Protecting the MCP endpoint from oversized denial-of-service payloads using Axum's `DefaultBodyLimit`
+- **Steps taken**:
+  1. Applied `DefaultBodyLimit::max(2 * 1024 * 1024)` to the Axum router
+  2. Sent a 5MB payload to `/mcp`
+- **Expected vs actual**:
+  - *Expected*: Axum rejects request before passing it to `StreamableHttpService`
+  - *Actual*: Request body reached `StreamableHttpService` because Axum's `DefaultBodyLimit` only applies to Axum's own extractors (`Json`, `Bytes`), ignoring raw Tower services mounted with `nest_service`
+- **Severity**: Medium
+- **Workaround**: Added explicit `validate_body_size` middleware inspecting `Content-Length` (returning immediate HTTP 413) and applied `tower_http::limit::RequestBodyLimitLayer` to limit streaming request bodies.
+- **Suggestion**: Emphasize in Axum documentation that nested Tower services bypass extractor-level body limits, requiring Tower-level middleware.
+
+### Windows Winsock 10053 on Immediate HTTP 413 Socket Teardown
+- **Date**: 2026-10-12
+- **Task attempted**: Asserting HTTP 413 response in Rust integration tests when uploading oversized payloads
+- **Steps taken**:
+  1. Sent a 5MB streaming body via `reqwest`
+  2. Server rejected immediately with HTTP 413 and closed the connection
+- **Expected vs actual**:
+  - *Expected*: Client cleanly reads HTTP 413 response status
+  - *Actual*: Windows socket layer triggered `os error 10053: An established connection was aborted by the software in your host machine` before client could read the HTTP response headers
+- **Severity**: Low
+- **Workaround**: Verified rejection and server health: the server properly refused the oversized payload without crashing and remained completely healthy for subsequent requests.
+- **Suggestion**: Document that raw socket resets during active client streaming on Windows may appear as connection reset rather than clean status codes.
+
+### MCP Inspector CLI Positional Target Flag Syntax
+- **Date**: 2026-10-12
+- **Task attempted**: Scripting automated tool discovery and invocation via `@modelcontextprotocol/inspector` CLI
+- **Steps taken**:
+  1. Ran `npx @modelcontextprotocol/inspector --cli --server-url http://127.0.0.1:8088/mcp --method tools/list`
+- **Expected vs actual**:
+  - *Expected*: CLI connects and outputs tools list
+  - *Actual*: In modern versions of the inspector CLI, `target` is passed as a positional argument (`[target...]`), and `--server-url` is deprecated or ignored in certain flag orderings
+- **Severity**: Low
+- **Workaround**: Inspected `npx @modelcontextprotocol/inspector --cli --help` directly and updated invocation to `npx @modelcontextprotocol/inspector --cli <URL> --method <method>`
+- **Suggestion**: Clearly document the positional syntax in the Inspector npm package README.
+
+### AppLocker Policy Block on Standalone Test Runner Executables
+- **Date**: 2026-10-12
+- **Task attempted**: Running a persistent background test server from `tests/server_runner.rs` via `cargo test --test server_runner`
+- **Steps taken**:
+  1. Created `backend/tests/server_runner.rs`
+  2. Attempted execution under `cargo test`
+- **Expected vs actual**:
+  - *Expected*: Runner executable starts the server
+  - *Actual*: Blocked by Windows Application Control policy (`os error 4551`)
+- **Severity**: Medium
+- **Workaround**: Removed `server_runner.rs` and replaced it with direct cargo execution (`cargo run --bin tabletalk-backend`) and standard integration tests (`#[tokio::test]`), which execute cleanly.
+- **Suggestion**: Use standard Cargo integration test harnesses and avoid creating custom test binary entry points.
+
+
