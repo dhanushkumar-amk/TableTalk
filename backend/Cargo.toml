@@ -6,11 +6,16 @@ edition = "2021"
 [dependencies]
 axum = "0.8"
 tokio = { version = "1", features = ["full"] }
+tokio-util = { version = "0.7", features = ["full"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+rmcp = { version = "3.5", features = ["server", "macros", "schemars", "transport-streamable-http-server"] }
+schemars = "1"
+tower = { version = "0.5", features = ["util"] }
+tower-http = { version = "0.6", features = ["cors", "trace", "timeout", "limit"] }
 
 [dev-dependencies]
-tower = { version = "0.5", features = ["util"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 http-body-util = "0.1"

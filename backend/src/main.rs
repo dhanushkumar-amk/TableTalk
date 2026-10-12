@@ -1,79 +1,32 @@
-use axum::{routing::get, Json, Router};
-use serde::{Deserialize, Serialize};
-use std::env;
 use std::net::SocketAddr;
+use tabletalk_backend::{build_router, Config};
 use tracing::info;
-
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
-pub struct HealthResponse {
-    pub status: String,
-}
-
-pub fn app() -> Router {
-    Router::new().route("/health", get(health_handler))
-}
-
-async fn health_handler() -> Json<HealthResponse> {
-    Json(HealthResponse {
-        status: "ok".to_string(),
-    })
-}
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 
 #[tokio::main]
 async fn main() {
-    tracing_subscriber::fmt::init();
+    let config = Config::from_env();
 
-    let port: u16 = env::var("PORT")
-        .ok()
-        .and_then(|p| p.parse().ok())
-        .unwrap_or(8080);
+    tracing_subscriber::registry()
+        .with(
+            EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new(&config.rust_log)),
+        )
+        .with(tracing_subscriber::fmt::layer())
+        .init();
 
-    let addr = SocketAddr::from(([0, 0, 0, 0], port));
+    let addr = SocketAddr::from(([0, 0, 0, 0], config.port));
     let listener = tokio::net::TcpListener::bind(addr)
         .await
-        .expect("Failed to bind TCP listener");
+        .unwrap_or_else(|err| panic!("Failed to bind TCP listener on {}: {}", addr, err));
 
-    info!("TableTalk backend listening on http://{}", addr);
+    info!(
+        "TableTalk backend listening on http://{} (MCP endpoint: http://{}/mcp)",
+        addr, addr
+    );
 
-    axum::serve(listener, app())
+    let app = build_router(&config);
+
+    axum::serve(listener, app)
         .await
-        .expect("Server failed to run");
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use axum::{
-        body::Body,
-        http::{Request, StatusCode},
-    };
-    use http_body_util::BodyExt;
-    use tower::ServiceExt;
-
-    #[tokio::test]
-    async fn test_health_check() {
-        let app = app();
-
-        let response = app
-            .oneshot(
-                Request::builder()
-                    .uri("/health")
-                    .body(Body::empty())
-                    .unwrap(),
-            )
-            .await
-            .unwrap();
-
-        assert_eq!(response.status(), StatusCode::OK);
-
-        let body = response.into_body().collect().await.unwrap().to_bytes();
-        let payload: HealthResponse = serde_json::from_slice(&body).unwrap();
-
-        assert_eq!(
-            payload,
-            HealthResponse {
-                status: "ok".to_string()
-            }
-        );
-    }
+        .unwrap_or_else(|err| panic!("Server runtime encountered fatal error: {}", err));
 }
