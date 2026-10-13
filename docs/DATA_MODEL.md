@@ -322,3 +322,52 @@ The database includes realistic fictional seed data for **"The Saffron Nebula Bi
 1. **SQLite Write Concurrency**: SQLite supports a single active writer per database file. While WAL mode enables concurrent readers without blocking writes, high-frequency concurrent writes are serialized.
 2. **Synthetic Demo Customers**: Customer records are purely synthetic with fictitious contact information (`+91-555-XXXX`, `@example.com`). Real-world customer records require explicit consent records and GDPR/data protection retention schedules.
 3. **Simulated Payment Ledger**: The `payments` table represents a simulated accounting ledger. Cardholder Primary Account Numbers (PANs), CVVs, or live banking credentials must never be stored.
+
+---
+
+## 8. Availability Engine & Scheduling Rules (Phase 7)
+
+### 8.1 Half-Open Overlap & Turnover Buffer Rule
+Dining room reservations use half-open intervals:
+$$\text{Existing Booking: } [S_{\text{existing}}, E_{\text{existing}} + B)$$
+$$\text{Requested Slot: } [S_{\text{new}}, E_{\text{new}})$$
+Where $B$ is the configurable `turnover_buffer_minutes` (defaulting to 0 minutes, configurable up to 15 minutes).
+
+A table conflict exists if and only if:
+$$(S_{\text{new}} < E_{\text{existing}} + B) \land (E_{\text{new}} > S_{\text{existing}})$$
+
+**Exact Boundary Semantics**:
+When $B = 0$, a request starting exactly at 19:00 ($S_{\text{new}} = 19:00$) does **not** overlap a booking ending at 19:00 ($E_{\text{existing}} = 19:00$), because $19:00 < 19:00$ is strictly false.
+
+**Booking Status Filtering**:
+Only bookings with status `pending` or `confirmed` block physical table capacity. Bookings marked `cancelled`, `no_show`, or `completed` do **not** block dining tables.
+
+### 8.2 Seating Duration Rules
+If the caller does not specify `duration_minutes`, duration is calculated deterministically by party size:
+- **1–2 Guests**: 75 minutes
+- **3–4 Guests**: 90 minutes (standard dining duration from `restaurant.dining_duration_minutes`)
+- **5–6 Guests**: 105 minutes
+- **7+ Guests**: 120 minutes
+
+When supplied by the caller, `duration_minutes` is validated to remain bounded within $[30, 240]$ minutes.
+
+### 8.3 Service Periods & Last-Seating Cutoff
+Operating shifts are defined in `opening_hours` with distinct lunch and dinner periods. A booking is valid within a service period $[P_{\text{open}}, P_{\text{close}}]$ if:
+1. $S_{\text{new}} \ge P_{\text{open}}$
+2. **Last-Seating Rule**: $S_{\text{new}} \le P_{\text{close}} - 45\text{ minutes}$ (the party cannot be seated less than 45 minutes before closing).
+3. **Closing Time Rule**: $S_{\text{new}} + \text{duration} \le P_{\text{close}}$ (the meal must completely conclude by the period closing time).
+
+### 8.4 Deterministic Best-Fit Table Allocation
+When multiple active tables satisfy $C_{\text{min}} \le \text{party\_size} \le C_{\text{max}}$ in the requested area without overlap, the engine allocates the table by:
+1. **Smallest Sufficient Capacity**: $C_{\text{max}}$ ascending (avoids wasting an 8-top on a 2-top party).
+2. **Area Priority**: Requested area match, then Indoor, Patio, Bar.
+3. **Deterministic Identifier**: Table ID ascending.
+
+### 8.5 Alternatives Search Limits & Tie-Breaking
+When the requested slot is unavailable, the search algorithm proceeds with strict cost boundaries:
+1. **Different Area at Requested Time**: If a specific area was requested, check other areas on the same date and time ($\Delta = 0\text{ minutes}$).
+2. **Same-Day Outward Search**: Checks grid intervals outward up to `max_search_window_minutes = 120` (8 slots at 15-minute granularity).
+   - **Documented Tie-Break**: Distance in time, then **later-before-earlier** ($+\Delta$ evaluated before $-\Delta$).
+3. **Multi-Day Fallback**: If the requested date has zero available slots, the engine evaluates up to the next **3 open operating days** at the requested time (skipping closed days and special closures).
+4. **Result Capping**: Returns at most `alternatives` slots (default 3, max 6).
+

@@ -201,7 +201,46 @@ cargo run -- seed
      }'
    ```
 
-For verbatim commands and recorded responses, see [docs/MCP_VERIFICATION.md](docs/MCP_VERIFICATION.md).
+5. **Search the menu (`search_menu`)**:
+   ```bash
+   curl -i -X POST http://localhost:8080/mcp \
+     -H "Content-Type: application/json" \
+     -H "mcp-session-id: <SESSION_ID>" \
+     -H "mcp-protocol-version: 2025-11-25" \
+     -d '{
+       "jsonrpc": "2.0",
+       "id": 4,
+       "method": "tools/call",
+       "params": {
+         "name": "search_menu",
+         "arguments": {"query": "biryani", "limit": 3}
+       }
+     }'
+   ```
+
+6. **Check table availability (`check_availability`)**:
+   ```bash
+   curl -i -X POST http://localhost:8080/mcp \
+     -H "Content-Type: application/json" \
+     -H "mcp-session-id: <SESSION_ID>" \
+     -H "mcp-protocol-version: 2025-11-25" \
+     -d '{
+       "jsonrpc": "2.0",
+       "id": 5,
+       "method": "tools/call",
+       "params": {
+         "name": "check_availability",
+         "arguments": {
+           "date": "2026-10-16",
+           "time": "19:30",
+           "party_size": 2,
+           "area": "indoor"
+         }
+       }
+     }'
+   ```
+
+For verbatim commands and recorded responses, see [docs/MCP_VERIFICATION.md](docs/MCP_VERIFICATION.md) and tool specifications in [docs/MCP_TOOLS.md](docs/MCP_TOOLS.md).
 
 ---
 

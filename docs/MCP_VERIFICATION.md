@@ -541,3 +541,390 @@ Implemented in `backend/tests/mcp_concurrency_and_stream_test.rs`:
   INFO tabletalk_backend: TableTalk server gracefully shut down
   ```
 
+---
+
+## 9. Phase 7: Availability Engine & `check_availability` Tool Verification
+
+Phase 7 implements the read-only `check_availability` MCP tool, the deterministic availability engine, and the alternatives recommendation algorithm. Verification was performed against the live TableTalk server seeded with real restaurant data and tested with both Streamable HTTP requests and the official MCP Inspector.
+
+### 9.1 MCP Inspector Interactive UI Steps (Manual Protocol)
+
+1. **Launch TableTalk Backend**:
+   ```bash
+   cargo run --bin mcp_tabletalk_backend
+   ```
+   *Expected*: Server logs `TableTalk backend listening on http://0.0.0.0:8080 (MCP endpoint: http://0.0.0.0:8080/mcp)`.
+2. **Launch MCP Inspector Web UI**:
+   ```bash
+   npx @modelcontextprotocol/inspector
+   ```
+   *Expected*: Browser opens to the Inspector UI (or URL displayed in console).
+3. **Connect to Transport**:
+   - Transport Type: Select **Streamable HTTP**.
+   - Server URL: `http://localhost:8080/mcp`.
+   - Click **Connect**.
+   - *Expected*: Server status indicates "Connected", protocol version `2025-11-25`.
+4. **Inspect Tool Listing (`tools/list`)**:
+   - Navigate to the **Tools** tab. Click **List Tools**.
+   - *Expected*: 3 tools appear: `ping_restaurant`, `search_menu`, and `check_availability`.
+   - Verify annotations for `check_availability`:
+     - `readOnlyHint`: `true`
+     - `idempotentHint`: `true`
+     - `destructiveHint`: `false`
+     - `openWorldHint`: `false`
+   - Verify both `inputSchema` and `outputSchema` conform to JSON Schema Draft 2020-12.
+5. **Scenario 1: Check Available Table**:
+   - Tool: `check_availability`
+   - Arguments: `{"date": "2026-10-16", "time": "13:00", "party_size": 2}`
+   - Click **Run Tool**.
+   - *Expected*: Result shows `status: "available"`, assigns 2-top `T01`, voice text speaks: `"I have a table for 2 guests on Friday the sixteenth at one in the afternoon. Want me to book it?"`.
+6. **Scenario 2: Fully Booked Slot with Alternatives**:
+   - Tool: `check_availability`
+   - Arguments: `{"date": "2026-10-16", "time": "19:30", "party_size": 4, "area": "indoor"}`
+   - Click **Run Tool**.
+   - *Expected*: Result shows `status: "unavailable"`, `reason: "fully_booked"`, offers patio alternative at 19:30 (`P02`) and indoor dinner slots at 21:00 (`T03`), with natural spoken dialogue.
+7. **Scenario 3: Weekly Closed Day**:
+   - Tool: `check_availability`
+   - Arguments: `{"date": "2026-10-20", "time": "19:30", "party_size": 2}`
+   - Click **Run Tool**.
+   - *Expected*: Result shows `status: "closed"`, `reason: "closed_day"`, voice text explains Tuesday closure.
+8. **Scenario 4: Invalid Argument Self-Correction**:
+   - Tool: `check_availability`
+   - Arguments: `{"date": "tomorrow", "time": "19:00", "party_size": 2}`
+   - Click **Run Tool**.
+   - *Expected*: `isError: true` with error message explaining date format required: `Invalid input: 'date' must be in ISO format YYYY-MM-DD (e.g. '2026-10-17'). Received 'tomorrow'.`
+
+---
+
+### 9.2 Real Runtime Scenarios (Verbatim Output)
+
+Executed against seeded `data/tabletalk.db` on Streamable HTTP transport:
+
+#### Scenario 1: Available Slot (Standard Booking)
+**Request arguments**:
+```json
+{
+  "date": "2026-10-16",
+  "time": "13:00",
+  "party_size": 2
+}
+```
+**Verbatim MCP Response (`id: 10`)**:
+```json
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "I have a table for 2 guests on Friday the sixteenth at one in the afternoon. Want me to book it?"
+    }
+  ],
+  "structuredContent": {
+    "requested": {
+      "date": "2026-10-16",
+      "time": "13:00",
+      "party_size": 2,
+      "area": "any",
+      "duration_minutes": 75,
+      "timezone": "Asia/Kolkata"
+    },
+    "restaurant_now": "2026-10-13T14:20:26.470221500+05:30",
+    "status": "available",
+    "reason": null,
+    "reason_detail": null,
+    "snapped_from": null,
+    "slot": {
+      "start_local": "2026-10-16T13:00:00+05:30",
+      "end_local": "2026-10-16T14:15:00+05:30",
+      "table_label": "T01",
+      "area": "indoor",
+      "capacity": 2
+    },
+    "alternatives": [],
+    "opening_hours_that_day": [
+      { "open": "12:00", "close": "15:30" },
+      { "open": "19:00", "close": "23:30" }
+    ],
+    "note": "availability is a snapshot, not a reservation"
+  },
+  "isError": false
+}
+```
+
+---
+
+#### Scenario 2: Fully Booked Slot with Multi-Dimensional Alternatives
+**Request arguments**:
+```json
+{
+  "date": "2026-10-16",
+  "time": "19:30",
+  "party_size": 4,
+  "area": "indoor"
+}
+```
+**Verbatim MCP Response (`id: 11`)**:
+```json
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "I don't have indoor seating at seven thirty in the evening, but patio is free at seven thirty in the evening, or I have nine in indoor. Would either work for you?"
+    }
+  ],
+  "structuredContent": {
+    "requested": {
+      "date": "2026-10-16",
+      "time": "19:30",
+      "party_size": 4,
+      "area": "indoor",
+      "duration_minutes": 90,
+      "timezone": "Asia/Kolkata"
+    },
+    "restaurant_now": "2026-10-13T14:20:26.474022800+05:30",
+    "status": "unavailable",
+    "reason": "fully_booked",
+    "reason_detail": "No tables available for party of 4 at 19:30 in indoor area. Found 3 alternative slot(s).",
+    "snapped_from": null,
+    "slot": null,
+    "alternatives": [
+      {
+        "start_local": "2026-10-16T19:30:00+05:30",
+        "end_local": "2026-10-16T21:00:00+05:30",
+        "area": "patio",
+        "table_label": "P02",
+        "minutes_from_requested": 0,
+        "different_day": false
+      },
+      {
+        "start_local": "2026-10-16T21:00:00+05:30",
+        "end_local": "2026-10-16T22:30:00+05:30",
+        "area": "indoor",
+        "table_label": "T03",
+        "minutes_from_requested": 90,
+        "different_day": false
+      },
+      {
+        "start_local": "2026-10-16T21:15:00+05:30",
+        "end_local": "2026-10-16T22:45:00+05:30",
+        "area": "indoor",
+        "table_label": "T03",
+        "minutes_from_requested": 105,
+        "different_day": false
+      }
+    ],
+    "opening_hours_that_day": [
+      { "open": "12:00", "close": "15:30" },
+      { "open": "19:00", "close": "23:30" }
+    ],
+    "note": "availability is a snapshot, not a reservation"
+  },
+  "isError": false
+}
+```
+
+---
+
+#### Scenario 3: Weekly Closed Day (Tuesdays Closed)
+**Request arguments**:
+```json
+{
+  "date": "2026-10-20",
+  "time": "19:30",
+  "party_size": 2
+}
+```
+**Verbatim MCP Response (`id: 12`)**:
+```json
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "The restaurant is closed on Tuesday the twentieth. Would you like to check availability for tomorrow?"
+    }
+  ],
+  "structuredContent": {
+    "requested": {
+      "date": "2026-10-20",
+      "time": "19:30",
+      "party_size": 2,
+      "area": "any",
+      "duration_minutes": 75,
+      "timezone": "Asia/Kolkata"
+    },
+    "restaurant_now": "2026-10-13T14:20:26.483084600+05:30",
+    "status": "closed",
+    "reason": "closed_day",
+    "reason_detail": "The restaurant is closed on Tuesdays.",
+    "snapped_from": null,
+    "slot": null,
+    "alternatives": [],
+    "opening_hours_that_day": [],
+    "note": "availability is a snapshot, not a reservation"
+  },
+  "isError": false
+}
+```
+
+---
+
+#### Scenario 4: Past Time / Lead Time Violation (`too_soon`)
+**Request arguments**:
+```json
+{
+  "date": "2026-10-13",
+  "time": "12:00",
+  "party_size": 2
+}
+```
+**Verbatim MCP Response (`id: 13`)**:
+```json
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "I don't have a table available for 2 on Tuesday the thirteenth around noon. Would you like to check another day?"
+    }
+  ],
+  "structuredContent": {
+    "requested": {
+      "date": "2026-10-13",
+      "time": "12:00",
+      "party_size": 2,
+      "area": "any",
+      "duration_minutes": 75,
+      "timezone": "Asia/Kolkata"
+    },
+    "restaurant_now": "2026-10-13T14:20:26.498965400+05:30",
+    "status": "unavailable",
+    "reason": "too_soon",
+    "reason_detail": "Bookings must be made at least 30 minutes in advance. The earliest booking time is 14:50.",
+    "snapped_from": null,
+    "slot": null,
+    "alternatives": [],
+    "opening_hours_that_day": [],
+    "note": "availability is a snapshot, not a reservation"
+  },
+  "isError": false
+}
+```
+
+---
+
+#### Scenario 5: Party Size Above Restaurant Maximum (`party_too_large`)
+**Request arguments**:
+```json
+{
+  "date": "2026-10-16",
+  "time": "19:30",
+  "party_size": 25
+}
+```
+**Verbatim MCP Response (`id: 14`)**:
+```json
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "I don't have a table available for 25 on Friday the sixteenth around seven thirty in the evening. Would you like to check another day?"
+    }
+  ],
+  "structuredContent": {
+    "requested": {
+      "date": "2026-10-16",
+      "time": "19:30",
+      "party_size": 25,
+      "area": "any",
+      "duration_minutes": 120,
+      "timezone": "Asia/Kolkata"
+    },
+    "restaurant_now": "2026-10-13T14:20:26.514628800+05:30",
+    "status": "unavailable",
+    "reason": "party_too_large",
+    "reason_detail": "Party size of 25 exceeds the restaurant maximum of 12 guests. Please contact the restaurant directly.",
+    "snapped_from": null,
+    "slot": null,
+    "alternatives": [],
+    "opening_hours_that_day": [],
+    "note": "availability is a snapshot, not a reservation"
+  },
+  "isError": false
+}
+```
+
+---
+
+#### Scenario 6: Off-Grid Time Snapping (19:22 snapped to 19:15)
+**Request arguments**:
+```json
+{
+  "date": "2026-10-16",
+  "time": "19:22",
+  "party_size": 2
+}
+```
+**Verbatim MCP Response (`id: 15`)**:
+```json
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "I have a table for 2 guests on Friday the sixteenth at seven twenty-two in the evening. Want me to book it?"
+    }
+  ],
+  "structuredContent": {
+    "requested": {
+      "date": "2026-10-16",
+      "time": "19:22",
+      "party_size": 2,
+      "area": "any",
+      "duration_minutes": 75,
+      "timezone": "Asia/Kolkata"
+    },
+    "restaurant_now": "2026-10-13T14:20:26.530204400+05:30",
+    "status": "available",
+    "reason": null,
+    "reason_detail": "Requested time 19:22 was snapped to the nearest 15-minute slot 19:15.",
+    "snapped_from": "19:22",
+    "slot": {
+      "start_local": "2026-10-16T19:15:00+05:30",
+      "end_local": "2026-10-16T20:30:00+05:30",
+      "table_label": "T01",
+      "area": "indoor",
+      "capacity": 2
+    },
+    "alternatives": [],
+    "opening_hours_that_day": [
+      { "open": "12:00", "close": "15:30" },
+      { "open": "19:00", "close": "23:30" }
+    ],
+    "note": "availability is a snapshot, not a reservation"
+  },
+  "isError": false
+}
+```
+
+---
+
+#### Scenario 7: Malformed / Relative Argument Rejected as Tool Error
+**Request arguments**:
+```json
+{
+  "date": "tomorrow",
+  "time": "19:00",
+  "party_size": 2
+}
+```
+**Verbatim MCP Response (`id: 16`)**:
+```json
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "Invalid input: 'date' must be in ISO format YYYY-MM-DD (e.g. '2026-10-17'). Received 'tomorrow'."
+    }
+  ],
+  "isError": true
+}
+```
+
+

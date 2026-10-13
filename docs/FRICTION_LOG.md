@@ -165,6 +165,31 @@ A running log of unexpected friction, hurdles, bugs, or developer experience iss
   - *Actual*: SQLite does not support generalized exclusion constraints or range types
 - **Severity**: Medium
 - **Workaround**: Implemented repository-level concurrency primitive `try_reserve_table` using SQLite `BEGIN IMMEDIATE` transaction semantics. By obtaining the write lock prior to checking `start_at < existing_end AND end_at > existing_start`, concurrent reservations are serialized and race conditions are eliminated.
-- **Suggestion**: For SQLite-backed reservation systems, explicitly design transaction-level locking primitives with concurrency tests rather than relying on schema-only guards.
+### Chrono Tz Enum Requires TimeZone Trait in Scope for from_local_datetime
+- **Date**: 2026-10-13
+- **Task attempted**: Converting local datetime to UTC using `chrono_tz::Tz`
+- **Steps taken**:
+  1. Instantiated `let tz: chrono_tz::Tz = "Asia/Kolkata".parse().unwrap();`
+  2. Called `tz.from_local_datetime(&naive)`
+- **Expected vs actual**:
+  - *Expected*: `from_local_datetime` is callable directly as an inherent method on `Tz`
+  - *Actual*: Compilation error: `error[E0599]: no method named 'from_local_datetime' found for enum 'Tz' in the current scope. items from traits can only be used if the trait is in scope; perhaps you want to import: use chrono::TimeZone;`
+- **Severity**: Low
+- **Workaround**: Explicitly imported `use chrono::TimeZone;` into the module scope.
+- **Suggestion**: Provide clear rustdoc examples in `chrono` and `chrono-tz` showing that methods like `from_local_datetime` are trait methods on `chrono::offset::TimeZone` rather than inherent methods on `Tz`.
+
+### SQLite Lexicographical ISO-8601 String Comparison Across Differing Timezone Offsets
+- **Date**: 2026-10-13
+- **Task attempted**: Evaluating reservation interval overlaps via SQLite SQL queries
+- **Steps taken**:
+  1. Ran overlap query `WHERE start_at < ? AND end_at > ?`
+  2. Bound local restaurant timestamp string (e.g. `2026-10-23T20:30:00+05:30`) against database column `start_at` storing UTC (`2026-10-23T19:30:00+00:00`)
+- **Expected vs actual**:
+  - *Expected*: SQLite compares semantic temporal ordering
+  - *Actual*: SQLite performs raw ASCII byte-by-byte lexicographical string comparison. Because ASCII `'19:30'` < `'20:30'`, SQLite evaluated `19:30+00:00 < 20:30+05:30` as true, despite `19:30 UTC` occurring 4.5 hours *after* `20:30 IST` (which is 15:00 UTC). This created false positive overlap detections in queries comparing mixed-offset strings.
+- **Severity**: High
+- **Workaround**: Strictly enforced that all database timestamps and query parameters are normalized to UTC (`.with_timezone(&Utc).to_rfc3339()`) before query parameter binding, ensuring lexicographical string comparison exactly mirrors temporal ordering.
+- **Suggestion**: Document in the data model that SQLite ISO string comparisons are valid only if both operands share an identical offset (strictly UTC `+00:00` or `Z`).
+
 
 

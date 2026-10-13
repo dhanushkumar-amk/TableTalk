@@ -57,3 +57,21 @@ Feedback and evaluation of core developer tools and platform components used in 
   - SQLite's `INSERT OR REPLACE` deletes conflicting rows prior to insertion rather than performing an in-place update. In schemas with `ON DELETE RESTRICT` foreign keys, this triggers unexpected constraint failures during re-seeding unless `ON CONFLICT (...) DO UPDATE` or `INSERT OR IGNORE` is explicitly used.
 - **Onboarding experience**: Excellent documentation on crates.io and docs.rs. Adding features like `chrono` and `uuid` is transparent and well-integrated.
 - **Would I build with it again**: **Yes** — SQLx provides the ideal balance of async Tokio compatibility, compile-time type safety via derives, and embedded zero-maintenance persistence for embedded SQLite architectures.
+
+---
+
+## Chrono 0.4 & Chrono-Tz (Timezone & Availability Scheduling Engine)
+
+- **What I used it for**: Implementing the pure, deterministic restaurant capacity and availability scheduling engine (`backend/src/availability.rs`), handling localized dining room timestamps (`Asia/Kolkata`), resolving daylight saving transitions (DST gaps and overlaps), and managing half-open `[start, end)` booking windows.
+- **What worked well**:
+  - `chrono-tz::Tz` compiles the complete IANA database directly into the binary, eliminating runtime filesystem access or external Olson database files (`/usr/share/zoneinfo`) which are notorious for missing in minimal Windows and scratch Docker containers.
+  - The `chrono::offset::MappedLocalTime` enum (`Single`, `Ambiguous`, `None`) provides explicit, type-safe semantics for handling DST edge cases:
+    - `MappedLocalTime::None` precisely detects spring-forward hour skips (DST gap) and returns a typed `dst_gap` rejection rather than silently inventing an invalid local wall-clock time.
+    - `MappedLocalTime::Ambiguous(earlier, later)` allows deterministic resolution of autumn fall-back repeats by picking the standard time offset.
+  - Duration arithmetic (`chrono::Duration`) and half-open interval overlap detection (`req_start < book_end && book_start < req_end`) are cleanly expressed without subtle floating-point or leap-second drift.
+- **What needs work**:
+  - Trait visibility ergonomics: In order to call methods on `chrono_tz::Tz` or `NaiveDate` (such as `.from_local_datetime()`, `.weekday()`), the traits `chrono::TimeZone` and `chrono::Datelike` must be explicitly brought into lexical scope (`use chrono::{TimeZone, Datelike};`). Without them, rustc yields compiler errors indicating private or non-existent methods (`method weekday is private`), which can confuse developers unfamiliar with Chrono's trait hierarchy.
+  - Formatting ISO-8601 timestamps for SQLite requires extra care: SQLite evaluates strings lexicographically (`ASCII`), so all UTC dates must be formatted uniformly (`+00:00` or `Z`) to guarantee correct sorting and boundary comparison in SQL queries.
+- **Onboarding experience**: Extremely fast and predictable. Parsing IANA timezone identifiers via `tz_str.parse::<chrono_tz::Tz>()` is clean and returns well-typed errors on unknown zones.
+- **Would I build with it again**: **Yes** — Chrono combined with Chrono-Tz is the gold standard for robust, timezone-aware scheduling systems in Rust.
+

@@ -246,11 +246,12 @@ All checklist items below have been formally proven by automated tests in `backe
 - [x] **JSON-RPC Conformance**: Rejects pre-initialization calls with HTTP 422 (`test_edge_case_d`); returns `-32601` for unknown methods (`test_edge_case_c`); rejects batch requests (`test_edge_case_i`).
 - [x] **Client Notifications & Ping**: Correctly handles notifications with HTTP 202 empty body (`test_edge_case_k`) and handles `ping` / `notifications/cancelled` (`test_edge_case_m`).
 - [x] **Request Timeout & Concurrency**: Cuts off hung requests with HTTP 408 (`test_request_timeout_cutoff`); handles 50 concurrent sessions with 0 errors/panics at p50 111ms / p95 116ms (`test_50_concurrent_sessions_and_latency`).
-- [x] **Tool Naming**: Tool name `ping_restaurant` conforms to `[A-Za-z0-9_.-]` within 1–128 characters.
+- [x] **Tool Naming**: Tool names `ping_restaurant`, `search_menu`, and `check_availability` conform to `[A-Za-z0-9_.-]` within 1–128 characters.
 - [x] **JSON Schema Dialect**: Tools export schemas in Draft 2020-12 format.
 - [x] **Parameterless Tools**: Zero-parameter calls fall back gracefully to defaults.
 - [x] **Domain Error Separation**: Tool execution errors return `isError: true` inside tool results, not JSON-RPC protocol error codes.
 - [x] **Runtime Invocation**: MCP server is imported and called at runtime in executable code (`tabletalk-backend`).
+- [x] **Read-Only Availability & Menu Discovery**: `check_availability` and `search_menu` are registered with `readOnlyHint: true`, `idempotentHint: true`, `destructiveHint: false`, `openWorldHint: false`, and strongly-typed `outputSchema` (verified in `mcp_availability_test.rs`).
 
 ---
 
@@ -258,9 +259,9 @@ All checklist items below have been formally proven by automated tests in `backe
 
 The following capabilities are intentionally deferred per the project roadmap:
 
-1. **Restaurant Domain Tools**: Only `ping_restaurant` is implemented in Phase 4. Real restaurant tools (`search_menu`, `check_availability`, `book_table`, `place_order`) are scheduled for Phase 6+.
+1. **State-Mutating Booking & Order Tools**: Read-only tools (`ping_restaurant`, `search_menu`, `check_availability`) are implemented in Phases 3, 6, and 7. Mutating tools (`book_table`, `modify_booking`, `place_order`) are scheduled for Phase 8+.
 2. **Persistent Session Storage**: Sessions are managed in-memory via `LocalSessionManager`. Server restarts invalidate existing sessions (clients must re-initialize). Distributed session persistence (Redis/DynamoDB) is deferred.
 3. **Authentication & Authorization**: The `/mcp` transport does not yet require OAuth 2.0 Bearer tokens or API keys (scheduled for Phase 8+).
-4. **Bedrock / LLM Orchestration**: No AWS Bedrock or LLM agent orchestration logic is wired yet (scheduled for Phase 7+).
-5. **Database Persistence**: No database connection or schema migrations are implemented yet (scheduled for Phase 5).
+4. **Bedrock / LLM Orchestration**: No AWS Bedrock or LLM agent orchestration logic is wired yet (scheduled for later phases).
+5. **Table Combining**: Physical table combining for large parties exceeding single-table capacities is deferred to future capacity engine extensions.
 
