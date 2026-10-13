@@ -1369,6 +1369,8 @@ mod tests {
             deposit_amount_per_person_cents: 50000,
             created_at: "2026-10-01T00:00:00Z".to_string(),
             updated_at: "2026-10-01T00:00:00Z".to_string(),
+            cancellation_cutoff_hours: 6,
+            late_cancellation_fee_cents: 0,
         }
     }
 
@@ -1503,6 +1505,8 @@ mod tests {
             created_at: "2026-10-01T00:00:00Z".to_string(),
             updated_at: "2026-10-01T00:00:00Z".to_string(),
             cancelled_at: None,
+            guest_phone: None,
+            guest_email: None,
         }
     }
 

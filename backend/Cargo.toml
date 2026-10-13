@@ -25,6 +25,8 @@ sqlx = { version = "0.8.3", features = ["runtime-tokio", "sqlite", "macros", "mi
 chrono = { version = "0.4", features = ["serde"] }
 chrono-tz = { version = "0.10", features = ["serde"] }
 thiserror = "2"
+sha2 = "0.10"
+rand = "0.8"
 
 [dev-dependencies]
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }

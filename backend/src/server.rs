@@ -111,6 +111,96 @@ impl TableTalkServer {
         let result = crate::tools::check_availability::handle_check_availability(pool, input).await;
         Ok(result)
     }
+
+    /// Create a dining reservation at the restaurant.
+    #[tool(
+        description = "Create a dining reservation at the restaurant. Re-evaluates real-time table availability inside an immediate write transaction and assigns a best-fit dining table. Returns a confirmed reservation with a human-friendly confirmation code, or suggests alternatives if the slot became unavailable. Supports idempotency keys for safe retries.",
+        output_schema = rmcp::handler::server::tool::schema_for_output::<crate::booking::CreateBookingOutput>(),
+        annotations(
+            read_only_hint = false,
+            idempotent_hint = true,
+            destructive_hint = false,
+            open_world_hint = false
+        )
+    )]
+    async fn create_booking(
+        &self,
+        Parameters(input): Parameters<crate::tools::create_booking::CreateBookingInput>,
+    ) -> Result<rmcp::model::CallToolResult, rmcp::ErrorData> {
+        let pool = match &self.db {
+            Some(p) => p,
+            None => {
+                return Ok(rmcp::model::CallToolResult::error(vec![
+                    rmcp::model::ContentBlock::text(
+                        "Database connection pool is not configured on TableTalkServer.",
+                    ),
+                ]));
+            }
+        };
+
+        let result = crate::tools::create_booking::handle_create_booking(pool, input).await;
+        Ok(result)
+    }
+
+    /// Cancel an existing dining reservation using its confirmation code and guest name.
+    #[tool(
+        description = "Cancel an existing dining reservation using its confirmation code and primary guest name. Requires guest identity verification to prevent unauthorized cancellations. Cancelling an already cancelled reservation is idempotent.",
+        output_schema = rmcp::handler::server::tool::schema_for_output::<crate::booking::CancelBookingOutput>(),
+        annotations(
+            read_only_hint = false,
+            idempotent_hint = true,
+            destructive_hint = true,
+            open_world_hint = false
+        )
+    )]
+    async fn cancel_booking(
+        &self,
+        Parameters(input): Parameters<crate::tools::cancel_booking::CancelBookingInput>,
+    ) -> Result<rmcp::model::CallToolResult, rmcp::ErrorData> {
+        let pool = match &self.db {
+            Some(p) => p,
+            None => {
+                return Ok(rmcp::model::CallToolResult::error(vec![
+                    rmcp::model::ContentBlock::text(
+                        "Database connection pool is not configured on TableTalkServer.",
+                    ),
+                ]));
+            }
+        };
+
+        let result = crate::tools::cancel_booking::handle_cancel_booking(pool, input).await;
+        Ok(result)
+    }
+
+    /// Retrieve reservation details and summary by confirmation code and guest name.
+    #[tool(
+        description = "Retrieve reservation details and summary by confirmation code and primary guest name. Requires guest name matching for privacy.",
+        output_schema = rmcp::handler::server::tool::schema_for_output::<crate::booking::GetBookingOutput>(),
+        annotations(
+            read_only_hint = true,
+            idempotent_hint = true,
+            destructive_hint = false,
+            open_world_hint = false
+        )
+    )]
+    async fn get_booking(
+        &self,
+        Parameters(input): Parameters<crate::tools::get_booking::GetBookingInput>,
+    ) -> Result<rmcp::model::CallToolResult, rmcp::ErrorData> {
+        let pool = match &self.db {
+            Some(p) => p,
+            None => {
+                return Ok(rmcp::model::CallToolResult::error(vec![
+                    rmcp::model::ContentBlock::text(
+                        "Database connection pool is not configured on TableTalkServer.",
+                    ),
+                ]));
+            }
+        };
+
+        let result = crate::tools::get_booking::handle_get_booking(pool, input).await;
+        Ok(result)
+    }
 }
 
 #[tool_handler(router = self.tool_router)]

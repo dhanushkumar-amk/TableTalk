@@ -1,4 +1,5 @@
 pub mod availability;
+pub mod booking;
 pub mod config;
 pub mod db;
 pub mod http;
