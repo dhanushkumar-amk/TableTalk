@@ -141,6 +141,8 @@ pub struct RestaurantConfig {
     pub deposit_amount_per_person_cents: i64,
     pub created_at: String,
     pub updated_at: String,
+    pub cancellation_cutoff_hours: i64,
+    pub late_cancellation_fee_cents: i64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, sqlx::FromRow)]
@@ -256,6 +258,20 @@ pub struct Booking {
     pub created_at: String,
     pub updated_at: String,
     pub cancelled_at: Option<String>,
+    pub guest_phone: Option<String>,
+    pub guest_email: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, sqlx::FromRow)]
+pub struct IdempotencyKeyRecord {
+    pub id: String,
+    pub key: String,
+    pub tool_name: String,
+    pub request_hash: String,
+    pub response_json: String,
+    pub booking_id: Option<String>,
+    pub created_at: String,
+    pub expires_at: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, sqlx::FromRow)]

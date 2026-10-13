@@ -9,7 +9,8 @@ pub async fn list_bookings(pool: &SqlitePool) -> Result<Vec<Booking>, DbError> {
         r#"
         SELECT id, confirmation_code, customer_id, guest_name, party_size,
                start_at, end_at, status, table_id, special_requests,
-               deposit_status, deposit_amount_cents, created_at, updated_at, cancelled_at
+               deposit_status, deposit_amount_cents, created_at, updated_at, cancelled_at,
+               guest_phone, guest_email
         FROM bookings
         ORDER BY start_at ASC
         "#,
@@ -25,7 +26,8 @@ pub async fn get_booking_by_id(pool: &SqlitePool, id: &str) -> Result<Booking, D
         r#"
         SELECT id, confirmation_code, customer_id, guest_name, party_size,
                start_at, end_at, status, table_id, special_requests,
-               deposit_status, deposit_amount_cents, created_at, updated_at, cancelled_at
+               deposit_status, deposit_amount_cents, created_at, updated_at, cancelled_at,
+               guest_phone, guest_email
         FROM bookings
         WHERE id = ?
         "#,
@@ -41,7 +43,8 @@ pub async fn get_booking_by_code(pool: &SqlitePool, code: &str) -> Result<Bookin
         r#"
         SELECT id, confirmation_code, customer_id, guest_name, party_size,
                start_at, end_at, status, table_id, special_requests,
-               deposit_status, deposit_amount_cents, created_at, updated_at, cancelled_at
+               deposit_status, deposit_amount_cents, created_at, updated_at, cancelled_at,
+               guest_phone, guest_email
         FROM bookings
         WHERE confirmation_code = ?
         "#,
@@ -60,7 +63,8 @@ pub async fn list_bookings_by_customer(
         r#"
         SELECT id, confirmation_code, customer_id, guest_name, party_size,
                start_at, end_at, status, table_id, special_requests,
-               deposit_status, deposit_amount_cents, created_at, updated_at, cancelled_at
+               deposit_status, deposit_amount_cents, created_at, updated_at, cancelled_at,
+               guest_phone, guest_email
         FROM bookings
         WHERE customer_id = ?
         ORDER BY start_at ASC
@@ -84,7 +88,8 @@ pub async fn list_active_bookings_in_range(
         r#"
         SELECT id, confirmation_code, customer_id, guest_name, party_size,
                start_at, end_at, status, table_id, special_requests,
-               deposit_status, deposit_amount_cents, created_at, updated_at, cancelled_at
+               deposit_status, deposit_amount_cents, created_at, updated_at, cancelled_at,
+               guest_phone, guest_email
         FROM bookings
         WHERE status IN ('pending', 'confirmed')
           AND start_at < ?
@@ -180,7 +185,8 @@ pub async fn try_reserve_table(
             r#"
             SELECT id, confirmation_code, customer_id, guest_name, party_size,
                    start_at, end_at, status, table_id, special_requests,
-                   deposit_status, deposit_amount_cents, created_at, updated_at, cancelled_at
+                   deposit_status, deposit_amount_cents, created_at, updated_at, cancelled_at,
+               guest_phone, guest_email
             FROM bookings
             WHERE id = ?
             "#,
