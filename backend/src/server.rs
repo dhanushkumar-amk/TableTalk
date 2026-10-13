@@ -201,6 +201,96 @@ impl TableTalkServer {
         let result = crate::tools::get_booking::handle_get_booking(pool, input).await;
         Ok(result)
     }
+
+    /// Place a pickup order for food and beverages from the restaurant.
+    #[tool(
+        description = "Place a pickup order for food and beverages from the restaurant. Computes exact server-side pricing and tax, validates item availability, enforces kitchen preparation timing, and verifies safety-critical allergen restrictions. Returns a confirmed order with an order code (e.g. 'TO-8K4MZ') or reports conflicts and alternative dishes.",
+        output_schema = rmcp::handler::server::tool::schema_for_output::<crate::ordering::PlaceOrderOutput>(),
+        annotations(
+            read_only_hint = false,
+            idempotent_hint = true,
+            destructive_hint = false,
+            open_world_hint = false
+        )
+    )]
+    async fn place_order(
+        &self,
+        Parameters(input): Parameters<crate::tools::place_order::PlaceOrderInput>,
+    ) -> Result<rmcp::model::CallToolResult, rmcp::ErrorData> {
+        let pool = match &self.db {
+            Some(p) => p,
+            None => {
+                return Ok(rmcp::model::CallToolResult::error(vec![
+                    rmcp::model::ContentBlock::text(
+                        "Database connection pool is not configured on TableTalkServer.",
+                    ),
+                ]));
+            }
+        };
+
+        let result = crate::tools::place_order::handle_place_order(pool, input).await;
+        Ok(result)
+    }
+
+    /// Cancel an existing placed pickup order using its order code and guest name.
+    #[tool(
+        description = "Cancel an existing placed pickup order using its order code (e.g. 'TO-8K4MZ') and primary guest name. Requires guest identity verification. Allowed only prior to kitchen preparation.",
+        output_schema = rmcp::handler::server::tool::schema_for_output::<crate::ordering::CancelOrderOutput>(),
+        annotations(
+            read_only_hint = false,
+            idempotent_hint = true,
+            destructive_hint = true,
+            open_world_hint = false
+        )
+    )]
+    async fn cancel_order(
+        &self,
+        Parameters(input): Parameters<crate::tools::cancel_order::CancelOrderInput>,
+    ) -> Result<rmcp::model::CallToolResult, rmcp::ErrorData> {
+        let pool = match &self.db {
+            Some(p) => p,
+            None => {
+                return Ok(rmcp::model::CallToolResult::error(vec![
+                    rmcp::model::ContentBlock::text(
+                        "Database connection pool is not configured on TableTalkServer.",
+                    ),
+                ]));
+            }
+        };
+
+        let result = crate::tools::cancel_order::handle_cancel_order(pool, input).await;
+        Ok(result)
+    }
+
+    /// Retrieve pickup order details, line items, and preparation status using the order code and guest name.
+    #[tool(
+        description = "Retrieve pickup order details, line items, pricing breakdown, and preparation status using the order code and primary guest name. Requires guest name matching for privacy.",
+        output_schema = rmcp::handler::server::tool::schema_for_output::<crate::ordering::GetOrderOutput>(),
+        annotations(
+            read_only_hint = true,
+            idempotent_hint = true,
+            destructive_hint = false,
+            open_world_hint = false
+        )
+    )]
+    async fn get_order(
+        &self,
+        Parameters(input): Parameters<crate::tools::get_order::GetOrderInput>,
+    ) -> Result<rmcp::model::CallToolResult, rmcp::ErrorData> {
+        let pool = match &self.db {
+            Some(p) => p,
+            None => {
+                return Ok(rmcp::model::CallToolResult::error(vec![
+                    rmcp::model::ContentBlock::text(
+                        "Database connection pool is not configured on TableTalkServer.",
+                    ),
+                ]));
+            }
+        };
+
+        let result = crate::tools::get_order::handle_get_order(pool, input).await;
+        Ok(result)
+    }
 }
 
 #[tool_handler(router = self.tool_router)]
