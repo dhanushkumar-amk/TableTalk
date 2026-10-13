@@ -72,10 +72,10 @@ fi
 # Check 2: Inspector CLI tools/list
 echo "Testing Inspector CLI tools/list against ${MCP_URL}..."
 if INSPECTOR_OUT=$(npx --yes @modelcontextprotocol/inspector --cli "${MCP_URL}" --method tools/list 2>&1); then
-  if [[ "${INSPECTOR_OUT}" =~ "ping_restaurant" && "${INSPECTOR_OUT}" =~ "search_menu" && "${INSPECTOR_OUT}" =~ "check_availability" ]]; then
-    log_pass "Inspector CLI tools/list discovered ping_restaurant, search_menu, and check_availability"
+  if [[ "${INSPECTOR_OUT}" =~ "ping_restaurant" && "${INSPECTOR_OUT}" =~ "search_menu" && "${INSPECTOR_OUT}" =~ "check_availability" && "${INSPECTOR_OUT}" =~ "create_booking" && "${INSPECTOR_OUT}" =~ "cancel_booking" && "${INSPECTOR_OUT}" =~ "get_booking" ]]; then
+    log_pass "Inspector CLI tools/list discovered all six tools"
   else
-    log_fail "Inspector CLI tools/list output did not contain expected tools: ${INSPECTOR_OUT}"
+    log_fail "Inspector CLI tools/list output did not contain all six tools: ${INSPECTOR_OUT}"
   fi
 else
   log_fail "Inspector CLI tools/list failed execution: ${INSPECTOR_OUT}"
@@ -165,6 +165,50 @@ if AVAIL_OUT=$(npx --yes @modelcontextprotocol/inspector --cli "${MCP_URL}" --me
   fi
 else
   log_fail "Inspector CLI tools/call check_availability failed execution: ${AVAIL_OUT}"
+fi
+
+# Check 10: Create -> Get -> Cancel booking lifecycle on a throwaway slot
+echo "Testing booking lifecycle: create_booking -> get_booking -> cancel_booking..."
+THROW_DATE=$(node -e 'const d=new Date(); d.setDate(d.getDate()+14); if (d.getDay() === 2) d.setDate(d.getDate()+1); console.log(d.toISOString().slice(0,10));')
+IDEMP_KEY="smoke-key-$(node -e 'console.log(Date.now());')"
+
+CREATE_OUT=$(npx --yes @modelcontextprotocol/inspector --cli "${MCP_URL}" --method tools/call --tool-name create_booking \
+  --tool-arg date="${THROW_DATE}" \
+  --tool-arg time="19:30" \
+  --tool-arg party_size="2" \
+  --tool-arg guest_name="Smoke Tester" \
+  --tool-arg idempotency_key="${IDEMP_KEY}" 2>&1 || true)
+
+if [[ "${CREATE_OUT}" =~ "confirmed" && "${CREATE_OUT}" =~ "TT-" ]]; then
+  log_pass "Inspector CLI create_booking succeeded on ${THROW_DATE} 19:30"
+  # Extract code (e.g. TT-XXXXX)
+  CONF_CODE=$(echo "${CREATE_OUT}" | grep -oE "TT-[A-Z0-9]{5}" | head -n 1)
+  if [[ -n "${CONF_CODE}" ]]; then
+    # Get booking
+    GET_OUT=$(npx --yes @modelcontextprotocol/inspector --cli "${MCP_URL}" --method tools/call --tool-name get_booking \
+      --tool-arg confirmation_code="${CONF_CODE}" \
+      --tool-arg guest_name="Smoke Tester" 2>&1 || true)
+    if [[ "${GET_OUT}" =~ "found" && "${GET_OUT}" =~ "${CONF_CODE}" ]]; then
+      log_pass "Inspector CLI get_booking found booking ${CONF_CODE}"
+    else
+      log_fail "Inspector CLI get_booking failed for ${CONF_CODE}: ${GET_OUT}"
+    fi
+
+    # Cancel booking
+    CANCEL_OUT=$(npx --yes @modelcontextprotocol/inspector --cli "${MCP_URL}" --method tools/call --tool-name cancel_booking \
+      --tool-arg confirmation_code="${CONF_CODE}" \
+      --tool-arg guest_name="Smoke Tester" \
+      --tool-arg reason="Smoke test cleanup" 2>&1 || true)
+    if [[ "${CANCEL_OUT}" =~ "cancelled" ]]; then
+      log_pass "Inspector CLI cancel_booking successfully cancelled ${CONF_CODE}"
+    else
+      log_fail "Inspector CLI cancel_booking failed for ${CONF_CODE}: ${CANCEL_OUT}"
+    fi
+  else
+    log_fail "Could not extract confirmation code from create_booking output"
+  fi
+else
+  log_fail "Inspector CLI create_booking failed: ${CREATE_OUT}"
 fi
 
 echo "--------------------------------------------------"
