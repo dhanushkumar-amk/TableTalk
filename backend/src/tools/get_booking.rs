@@ -31,9 +31,7 @@ pub async fn handle_get_booking(pool: &SqlitePool, input: GetBookingInput) -> Ca
 
     let trimmed_name = input.guest_name.trim();
     if trimmed_name.is_empty() {
-        return tool_validation_error(
-            "Guest name is required for booking verification.",
-        );
+        return tool_validation_error("Guest name is required for booking verification.");
     }
 
     let outcome = match get_booking_tx(pool, trimmed_code, trimmed_name).await {

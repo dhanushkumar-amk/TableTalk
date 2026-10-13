@@ -1,8 +1,7 @@
 use crate::{
     availability::{Clock, SystemClock},
     booking::{
-        cancel_booking_tx, CancelBookingOutcome, CancelBookingTxRequest,
-        CancellationRateLimiter,
+        cancel_booking_tx, CancelBookingOutcome, CancelBookingTxRequest, CancellationRateLimiter,
     },
 };
 use rmcp::model::{CallToolResult, ContentBlock};
@@ -57,16 +56,12 @@ pub async fn handle_cancel_booking_with_clock(
 
     let trimmed_name = input.guest_name.trim();
     if trimmed_name.is_empty() {
-        return tool_validation_error(
-            "Guest name is required for booking verification.",
-        );
+        return tool_validation_error("Guest name is required for booking verification.");
     }
 
     if let Some(ref r) = input.reason {
         if r.len() > 200 {
-            return tool_validation_error(
-                "Cancellation reason cannot exceed 200 characters.",
-            );
+            return tool_validation_error("Cancellation reason cannot exceed 200 characters.");
         }
     }
 
