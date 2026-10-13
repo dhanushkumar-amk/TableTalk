@@ -73,6 +73,33 @@ pub async fn list_bookings_by_customer(
     Ok(bookings)
 }
 
+/// List active (pending or confirmed) bookings that overlap the specified time window [start_iso, end_iso).
+/// Overlap condition: start_at < end_iso AND end_at > start_iso.
+pub async fn list_active_bookings_in_range(
+    pool: &SqlitePool,
+    start_iso: &str,
+    end_iso: &str,
+) -> Result<Vec<Booking>, DbError> {
+    let bookings = sqlx::query_as::<_, Booking>(
+        r#"
+        SELECT id, confirmation_code, customer_id, guest_name, party_size,
+               start_at, end_at, status, table_id, special_requests,
+               deposit_status, deposit_amount_cents, created_at, updated_at, cancelled_at
+        FROM bookings
+        WHERE status IN ('pending', 'confirmed')
+          AND start_at < ?
+          AND end_at > ?
+        ORDER BY start_at ASC
+        "#,
+    )
+    .bind(end_iso)
+    .bind(start_iso)
+    .fetch_all(pool)
+    .await?;
+
+    Ok(bookings)
+}
+
 /// Double-booking prevention primitive using SQLite BEGIN IMMEDIATE transaction semantics.
 /// Serializes concurrent booking attempts for the same table across active bookings.
 #[allow(clippy::too_many_arguments)]

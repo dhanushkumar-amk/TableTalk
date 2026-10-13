@@ -39,6 +39,16 @@ pub enum Area {
     Bar,
 }
 
+impl Area {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Area::Indoor => "indoor",
+            Area::Patio => "patio",
+            Area::Bar => "bar",
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, sqlx::Type)]
 #[sqlx(rename_all = "snake_case")]
 pub enum PreferenceKind {
