@@ -262,6 +262,15 @@ All checklist items below have been formally proven by automated tests in `backe
   - `cancel_order`: `readOnlyHint: false`, `destructiveHint: true`, `idempotentHint: true`, `openWorldHint: false`.
   - `get_order`: `readOnlyHint: true`, `destructiveHint: false`, `idempotentHint: true`, `openWorldHint: false`.
   - Pure integer arithmetic in minor units (paise), server-side price snapshots, round-half-up tax calculation, allergen conflict rejection with unverified data blocks, dynamic kitchen prep estimation with slot grid snapping, and rate-limited anti-enumeration cancellations.
+- [x] **Profile Memory, Preferences & Privacy Engine (Phase 10)**:
+  - `enable_memory`: `readOnlyHint: false`, `destructiveHint: false`, `idempotentHint: false`, `openWorldHint: false`.
+  - `get_profile`: `readOnlyHint: true`, `destructiveHint: false`, `idempotentHint: true`, `openWorldHint: false`.
+  - `remember_preference`: `readOnlyHint: false`, `destructiveHint: false`, `idempotentHint: true`, `openWorldHint: false`.
+  - `forget_preference`: `readOnlyHint: false`, `destructiveHint: true`, `idempotentHint: true`, `openWorldHint: false`.
+  - `get_usual_order`: `readOnlyHint: true`, `destructiveHint: false`, `idempotentHint: true`, `openWorldHint: false`.
+  - `rotate_profile_token`: `readOnlyHint: false`, `destructiveHint: false`, `idempotentHint: false`, `openWorldHint: false`.
+  - `forget_me`: `readOnlyHint: false`, `destructiveHint: true`, `idempotentHint: true`, `openWorldHint: false`.
+  - Explicit consent enforcement, 256-bit CSPRNG bearer tokens stored as SHA-256 hashes, constant-time comparisons, rate-limiting failed token attempts, non-bypassable stored profile allergies, live menu re-validation for usual orders without order creation, untrusted note prompt-injection protection, and atomic PII hard deletion and scrubbing.
 
 ---
 
@@ -270,10 +279,11 @@ All checklist items below have been formally proven by automated tests in `backe
 The following capabilities are intentionally deferred per the project roadmap:
 
 1. **Payments & Deposits**: Online payments, credit card capture, deposit processing, and payment ledgers are deferred to Phase 12. Orders are strictly `"unpaid_pay_at_pickup"`.
-2. **Session Memory & "Your Usual"**: Contextual state across dialogues and customer past favorites ("the usual") are deferred to Phase 10.
-3. **Rich Cards / UI Elements**: MCP UI widgets and visual interactive order cards are deferred to Phase 13.
-4. **Persistent Session Storage**: Sessions are managed in-memory via `LocalSessionManager`. Server restarts invalidate existing sessions (clients must re-initialize). Distributed session persistence (Redis/DynamoDB) is deferred.
-5. **Authentication & Authorization**: The `/mcp` transport does not yet require OAuth 2.0 Bearer tokens or API keys (scheduled for future security phase).
-6. **Bedrock / LLM Orchestration**: Direct AWS Bedrock agent wiring is scheduled for later phases.
+2. **Session Memory & "Your Usual"**: **Completed in Phase 10** (`enable_memory`, `get_profile`, `remember_preference`, `forget_preference`, `get_usual_order`, `rotate_profile_token`, `forget_me`).
+3. **Conflict Negotiation Dialogue**: Multi-turn dialogue for booking conflicts is deferred to Phase 11.
+4. **Rich Cards / UI Elements**: MCP UI widgets and visual interactive order cards are deferred to Phase 13.
+5. **Persistent Session Storage**: Sessions are managed in-memory via `LocalSessionManager`. Server restarts invalidate existing sessions (clients must re-initialize). Distributed session persistence (Redis/DynamoDB) is deferred.
+6. **Authentication & Authorization**: The `/mcp` transport does not yet require OAuth 2.0 Bearer tokens or API keys (scheduled for future security phase).
+7. **Bedrock / LLM Orchestration**: Direct AWS Bedrock agent wiring is scheduled for later phases.
 
 

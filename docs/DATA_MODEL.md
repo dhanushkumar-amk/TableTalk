@@ -41,6 +41,8 @@ erDiagram
     allergens ||--o{ menu_item_allergens : "present_in"
 
     customers ||--o{ customer_preferences : "has"
+    customers ||--o{ memory_consents : "grants"
+    customers ||--o{ profile_tokens : "possesses"
     customers ||--o{ bookings : "reserves"
     customers ||--o{ orders : "places"
 
@@ -154,6 +156,25 @@ erDiagram
         string value
         string source
         string created_at
+        string confirmed_at
+        string severity
+    }
+
+    memory_consents {
+        int id PK
+        int customer_id FK
+        string consent_version
+        string granted_at
+        string revoked_at
+    }
+
+    profile_tokens {
+        int id PK
+        int customer_id FK
+        string token_hash UK
+        string created_at
+        string last_used_at
+        string revoked_at
     }
 
     bookings {

@@ -13,14 +13,21 @@ This document serves as the canonical reference for all MCP tools exposed by the
 | Tool Name | Lifecycle Phase | Read-Only | Idempotent | Description |
 |---|---|---|---|---|
 | `ping_restaurant` | Phase 3 | Yes | Yes | Connectivity check and server metadata verification. |
-| `search_menu` | Phase 6 | Yes | Yes | Search food items with dietary and allergen filters and spoken prices. |
+| `search_menu` | Phase 6 | Yes | Yes | Search food items with dietary/allergen filters, profile memory integration, and spoken prices. |
 | `check_availability` | Phase 7 | Yes | Yes | Check table availability, snap slot grid, and propose alternatives. |
-| `create_booking` | Phase 8 | No | Yes (with key) | Transactionally create a table reservation with idempotency and race safety. |
+| `create_booking` | Phase 8 | No | Yes (with key) | Transactionally create a table reservation with idempotency, race safety, and seating preference tie-breaking. |
 | `cancel_booking` | Phase 8 | No (destructive) | Yes | Cancel an existing reservation with guest-name verification and anti-enumeration. |
 | `get_booking` | Phase 8 | Yes | Yes | Read-only reservation summary lookup verified by guest name. |
-| `place_order` | Phase 9 | No | Yes (with key) | Transactionally place a pickup order with integer pricing, allergen protection, and dynamic prep estimation. |
+| `place_order` | Phase 9 | No | Yes (with key) | Transactionally place a pickup order with integer pricing, non-bypassable profile allergen protection, and dynamic prep estimation. |
 | `get_order` | Phase 9 | Yes | Yes | Read-only pickup order summary lookup verified by guest name. |
 | `cancel_order` | Phase 9 | No (destructive) | Yes | Cancel an existing placed pickup order with guest-name verification and rate-limited anti-enumeration. |
+| `enable_memory` | Phase 10 | No | No | Explicit opt-in creation of profile memory, issuing single-use profile token with consent recording. |
+| `get_profile` | Phase 10 | Yes | Yes | Read-only profile overview and data access/export record with masked contact details. |
+| `remember_preference` | Phase 10 | No | Yes | Deduplicated storage of typed preferences (allergy, dietary, seat_pref, favorite_item, note). |
+| `forget_preference` | Phase 10 | No (destructive) | Yes | Targeted removal of stored preferences with explicit confirmation requirement for allergy removal. |
+| `get_usual_order` | Phase 10 | Yes | Yes | Read-only deterministic calculation of usual order from history, re-validated against current menu. |
+| `rotate_profile_token` | Phase 10 | No | No | Atomic issuance of new bearer profile token with instant revocation of previous token. |
+| `forget_me` | Phase 10 | No (destructive) | Yes | Complete hard delete of profile and preferences with unlinking and scrubbing of historical business records. |
 
 ---
 
@@ -956,6 +963,367 @@ Cancels a previously placed pickup order. Cancellation is strictly allowed only 
     "reason_detail": { "type": ["string", "null"] }
   },
   "required": ["status", "already_cancelled"]
+}
+```
+
+---
+
+## 12. Tool: `enable_memory`
+
+### 12.1 Purpose & Role in Agentic Workflow
+Enables persistent profile memory for a dining guest. **Memory is strictly OFF by default.** Callers must explicitly obtain guest consent (`consent_acknowledged: true`). Generates and returns a 256-bit cryptographically secure profile token (`tt_prof_...`) exactly once.
+
+### 12.2 Annotations
+```json
+{
+  "readOnlyHint": false,
+  "destructiveHint": false,
+  "idempotentHint": false,
+  "openWorldHint": false
+}
+```
+
+### 12.3 Input Schema
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "guest_name": { "type": "string", "minLength": 1, "maxLength": 80 },
+    "phone": { "type": ["string", "null"] },
+    "email": { "type": ["string", "null"] },
+    "consent_acknowledged": { "type": "boolean" },
+    "initial_preferences": {
+      "type": ["array", "null"],
+      "items": {
+        "type": "object",
+        "properties": {
+          "kind": { "type": "string", "enum": ["allergy", "dietary", "seat_pref", "favorite_item", "note"] },
+          "value": { "type": "string" },
+          "severity": { "type": ["string", "null"], "enum": ["mild", "severe", "unknown"] }
+        },
+        "required": ["kind", "value"]
+      }
+    }
+  },
+  "required": ["guest_name", "consent_acknowledged"]
+}
+```
+
+### 12.4 Output Schema
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "status": { "type": "string", "enum": ["enabled", "consent_required"] },
+    "profile_token": { "type": ["string", "null"] },
+    "guest_name": { "type": "string" },
+    "consent_version": { "type": "string" },
+    "preferences_saved": { "type": "integer" },
+    "message": { "type": "string" }
+  },
+  "required": ["status", "guest_name", "consent_version", "preferences_saved", "message"]
+}
+```
+
+---
+
+## 13. Tool: `get_profile`
+
+### 13.1 Purpose & Role in Agentic Workflow
+Read-only profile inspection tool. Returns profile display name, masked contact details, typed preferences, re-confirmation notices, and a full `data_export` object that functions as the GDPR Art. 15 / DPDP data access feature.
+
+### 13.2 Annotations
+```json
+{
+  "readOnlyHint": true,
+  "destructiveHint": false,
+  "idempotentHint": true,
+  "openWorldHint": false
+}
+```
+
+### 13.3 Input Schema
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "profile_token": { "type": "string" }
+  },
+  "required": ["profile_token"]
+}
+```
+
+### 13.4 Output Schema
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "status": { "type": "string", "enum": ["found", "not_found"] },
+    "guest_name": { "type": "string" },
+    "phone_masked": { "type": ["string", "null"] },
+    "email_masked": { "type": ["string", "null"] },
+    "consent_version": { "type": "string" },
+    "consent_granted_at": { "type": "string" },
+    "preferences": { "type": "array" },
+    "counts": {
+      "type": "object",
+      "properties": {
+        "total_orders": { "type": "integer" },
+        "total_bookings": { "type": "integer" },
+        "preference_count": { "type": "integer" }
+      },
+      "required": ["total_orders", "total_bookings", "preference_count"]
+    },
+    "needs_reconfirmation": { "type": "array", "items": { "type": "string" } },
+    "data_export": { "type": ["object", "null"] }
+  },
+  "required": ["status", "guest_name", "consent_version", "consent_granted_at", "preferences", "counts", "needs_reconfirmation"]
+}
+```
+
+---
+
+## 14. Tool: `remember_preference`
+
+### 14.1 Purpose & Role in Agentic Workflow
+Stores a validated, typed dining preference. Deduplicates repeated entries idempotently. Allergies and dietary values must resolve against database registers. Notes are capped at 140 chars with a hard limit of 20 notes per profile.
+
+### 14.2 Annotations
+```json
+{
+  "readOnlyHint": false,
+  "destructiveHint": false,
+  "idempotentHint": true,
+  "openWorldHint": false
+}
+```
+
+### 14.3 Input Schema
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "profile_token": { "type": "string" },
+    "kind": { "type": "string", "enum": ["allergy", "dietary", "seat_pref", "favorite_item", "note"] },
+    "value": { "type": "string" },
+    "severity": { "type": ["string", "null"], "enum": ["mild", "severe", "unknown"] }
+  },
+  "required": ["profile_token", "kind", "value"]
+}
+```
+
+### 14.4 Output Schema
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "status": { "type": "string", "enum": ["remembered", "not_found", "validation_failed"] },
+    "preference": { "type": ["object", "null"] },
+    "deduplicated": { "type": "boolean" },
+    "message": { "type": "string" }
+  },
+  "required": ["status", "deduplicated", "message"]
+}
+```
+
+---
+
+## 15. Tool: `forget_preference`
+
+### 15.1 Purpose & Role in Agentic Workflow
+Removes a specific preference from the guest's profile. Removing an **allergy** strictly requires `confirm_remove_allergy: true`. The voice response explicitly reminds guests that deletion applies to the digital profile only and they must continue informing waitstaff.
+
+### 15.2 Annotations
+```json
+{
+  "readOnlyHint": false,
+  "destructiveHint": true,
+  "idempotentHint": true,
+  "openWorldHint": false
+}
+```
+
+### 15.3 Input Schema
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "profile_token": { "type": "string" },
+    "kind": { "type": "string" },
+    "value": { "type": "string" },
+    "confirm_remove_allergy": { "type": ["boolean", "null"], "default": false }
+  },
+  "required": ["profile_token", "kind", "value"]
+}
+```
+
+### 15.4 Output Schema
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "status": { "type": "string", "enum": ["forgotten", "confirmation_required", "not_found"] },
+    "kind": { "type": "string" },
+    "value": { "type": "string" },
+    "removed": { "type": "boolean" },
+    "policy_note": { "type": ["string", "null"] },
+    "message": { "type": "string" }
+  },
+  "required": ["status", "kind", "value", "removed", "message"]
+}
+```
+
+---
+
+## 16. Tool: `get_usual_order`
+
+### 16.1 Purpose & Role in Agentic Workflow
+Computes a "usual order" suggestion from historical placed or completed orders. Re-evaluates every item against the **live menu state**: checks current stock availability, flags price shifts, and filters against stored profile allergies. Does **not** place an order.
+
+### 16.2 Annotations
+```json
+{
+  "readOnlyHint": true,
+  "destructiveHint": false,
+  "idempotentHint": true,
+  "openWorldHint": false
+}
+```
+
+### 16.3 Input Schema
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "profile_token": { "type": "string" }
+  },
+  "required": ["profile_token"]
+}
+```
+
+### 16.4 Output Schema
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "status": { "type": "string", "enum": ["suggested", "no_history", "not_found"] },
+    "guest_name": { "type": ["string", "null"] },
+    "suggested_lines": { "type": "array" },
+    "subtotal": { "type": ["object", "null"] },
+    "tax": { "type": ["object", "null"] },
+    "total": { "type": ["object", "null"] },
+    "price_changes": { "type": "array" },
+    "unavailable_items": { "type": "array", "items": { "type": "string" } },
+    "conflicting_items": { "type": "array" },
+    "needs_allergy_reconfirmation": { "type": "array", "items": { "type": "string" } },
+    "allergen_notice": { "type": "string" }
+  },
+  "required": ["status", "suggested_lines", "price_changes", "unavailable_items", "conflicting_items", "needs_allergy_reconfirmation", "allergen_notice"]
+}
+```
+
+---
+
+## 17. Tool: `rotate_profile_token`
+
+### 17.1 Purpose & Role in Agentic Workflow
+Rotates the bearer profile token atomically. Issues a new token and permanently revokes the existing token in a single transaction.
+
+### 17.2 Annotations
+```json
+{
+  "readOnlyHint": false,
+  "destructiveHint": false,
+  "idempotentHint": false,
+  "openWorldHint": false
+}
+```
+
+### 17.3 Input Schema
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "profile_token": { "type": "string" }
+  },
+  "required": ["profile_token"]
+}
+```
+
+### 17.4 Output Schema
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "status": { "type": "string", "enum": ["rotated", "not_found"] },
+    "new_profile_token": { "type": ["string", "null"] },
+    "message": { "type": "string" }
+  },
+  "required": ["status", "message"]
+}
+```
+
+---
+
+## 18. Tool: `forget_me`
+
+### 18.1 Purpose & Role in Agentic Workflow
+Enforces complete hard-deletion of the guest profile, preferences, tokens, and consent records. Past orders and bookings are unlinked and scrubbed to non-identifying aggregates (`[deleted]` name, NULL contacts/notes). Deletes cached idempotency response records.
+
+### 18.2 Annotations
+```json
+{
+  "readOnlyHint": false,
+  "destructiveHint": true,
+  "idempotentHint": true,
+  "openWorldHint": false
+}
+```
+
+### 18.3 Input Schema
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "profile_token": { "type": "string" },
+    "confirm": { "type": "boolean" }
+  },
+  "required": ["profile_token", "confirm"]
+}
+```
+
+### 18.4 Output Schema
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "status": { "type": "string", "enum": ["forgotten", "confirmation_required", "not_found"] },
+    "removed_components": { "type": "array", "items": { "type": "string" } },
+    "scrubbed_business_records": {
+      "type": "object",
+      "properties": {
+        "scrubbed_orders": { "type": "integer" },
+        "scrubbed_bookings": { "type": "integer" }
+      },
+      "required": ["scrubbed_orders", "scrubbed_bookings"]
+    },
+    "message": { "type": "string" }
+  },
+  "required": ["status", "removed_components", "scrubbed_business_records", "message"]
 }
 ```
 

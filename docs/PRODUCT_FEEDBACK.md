@@ -103,5 +103,21 @@ Feedback and evaluation of core developer tools and platform components used in 
 - **Onboarding experience**: Smooth and highly reliable.
 - **Would I build with it again**: **Yes** — Pure Rust domain models with injected mock clocks and integer money math make financial and safety-critical ordering engines simple to test and impossible to compromise from client input.
 
+---
+
+## Phase 10: Persistent Profile Memory, Privacy & Streamable HTTP Identity
+
+- **What I used it for**: Implementing opt-in profile memory (`enable_memory`), preference storage (`remember_preference`, `forget_preference`), data export (`get_profile`), live-revalidated usual order suggestions (`get_usual_order`), token rotation (`rotate_profile_token`), and atomic hard deletion (`forget_me`).
+- **What worked well**:
+  - **Opaque Bearer Token Pattern**: Using 256 bits of OS CSPRNG entropy encoded in base64url (`tt_prof_<43 chars>`) with SHA-256 hash storage allowed us to implement stateful user identity without rolling fake user accounts or simulating Alexa+ internal identity structures.
+  - **Atomic Hard Deletion & Scrubbing**: Combining profile deletion with transaction-level unlinking and PII scrubbing (`[deleted]`, NULL contacts/notes) and clearing cached idempotency records guarantees complete compliance with GDPR Art. 17 / DPDP deletion rights while maintaining financial and order-item aggregates.
+  - **Deterministic Menu Re-Validation**: Re-evaluating past favorite items against the current menu in `get_usual_order` ensures that out-of-stock items, price shifts, and stored allergy conflicts are honestly presented to the guest rather than blindly repeated or silently dropped.
+  - **Prompt Injection Defense on User Notes**: Treating user-supplied notes purely as raw data, enforcing length caps (140 chars), stripping control characters, and emitting them only within designated structured output fields (`user_provided_note`) prevents prompt injection attacks when conversational history is ingested by LLMs.
+- **What needs work**:
+  - **Bearer Token Exposure in LLM Context**: In an MCP architecture where identity is passed as tool arguments, the bearer token resides in the LLM context and client-side conversational transcripts. While acceptable for hackathon evaluation and isolated MCP server sessions, production environments require standards-based OAuth 2.0 per the MCP authorization specification.
+  - **Allergy Re-Confirmation Ergonomics**: Designing spoken prompts for allergy re-confirmation (older than 180 days) requires delicate conversational phrasing: it must alert the user without creating alarm or sounding like bureaucratic disclaimer language.
+- **Onboarding experience**: High satisfaction. Rust's strict typing and SQLx transactions made atomic data unlinking and cryptographic hashing seamless.
+- **Would I build with it again**: **Yes** — The design strikes an optimal balance between conversational delight ("the usual") and uncompromising allergen safety and data privacy.
+
 
 

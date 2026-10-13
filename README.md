@@ -463,6 +463,50 @@ npm run build
 
 ---
 
+## Memory and Privacy (Phase 10)
+
+TableTalk provides an opt-in profile memory engine allowing voice assistants to remember dining guests across sessions while strictly enforcing data minimization, consent, and allergen safety.
+
+### Privacy Highlights
+- **Strictly Opt-In**: Memory is OFF by default. No profile is created unless the guest explicitly consents (`consent_acknowledged: true`).
+- **Opaque Token Identity**: Bearer profile tokens (`tt_prof_<43 chars>`) are generated using the OS CSPRNG (256 bits of entropy) and stored only as SHA-256 hashes. Plain tokens are never stored in the database or logged.
+- **Safety-Critical Allergen Enforcement**: Stored profile allergies merge into order avoidances and cannot be bypassed via ad-hoc parameters. The server never claims food is "safe" or "guaranteed".
+- **Hard Deletion (`forget_me`)**: Permanently hard-deletes the profile, preferences, and security tokens. Historical orders and bookings are unlinked and scrubbed to non-identifying aggregates (`[deleted]` guest name, NULL contacts/notes).
+- **Inactivity Purge**: Inactive profiles (> 365 days) are purged via `cargo run -- purge-expired --days 365`.
+
+### Example Memory Flow
+1. **Enable Memory (Opt-in)**:
+   ```json
+   { "tool": "enable_memory", "arguments": { "guest_name": "Ananya Sharma", "consent_acknowledged": true } }
+   ```
+   *Response*: Returns `profile_token` (e.g. `tt_prof_...`) once for caller storage.
+2. **Remember Allergy & Favorites**:
+   ```json
+   { "tool": "remember_preference", "arguments": { "profile_token": "tt_prof_...", "kind": "allergy", "value": "peanuts", "severity": "severe" } }
+   ```
+3. **Safe Ordering with Stored Allergens**:
+   ```json
+   { "tool": "place_order", "arguments": { "profile_token": "tt_prof_...", "items": [{ "item_id": 5, "quantity": 1 }] } }
+   ```
+   *Response*: Order is blocked (`status: "allergen_conflict"`), flagging Kurkuri Bhindi Tartlets as containing peanuts.
+4. **Usual Order Suggestion**:
+   ```json
+   { "tool": "get_usual_order", "arguments": { "profile_token": "tt_prof_..." } }
+   ```
+   *Voice*: *"Welcome back, Ananya. Same as last time, the Paneer Tikka Angaare and 2 Truffle Garlic Butter Naan? It's eight hundred eighty-two rupees today."*
+5. **Full Deletion**:
+   ```json
+   { "tool": "forget_me", "arguments": { "profile_token": "tt_prof_...", "confirm": true } }
+   ```
+   *Response*: Hard-deletes profile and scrubs order records to `[deleted]`.
+
+> [!CAUTION]
+> **Synthetic Demo Data Disclaimer**:
+> TableTalk uses fictitious names, addresses, and sample credentials for hackathon evaluation only. Real-world deployments require OAuth 2.0 per the official MCP authorization specification, field-level encryption at rest (AES-GCM-256), and formal Data Protection Impact Assessments (DPIAs) for health-related allergen data.
+
+---
+
 ## License
 
 This project is licensed under the [MIT License](LICENSE).
+

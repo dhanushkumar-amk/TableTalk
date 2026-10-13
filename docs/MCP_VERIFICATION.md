@@ -1947,6 +1947,549 @@ If verifying using the MCP Inspector Web UI (`npx @modelcontextprotocol/inspecto
    - Verify `status: "cancelled"` and `already_cancelled: false`.
    - Re-run with the same arguments: verify `status: "already_cancelled"` and `already_cancelled: true`.
 
+---
 
+## 15. Phase 10: Profile Memory, Preferences & Privacy Verification
 
+**Date**: 2026-10-13  
+**Verified Suite**: `backend/tests/mcp_memory_test.rs` & `backend/tests/mcp_manual_memory_scenarios.rs`  
+**Tools Active**: 16 tools (all Phase 3-9 tools + 7 Phase 10 tools)
 
+### 15.1 Automated Test Suite Results
+All 14 integration and safety tests passed deterministically:
+```text
+running 14 tests
+test test_rate_limiter_failed_token_attempts ... ok
+test test_spoken_voice_formatting_samples ... ok
+test test_token_generation_entropy_and_format ... ok
+test test_preference_validation_per_kind ... ok
+test test_consent_enforcement_no_memory_without_acknowledgement ... ok
+test test_token_security_invalid_revoked_rotated_byte_identical ... ok
+test test_injection_style_notes_safety ... ok
+test test_retention_purge_with_injected_clock ... ok
+test test_allergy_safety_stored_peanut_blocks_and_cannot_silently_remove ... ok
+test test_usual_order_revalidated_against_live_menu ... ok
+test test_mcp_tools_list_sixteen_tools_http ... ok
+test test_concurrency_remember_and_enable ... ok
+test test_hash_storage_and_plain_token_never_in_db ... ok
+test test_forget_me_hard_delete_and_pii_scrubbing ... ok
+
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.46s
+```
+
+### 15.2 Real Verbatim Outputs from Manual Verification Flow
+
+#### Scenario 1: `enable_memory` (Opt-in with Consent)
+```json
+{
+  "resultType": "complete",
+  "content": [
+    {
+      "type": "text",
+      "text": "I've saved your profile, Ananya. I'll remember your dining preferences and past orders. You can ask me to forget your profile at any time."
+    }
+  ],
+  "structuredContent": {
+    "consent_version": "v1.0",
+    "guest_name": "Ananya Sharma",
+    "message": "Profile memory enabled successfully. Please store your profile token securely.",
+    "preferences_saved": 1,
+    "profile_token": "tt_prof_1r2Z6F6n65g67l-2nF0v7P6b3zVb8_4lA2-9mK1X8yU",
+    "status": "enabled"
+  },
+  "isError": false
+}
+```
+
+#### Scenario 2A: `remember_preference` (Allergy: Peanuts, Severe)
+```json
+{
+  "resultType": "complete",
+  "content": [
+    {
+      "type": "text",
+      "text": "I've noted your allergy to peanuts in your profile. Please also remind staff when ordering."
+    }
+  ],
+  "structuredContent": {
+    "deduplicated": false,
+    "message": "Preference saved to profile successfully.",
+    "preference": {
+      "confirmed_at": "2026-10-21T07:00:00+00:00",
+      "created_at": "2026-10-21T07:00:00+00:00",
+      "id": 15,
+      "kind": "allergy",
+      "severity": "severe",
+      "value": "peanuts"
+    },
+    "status": "remembered"
+  },
+  "isError": false
+}
+```
+
+#### Scenario 3A: `place_order` with Profile Token & Conflicting Item (Blocked)
+```json
+{
+  "resultType": "complete",
+  "content": [
+    {
+      "type": "text",
+      "text": "Kurkuri Bhindi Tartlets is listed as containing peanuts, which conflicts with your allergy preference. We cannot place this order. Would you like to try Palak Chaat Crisp instead?"
+    }
+  ],
+  "structuredContent": {
+    "allergen_notice": "Kitchen handles common allergens including dairy, peanuts, tree nuts, and gluten. Please inform restaurant staff of any severe allergies before ordering.",
+    "alternatives": [
+      {
+        "description": "Crispy baby spinach leaves with spiced yoghurt and tamarind drizzle",
+        "item_id": 1,
+        "name": "Palak Chaat Crisp",
+        "price": {
+          "amount_minor": 38000,
+          "currency": "INR",
+          "display": "₹380"
+        }
+      }
+    ],
+    "candidates": [],
+    "earliest_pickup_local": null,
+    "idempotent_replay": false,
+    "order": null,
+    "price_changes": [],
+    "profile_applied": true,
+    "reason": "allergen_conflict",
+    "reason_detail": "Ordered items contain allergens flagged in guest restrictions: peanuts.",
+    "status": "allergen_conflict"
+  },
+  "isError": false
+}
+```
+
+#### Scenario 3B: `place_order` with Profile Token & Clean Items (Placed)
+```json
+{
+  "resultType": "complete",
+  "content": [
+    {
+      "type": "text",
+      "text": "I've placed your pickup order for 2 items totaling eight hundred eighty-two rupees, ready at one fifteen in the afternoon. Your order code is T O X M R 2 D. Pay at pickup. Items are listed as not containing peanuts. Please confirm severe allergies with staff at pickup. Stored allergy preferences were applied to your order."
+    }
+  ],
+  "structuredContent": {
+    "allergen_notice": "Kitchen handles common allergens including dairy, peanuts, tree nuts, and gluten. Please inform restaurant staff of any severe allergies before ordering.",
+    "alternatives": [],
+    "candidates": [],
+    "earliest_pickup_local": "2026-10-21T12:45:00+05:30",
+    "idempotent_replay": false,
+    "order": {
+      "created_at": "2026-10-21T07:00:00+00:00",
+      "guest_name": "Ananya Sharma",
+      "lines": [
+        {
+          "allergens": [
+            "dairy"
+          ],
+          "dietary_tags": [
+            "vegetarian",
+            "gluten_free",
+            "nut_free"
+          ],
+          "item_id": 7,
+          "line_total": {
+            "amount_minor": 48000,
+            "currency": "INR",
+            "display": "₹480"
+          },
+          "name": "Paneer Tikka Angaare",
+          "notes": "Medium spice",
+          "quantity": 1,
+          "unit_price": {
+            "amount_minor": 48000,
+            "currency": "INR",
+            "display": "₹480"
+          }
+        },
+        {
+          "allergens": [
+            "gluten",
+            "dairy"
+          ],
+          "dietary_tags": [
+            "vegetarian",
+            "nut_free"
+          ],
+          "item_id": 25,
+          "line_total": {
+            "amount_minor": 36000,
+            "currency": "INR",
+            "display": "₹360"
+          },
+          "name": "Truffle Garlic Butter Naan",
+          "notes": null,
+          "quantity": 2,
+          "unit_price": {
+            "amount_minor": 18000,
+            "currency": "INR",
+            "display": "₹180"
+          }
+        }
+      ],
+      "order_code": "TO-XMR2D",
+      "payment_status": "unpaid_pay_at_pickup",
+      "pickup_time_local": "2026-10-21T13:15:00+05:30",
+      "stated_allergens": "peanuts",
+      "status": "placed",
+      "subtotal": {
+        "amount_minor": 84000,
+        "currency": "INR",
+        "display": "₹840"
+      },
+      "tax": {
+        "amount_minor": 4200,
+        "currency": "INR",
+        "display": "₹42"
+      },
+      "total": {
+        "amount_minor": 88200,
+        "currency": "INR",
+        "display": "₹882"
+      }
+    },
+    "price_changes": [],
+    "profile_applied": true,
+    "reason": null,
+    "reason_detail": null,
+    "status": "placed"
+  },
+  "isError": false
+}
+```
+
+#### Scenario 4: `get_usual_order` (Suggestion from Past History Re-validated against Live Menu)
+```json
+{
+  "resultType": "complete",
+  "content": [
+    {
+      "type": "text",
+      "text": "Welcome back, Ananya. Same as last time, the Paneer Tikka Angaare, 2 Truffle Garlic Butter Naan? It's eight hundred eighty-two rupees today."
+    }
+  ],
+  "structuredContent": {
+    "allergen_notice": "Kitchen handles common allergens including dairy, peanuts, tree nuts, and gluten. Please inform restaurant staff of any severe allergies before ordering.",
+    "conflicting_items": [],
+    "guest_name": "Ananya Sharma",
+    "needs_allergy_reconfirmation": [],
+    "price_changes": [],
+    "status": "suggested",
+    "subtotal": {
+      "amount_minor": 84000,
+      "currency": "INR",
+      "display": "₹840"
+    },
+    "suggested_lines": [
+      {
+        "item_id": 7,
+        "item_name": "Paneer Tikka Angaare",
+        "line_total": {
+          "amount_minor": 48000,
+          "currency": "INR",
+          "display": "₹480"
+        },
+        "quantity": 1,
+        "unit_price": {
+          "amount_minor": 48000,
+          "currency": "INR",
+          "display": "₹480"
+        },
+        "user_provided_note": "Medium spice"
+      },
+      {
+        "item_id": 25,
+        "item_name": "Truffle Garlic Butter Naan",
+        "line_total": {
+          "amount_minor": 36000,
+          "currency": "INR",
+          "display": "₹360"
+        },
+        "quantity": 2,
+        "unit_price": {
+          "amount_minor": 18000,
+          "currency": "INR",
+          "display": "₹180"
+        },
+        "user_provided_note": null
+      }
+    ],
+    "tax": {
+      "amount_minor": 4200,
+      "currency": "INR",
+      "display": "₹42"
+    },
+    "total": {
+      "amount_minor": 88200,
+      "currency": "INR",
+      "display": "₹882"
+    },
+    "unavailable_items": []
+  },
+  "isError": false
+}
+```
+
+#### Scenario 5: `get_profile` (Data Export Record with Masked Contact)
+```json
+{
+  "resultType": "complete",
+  "content": [
+    {
+      "type": "text",
+      "text": "Welcome back, Ananya. I found your profile with 3 saved dining preferences."
+    }
+  ],
+  "structuredContent": {
+    "consent_granted_at": "2026-10-21T07:00:00+00:00",
+    "consent_version": "v1.0",
+    "counts": {
+      "preference_count": 3,
+      "total_bookings": 0,
+      "total_orders": 1
+    },
+    "data_export": {
+      "booking_ids": [],
+      "consent_granted_at": "2026-10-21T07:00:00+00:00",
+      "consent_version": "v1.0",
+      "display_name": "Ananya Sharma",
+      "email": "ananya.sharma@example.com",
+      "order_ids": [
+        "578aadea-4706-4026-a74f-a9c3e0c3653b"
+      ],
+      "phone": "+91 98765 11223",
+      "preferences": [
+        {
+          "confirmed_at": null,
+          "created_at": "2026-10-21T07:00:00+00:00",
+          "id": 14,
+          "kind": "dietary",
+          "severity": null,
+          "value": "vegetarian"
+        },
+        {
+          "confirmed_at": "2026-10-21T07:00:00+00:00",
+          "created_at": "2026-10-21T07:00:00+00:00",
+          "id": 15,
+          "kind": "allergy",
+          "severity": "severe",
+          "value": "peanuts"
+        },
+        {
+          "confirmed_at": null,
+          "created_at": "2026-10-21T07:00:00+00:00",
+          "id": 16,
+          "kind": "favorite_item",
+          "severity": null,
+          "value": "Paneer Tikka Angaare"
+        }
+      ]
+    },
+    "email_masked": "a***a@example.com",
+    "guest_name": "Ananya Sharma",
+    "needs_reconfirmation": [],
+    "phone_masked": "+91 ****1223",
+    "preferences": [
+      {
+        "confirmed_at": null,
+        "created_at": "2026-10-21T07:00:00+00:00",
+        "id": 14,
+        "kind": "dietary",
+        "severity": null,
+        "value": "vegetarian"
+      },
+      {
+        "confirmed_at": "2026-10-21T07:00:00+00:00",
+        "created_at": "2026-10-21T07:00:00+00:00",
+        "id": 15,
+        "kind": "allergy",
+        "severity": "severe",
+        "value": "peanuts"
+      },
+      {
+        "confirmed_at": null,
+        "created_at": "2026-10-21T07:00:00+00:00",
+        "id": 16,
+        "kind": "favorite_item",
+        "severity": null,
+        "value": "Paneer Tikka Angaare"
+      }
+    ],
+    "status": "found"
+  },
+  "isError": false
+}
+```
+
+#### Scenario 6: `rotate_profile_token`
+```json
+{
+  "resultType": "complete",
+  "content": [
+    {
+      "type": "text",
+      "text": "I have rotated your profile token. Please make sure to save your new token securely, as your previous token is now invalid."
+    }
+  ],
+  "structuredContent": {
+    "message": "Profile token successfully rotated. The previous token has been permanently revoked.",
+    "new_profile_token": "tt_prof_RmWTLIu3SRVZUIkKHSON3SOKPFj5D28Amw9CLJG67sw",
+    "status": "rotated"
+  },
+  "isError": false
+}
+```
+
+#### Scenario 6B: Verification - Old Token is Revoked and Returns Profile Not Found
+```json
+{
+  "resultType": "complete",
+  "content": [
+    {
+      "type": "text",
+      "text": "I couldn't find a saved profile with that token. Please check your token or ask to enable memory."
+    }
+  ],
+  "structuredContent": {
+    "consent_granted_at": "",
+    "consent_version": "",
+    "counts": {
+      "preference_count": 0,
+      "total_bookings": 0,
+      "total_orders": 0
+    },
+    "data_export": null,
+    "email_masked": null,
+    "guest_name": "",
+    "needs_reconfirmation": [],
+    "phone_masked": null,
+    "preferences": [],
+    "status": "not_found"
+  },
+  "isError": false
+}
+```
+
+#### Scenario 7: `forget_me` (Hard Delete of Profile, Unlinking and Scrubbing Business Records)
+```json
+{
+  "resultType": "complete",
+  "content": [
+    {
+      "type": "text",
+      "text": "I have completely removed your profile and preferences. Your historical orders and bookings have been anonymized for business records."
+    }
+  ],
+  "structuredContent": {
+    "message": "Your profile, preferences, and security tokens have been permanently deleted. Historical order and booking records have been scrubbed of all personal identifiers.",
+    "removed_components": [
+      "profile",
+      "preferences",
+      "profile_tokens",
+      "consent_records"
+    ],
+    "scrubbed_business_records": {
+      "scrubbed_bookings": 0,
+      "scrubbed_orders": 1
+    },
+    "status": "forgotten"
+  },
+  "isError": false
+}
+```
+
+#### Scenario 8: Full Database Scan Post-Deletion
+```text
+DB Scan complete across 27 tables. Total PII matches found: 0
+```
+
+#### Scenario 9: Invalid Token Error Response
+```json
+{
+  "resultType": "complete",
+  "content": [
+    {
+      "type": "text",
+      "text": "I couldn't find a saved profile with that token. Please check your token or ask to enable memory."
+    }
+  ],
+  "structuredContent": {
+    "consent_granted_at": "",
+    "consent_version": "",
+    "counts": {
+      "preference_count": 0,
+      "total_bookings": 0,
+      "total_orders": 0
+    },
+    "data_export": null,
+    "email_masked": null,
+    "guest_name": "",
+    "needs_reconfirmation": [],
+    "phone_masked": null,
+    "preferences": [],
+    "status": "not_found"
+  },
+  "isError": false
+}
+```
+
+### 15.3 Step-by-Step Manual Inspector UI Verification Guide
+To execute manual verification using the web-based MCP Inspector UI:
+
+1. **Start Backend**:
+   ```bash
+   cargo run --manifest-path backend/Cargo.toml --bin mcp_tabletalk_backend
+   ```
+2. **Start Inspector**:
+   ```bash
+   npx @modelcontextprotocol/inspector
+   ```
+3. **Connect**:
+   - Transport: `Streamable HTTP`
+   - URL: `http://127.0.0.1:8080/mcp`
+   - Click **Connect**.
+4. **List Tools**:
+   - Verify all **16 tools** appear in the left sidebar dropdown.
+5. **Enable Memory**:
+   - Tool: `enable_memory`
+   - Arguments:
+     ```json
+     { "guest_name": "Ravi Shastri", "consent_acknowledged": true }
+     ```
+   - Click **Run Tool**. Note the returned `profile_token`.
+6. **Remember Preference**:
+   - Tool: `remember_preference`
+   - Arguments:
+     ```json
+     { "profile_token": "<TOKEN>", "kind": "allergy", "value": "peanuts", "severity": "severe" }
+     ```
+   - Click **Run Tool**. Verify `status: "remembered"`.
+7. **Test Conflict Blocking**:
+   - Tool: `place_order`
+   - Arguments:
+     ```json
+     { "profile_token": "<TOKEN>", "items": [{ "item_id": 5, "quantity": 1 }], "pickup_time": "13:30" }
+     ```
+   - Click **Run Tool**. Verify `status: "allergen_conflict"` (Kurkuri Bhindi contains peanuts).
+8. **Check Usual Order**:
+   - Tool: `get_usual_order`
+   - Arguments:
+     ```json
+     { "profile_token": "<TOKEN>" }
+     ```
+   - Click **Run Tool**.
+9. **Forget Me**:
+   - Tool: `forget_me`
+   - Arguments:
+     ```json
+     { "profile_token": "<TOKEN>", "confirm": true }
+     ```
+   - Click **Run Tool**. Verify `status: "forgotten"` and components scrubbed.

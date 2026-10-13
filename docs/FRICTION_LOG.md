@@ -225,6 +225,32 @@ A running log of unexpected friction, hurdles, bugs, or developer experience iss
 - **Workaround**: Updated SQL queries to reference `tag_id`.
 - **Suggestion**: Standardize foreign key naming conventions across all migration scripts (`entity_id` everywhere).
 
+### Lack of Standard Persistent User Identity in Streamable HTTP MCP Servers
+- **Date**: 2026-10-13
+- **Task attempted**: Maintaining dining guest identity across multi-turn sessions for profile memory, allergy tracking, and GDPR-style data deletion in an MCP server.
+- **Steps taken**:
+  1. Reviewed MCP 2025-11-25 specifications for lifecycle, transports, sessions, and authorization.
+  2. Evaluated whether `Mcp-Session-Id` or client headers can propagate user identity claims.
+- **Expected vs actual**:
+  - *Expected*: The MCP protocol provides a standard user identity claim or authenticated user context propagated in HTTP headers or protocol messages.
+  - *Actual*: `Mcp-Session-Id` identifies only an ephemeral transport connection session (invalidated on server restart or client re-init), with zero persistent user identity claims. No standardized mechanism exists for an MCP server to identify the human user behind the calling assistant without passing opaque bearer tokens as tool arguments through the LLM context window.
+- **Severity**: High
+- **Workaround**: Designed an application-layer opaque bearer token (`tt_prof_<43 chars>`) with 256 bits of CSPRNG entropy passed as tool arguments, stored strictly as SHA-256 hashes, with rate-limited anti-enumeration and atomic deletion. Documented this limitation plainly in `docs/MEMORY_AND_PRIVACY.md`.
+- **Suggestion**: The MCP specification should formalize transport-level authorization (such as RFC 9068 JWT access tokens in the `Authorization: Bearer` header) that maps securely to authenticated user identities without leaking credentials into the LLM context window.
+
+### SQLite Nested Connection Lock Contention During In-Transaction Validation
+- **Date**: 2026-10-13
+- **Task attempted**: Validating initial preferences against database lookup tables (`allergens`, `dietary_tags`) during `enable_memory_tx`.
+- **Steps taken**:
+  1. Acquired a connection from the pool and initiated `BEGIN IMMEDIATE` to serialize customer creation.
+  2. Inside the transaction closure, called `validate_and_clean_preference(pool, ...)`, which attempted to acquire a second connection from the pool to read lookup tables.
+- **Expected vs actual**:
+  - *Expected*: The read queries succeed concurrently.
+  - *Actual*: In single-process embedded SQLite, having one connection hold an active `BEGIN IMMEDIATE` write transaction can cause concurrent read queries on other pool connections to fail with `database is locked` / `SQLITE_BUSY`, causing initial preference validation to fail silently.
+- **Severity**: Medium
+- **Workaround**: Refactored the workflow to validate and canonicalize all initial preferences against lookup tables **before** opening the `BEGIN IMMEDIATE` write transaction.
+- **Suggestion**: Always perform read-only canonicalization and validation queries against static reference tables prior to entering write-exclusive database transactions.
+
 
 
 
