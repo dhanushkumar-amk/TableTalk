@@ -170,16 +170,16 @@ pub fn strip_plural(word: &str) -> String {
     if word.ends_with("ies") && word.len() > 4 {
         return format!("{}y", &word[..word.len() - 3]);
     }
-    if word.ends_with("es") && word.len() > 4 {
-        if word.ends_with("shes") || word.ends_with("ches") || word.ends_with("xes") || word.ends_with("sses") {
-            return word[..word.len() - 2].to_string();
-        }
-    }
-    if word.ends_with('s')
-        && !word.ends_with("ss")
-        && !word.ends_with("us")
-        && word.len() > 3
+    if word.ends_with("es")
+        && word.len() > 4
+        && (word.ends_with("shes")
+            || word.ends_with("ches")
+            || word.ends_with("xes")
+            || word.ends_with("sses"))
     {
+        return word[..word.len() - 2].to_string();
+    }
+    if word.ends_with('s') && !word.ends_with("ss") && !word.ends_with("us") && word.len() > 3 {
         return word[..word.len() - 1].to_string();
     }
     word.to_string()
@@ -634,7 +634,10 @@ async fn build_and_exec_query(
     items_qb.push(" LIMIT ");
     items_qb.push_bind(query.limit as i64);
 
-    let items = items_qb.build_query_as::<RawSearchResult>().fetch_all(pool).await?;
+    let items = items_qb
+        .build_query_as::<RawSearchResult>()
+        .fetch_all(pool)
+        .await?;
 
     Ok((items, total_matches as usize))
 }
@@ -809,7 +812,11 @@ fn build_query_summary(query: &MenuSearchQuery, total: usize) -> String {
         parts.push(format!("tagged {}", tags.join(", ")));
     }
     if !query.exclude_allergens.is_empty() {
-        let allergens: Vec<&str> = query.exclude_allergens.iter().map(|a| a.as_db_str()).collect();
+        let allergens: Vec<&str> = query
+            .exclude_allergens
+            .iter()
+            .map(|a| a.as_db_str())
+            .collect();
         parts.push(format!("excluding {}", allergens.join(", ")));
     }
     if let Some(max_cents) = query.max_price_cents {
@@ -829,7 +836,10 @@ mod tests {
 
     #[test]
     fn test_normalize_query_text() {
-        assert_eq!(normalize_query_text("   Crisp   Palak! Chaat? "), "crisp palak chaat");
+        assert_eq!(
+            normalize_query_text("   Crisp   Palak! Chaat? "),
+            "crisp palak chaat"
+        );
         assert_eq!(normalize_query_text("Butter-Chicken"), "butter chicken");
         assert_eq!(normalize_query_text("100% Vegan!"), "100 vegan");
     }
@@ -850,7 +860,13 @@ mod tests {
         let mut allergens = Vec::new();
         let mut min_spice = None;
         let mut max_spice = None;
-        apply_synonyms("show me veg starters", &mut dietary, &mut allergens, &mut min_spice, &mut max_spice);
+        apply_synonyms(
+            "show me veg starters",
+            &mut dietary,
+            &mut allergens,
+            &mut min_spice,
+            &mut max_spice,
+        );
         assert!(dietary.contains(&DietaryTagFilter::Vegetarian));
 
         // nut-free
@@ -858,7 +874,13 @@ mod tests {
         let mut allergens = Vec::new();
         let mut min_spice = None;
         let mut max_spice = None;
-        apply_synonyms("nut free dishes please", &mut dietary, &mut allergens, &mut min_spice, &mut max_spice);
+        apply_synonyms(
+            "nut free dishes please",
+            &mut dietary,
+            &mut allergens,
+            &mut min_spice,
+            &mut max_spice,
+        );
         assert!(dietary.contains(&DietaryTagFilter::NutFree));
         assert!(allergens.contains(&AllergenFilter::Peanuts));
         assert!(allergens.contains(&AllergenFilter::TreeNuts));
@@ -868,7 +890,13 @@ mod tests {
         let mut allergens = Vec::new();
         let mut min_spice = None;
         let mut max_spice = None;
-        apply_synonyms("no dairy curry", &mut dietary, &mut allergens, &mut min_spice, &mut max_spice);
+        apply_synonyms(
+            "no dairy curry",
+            &mut dietary,
+            &mut allergens,
+            &mut min_spice,
+            &mut max_spice,
+        );
         assert!(dietary.contains(&DietaryTagFilter::DairyFree));
         assert!(allergens.contains(&AllergenFilter::Dairy));
 
@@ -877,19 +905,34 @@ mod tests {
         let mut allergens = Vec::new();
         let mut min_spice = None;
         let mut max_spice = None;
-        apply_synonyms("something spicy", &mut dietary, &mut allergens, &mut min_spice, &mut max_spice);
+        apply_synonyms(
+            "something spicy",
+            &mut dietary,
+            &mut allergens,
+            &mut min_spice,
+            &mut max_spice,
+        );
         assert_eq!(min_spice, Some(2));
 
         let mut min_spice = None;
         let mut max_spice = None;
-        apply_synonyms("mild biryani", &mut dietary, &mut allergens, &mut min_spice, &mut max_spice);
+        apply_synonyms(
+            "mild biryani",
+            &mut dietary,
+            &mut allergens,
+            &mut min_spice,
+            &mut max_spice,
+        );
         assert_eq!(max_spice, Some(0));
     }
 
     #[test]
     fn test_sanitize_fts_query() {
         assert_eq!(sanitize_fts_query("palak OR chaat"), "palak* chaat*");
-        assert_eq!(sanitize_fts_query("NOT butter* AND chicken"), "butter* chicken*");
+        assert_eq!(
+            sanitize_fts_query("NOT butter* AND chicken"),
+            "butter* chicken*"
+        );
         assert_eq!(sanitize_fts_query(""), "");
     }
 
@@ -904,33 +947,34 @@ mod tests {
         assert_eq!(paise_to_spoken_rupees(38000), "three hundred eighty rupees");
         assert_eq!(paise_to_spoken_rupees(68000), "six hundred eighty rupees");
         assert_eq!(paise_to_spoken_rupees(100000), "one thousand rupees");
-        assert_eq!(paise_to_spoken_rupees(125050), "one thousand two hundred fifty rupees and fifty paise");
+        assert_eq!(
+            paise_to_spoken_rupees(125050),
+            "one thousand two hundred fifty rupees and fifty paise"
+        );
     }
 
     #[test]
     fn test_generate_voice_text_single_and_multi() {
-        let items = vec![
-            MenuItemCard {
-                id: 1,
-                name: "Crisp Palak Chaat".to_string(),
-                description: "Spinach chaat".to_string(),
-                category: "Small Plates & Starters".to_string(),
-                price: PriceDisplay {
-                    amount_minor: 38000,
-                    currency: "INR".to_string(),
-                    display: "₹380".to_string(),
-                },
-                dietary_tags: vec!["vegetarian".to_string()],
-                allergens: vec![],
-                spice_level: 1,
-                calories: Some(310),
-                prep_time_minutes: 12,
-                available: true,
-                chefs_special: true,
-                image_url: None,
-                match_reason: "matched menu search".to_string(),
+        let items = vec![MenuItemCard {
+            id: 1,
+            name: "Crisp Palak Chaat".to_string(),
+            description: "Spinach chaat".to_string(),
+            category: "Small Plates & Starters".to_string(),
+            price: PriceDisplay {
+                amount_minor: 38000,
+                currency: "INR".to_string(),
+                display: "₹380".to_string(),
             },
-        ];
+            dietary_tags: vec!["vegetarian".to_string()],
+            allergens: vec![],
+            spice_level: 1,
+            calories: Some(310),
+            prep_time_minutes: 12,
+            available: true,
+            chefs_special: true,
+            image_url: None,
+            match_reason: "matched menu search".to_string(),
+        }];
 
         let voice = generate_voice_text(1, &items, &[], &[]);
         assert_eq!(
@@ -946,12 +990,16 @@ mod tests {
         let lower = voice_allergen.to_lowercase();
         assert!(!lower.contains("safe"), "Must never say 'safe'");
         assert!(!lower.contains("guaranteed"), "Must never say 'guaranteed'");
-        assert!(!lower.contains("allergy-free"), "Must never say 'allergy-free'");
+        assert!(
+            !lower.contains("allergy-free"),
+            "Must never say 'allergy-free'"
+        );
     }
 
     #[test]
     fn test_generate_voice_text_empty_suggestions() {
-        let suggestions = vec!["Removing the 'gluten_free' filter would match 8 dishes".to_string()];
+        let suggestions =
+            vec!["Removing the 'gluten_free' filter would match 8 dishes".to_string()];
         let voice = generate_voice_text(0, &[], &[], &suggestions);
         assert!(voice.contains("Removing the 'gluten_free' filter would match 8 dishes"));
         assert!(voice.contains("Would you like to try that?"));

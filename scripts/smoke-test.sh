@@ -35,8 +35,8 @@ echo "=================================================="
 echo " Starting TableTalk MCP Server on port ${PORT}..."
 echo "=================================================="
 
-echo "Starting backend via cargo run --manifest-path backend/Cargo.toml --bin tabletalk-backend..."
-PORT="${PORT}" RUST_LOG="warn" cargo run --manifest-path backend/Cargo.toml --bin tabletalk-backend &
+echo "Starting backend via cargo run --manifest-path backend/Cargo.toml --bin mcp_tabletalk_backend..."
+PORT="${PORT}" RUST_LOG="warn" cargo run --manifest-path backend/Cargo.toml --bin mcp_tabletalk_backend &
 SERVER_PID=$!
 
 # Wait for /health

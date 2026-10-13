@@ -2,10 +2,7 @@
 name = "tabletalk-backend"
 version = "0.1.0"
 edition = "2021"
-
-[[bin]]
-name = "tabletalk-backend"
-path = "src/main.rs"
+default-run = "mcp_tabletalk_backend"
 
 [[bin]]
 name = "mcp_tabletalk_backend"

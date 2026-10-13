@@ -1,6 +1,6 @@
 use crate::menu_search::{
-    apply_synonyms, execute_menu_search, generate_voice_text, normalize_query_text,
-    AllergenFilter, DietaryTagFilter, MenuSearchQuery, SortOption,
+    apply_synonyms, execute_menu_search, generate_voice_text, normalize_query_text, AllergenFilter,
+    DietaryTagFilter, MenuSearchQuery, SortOption,
 };
 use rmcp::model::{CallToolResult, ContentBlock};
 use schemars::JsonSchema;

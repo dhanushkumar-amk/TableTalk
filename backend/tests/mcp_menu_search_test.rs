@@ -4,9 +4,7 @@ use std::time::{Duration, Instant};
 use tabletalk_backend::{
     build_router_with_db,
     db::{init_test_pool, seed_database},
-    menu_search::{
-        AllergenFilter, DietaryTagFilter, SearchMenuOutput, SortOption,
-    },
+    menu_search::{AllergenFilter, DietaryTagFilter, SearchMenuOutput, SortOption},
     tools::search_menu::{handle_search_menu, SearchMenuInput},
     Config,
 };
@@ -29,12 +27,18 @@ fn extract_json_from_response(raw: &str) -> Value {
 }
 
 async fn setup_seeded_test_db() -> sqlx::SqlitePool {
-    let pool = init_test_pool().await.expect("Failed to init in-memory test pool");
-    seed_database(&pool, None).await.expect("Failed to seed test database");
+    let pool = init_test_pool()
+        .await
+        .expect("Failed to init in-memory test pool");
+    seed_database(&pool, None)
+        .await
+        .expect("Failed to seed test database");
     pool
 }
 
-async fn spawn_test_server_with_db(pool: sqlx::SqlitePool) -> (String, tokio::task::JoinHandle<()>) {
+async fn spawn_test_server_with_db(
+    pool: sqlx::SqlitePool,
+) -> (String, tokio::task::JoinHandle<()>) {
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
         .await
         .expect("Failed to bind ephemeral listener");
@@ -80,7 +84,8 @@ async fn test_filter_dietary_vegan_only() {
     let res = handle_search_menu(&pool, input).await;
     assert_eq!(res.is_error, Some(false));
 
-    let structured: SearchMenuOutput = serde_json::from_value(res.structured_content.unwrap()).unwrap();
+    let structured: SearchMenuOutput =
+        serde_json::from_value(res.structured_content.unwrap()).unwrap();
     assert!(structured.total_matches > 0);
 
     for item in &structured.items {
@@ -98,7 +103,10 @@ async fn test_filter_dietary_vegan_only() {
 async fn test_filter_dietary_and_allergen_combined() {
     let pool = setup_seeded_test_db().await;
     let input = SearchMenuInput {
-        dietary: Some(vec![DietaryTagFilter::Vegetarian, DietaryTagFilter::GlutenFree]),
+        dietary: Some(vec![
+            DietaryTagFilter::Vegetarian,
+            DietaryTagFilter::GlutenFree,
+        ]),
         exclude_allergens: Some(vec![AllergenFilter::Peanuts]),
         limit: Some(10),
         ..Default::default()
@@ -107,7 +115,8 @@ async fn test_filter_dietary_and_allergen_combined() {
     let res = handle_search_menu(&pool, input).await;
     assert_eq!(res.is_error, Some(false));
 
-    let structured: SearchMenuOutput = serde_json::from_value(res.structured_content.unwrap()).unwrap();
+    let structured: SearchMenuOutput =
+        serde_json::from_value(res.structured_content.unwrap()).unwrap();
     assert!(structured.total_matches > 0);
 
     for item in &structured.items {
@@ -127,7 +136,8 @@ async fn test_filter_max_price() {
     };
 
     let res = handle_search_menu(&pool, input).await;
-    let structured: SearchMenuOutput = serde_json::from_value(res.structured_content.unwrap()).unwrap();
+    let structured: SearchMenuOutput =
+        serde_json::from_value(res.structured_content.unwrap()).unwrap();
     assert!(structured.total_matches > 0);
 
     for item in &structured.items {
@@ -150,7 +160,8 @@ async fn test_filter_category() {
     };
 
     let res = handle_search_menu(&pool, input).await;
-    let structured: SearchMenuOutput = serde_json::from_value(res.structured_content.unwrap()).unwrap();
+    let structured: SearchMenuOutput =
+        serde_json::from_value(res.structured_content.unwrap()).unwrap();
     assert_eq!(structured.total_matches, 4); // 4 desserts in seed
 
     for item in &structured.items {
@@ -169,7 +180,8 @@ async fn test_filter_availability_flag() {
         ..Default::default()
     };
     let res = handle_search_menu(&pool, default_input).await;
-    let structured: SearchMenuOutput = serde_json::from_value(res.structured_content.unwrap()).unwrap();
+    let structured: SearchMenuOutput =
+        serde_json::from_value(res.structured_content.unwrap()).unwrap();
     assert!(structured.items.iter().all(|it| it.id != 4 && it.id != 12));
 
     // When include_unavailable is true, query for fish fingers (id 4)
@@ -179,7 +191,8 @@ async fn test_filter_availability_flag() {
         ..Default::default()
     };
     let res_unavail = handle_search_menu(&pool, unavail_input).await;
-    let structured_unavail: SearchMenuOutput = serde_json::from_value(res_unavail.structured_content.unwrap()).unwrap();
+    let structured_unavail: SearchMenuOutput =
+        serde_json::from_value(res_unavail.structured_content.unwrap()).unwrap();
     assert!(structured_unavail.items.iter().any(|it| it.id == 4));
 }
 
@@ -194,7 +207,8 @@ async fn test_sorting_and_stable_tie_breaking() {
         ..Default::default()
     };
     let res_asc = handle_search_menu(&pool, asc_input).await;
-    let out_asc: SearchMenuOutput = serde_json::from_value(res_asc.structured_content.unwrap()).unwrap();
+    let out_asc: SearchMenuOutput =
+        serde_json::from_value(res_asc.structured_content.unwrap()).unwrap();
     for window in out_asc.items.windows(2) {
         assert!(window[0].price.amount_minor <= window[1].price.amount_minor);
     }
@@ -206,14 +220,16 @@ async fn test_sorting_and_stable_tie_breaking() {
         ..Default::default()
     };
     let res_desc = handle_search_menu(&pool, desc_input.clone()).await;
-    let out_desc: SearchMenuOutput = serde_json::from_value(res_desc.structured_content.unwrap()).unwrap();
+    let out_desc: SearchMenuOutput =
+        serde_json::from_value(res_desc.structured_content.unwrap()).unwrap();
     for window in out_desc.items.windows(2) {
         assert!(window[0].price.amount_minor >= window[1].price.amount_minor);
     }
 
     // 3. Determinism check: repeating the same call produces identical ordering and ids
     let res_repeat = handle_search_menu(&pool, desc_input).await;
-    let out_repeat: SearchMenuOutput = serde_json::from_value(res_repeat.structured_content.unwrap()).unwrap();
+    let out_repeat: SearchMenuOutput =
+        serde_json::from_value(res_repeat.structured_content.unwrap()).unwrap();
     assert_eq!(out_desc.items, out_repeat.items);
 }
 
@@ -233,9 +249,16 @@ async fn test_peanut_exclusion_when_unfiltered_top_contains_peanuts() {
         ..Default::default()
     };
     let res_unfiltered = handle_search_menu(&pool, unfiltered_input).await;
-    let out_unfiltered: SearchMenuOutput = serde_json::from_value(res_unfiltered.structured_content.unwrap()).unwrap();
+    let out_unfiltered: SearchMenuOutput =
+        serde_json::from_value(res_unfiltered.structured_content.unwrap()).unwrap();
     assert!(out_unfiltered.items.iter().any(|it| it.id == 5));
-    assert!(out_unfiltered.items.iter().find(|it| it.id == 5).unwrap().allergens.contains(&"peanuts".to_string()));
+    assert!(out_unfiltered
+        .items
+        .iter()
+        .find(|it| it.id == 5)
+        .unwrap()
+        .allergens
+        .contains(&"peanuts".to_string()));
 
     // Now query "bhindi" with exclude_allergens = [peanuts]
     // Proves the filter is hard in SQL and NOT post-hoc on a truncated list:
@@ -246,7 +269,8 @@ async fn test_peanut_exclusion_when_unfiltered_top_contains_peanuts() {
         ..Default::default()
     };
     let res_filtered = handle_search_menu(&pool, filtered_input).await;
-    let out_filtered: SearchMenuOutput = serde_json::from_value(res_filtered.structured_content.unwrap()).unwrap();
+    let out_filtered: SearchMenuOutput =
+        serde_json::from_value(res_filtered.structured_content.unwrap()).unwrap();
 
     // Kurkuri Bhindi MUST NOT be returned!
     assert!(
@@ -263,7 +287,8 @@ async fn test_peanut_exclusion_when_unfiltered_top_contains_peanuts() {
         ..Default::default()
     };
     let res_starters = handle_search_menu(&pool, starter_input).await;
-    let out_starters: SearchMenuOutput = serde_json::from_value(res_starters.structured_content.unwrap()).unwrap();
+    let out_starters: SearchMenuOutput =
+        serde_json::from_value(res_starters.structured_content.unwrap()).unwrap();
     for it in &out_starters.items {
         assert_ne!(it.id, 5, "Kurkuri Bhindi (peanuts) found in starters");
         assert!(!it.allergens.contains(&"peanuts".to_string()));
@@ -298,7 +323,8 @@ async fn test_property_all_allergens_in_db_strictly_excluded() {
         let res = handle_search_menu(&pool, input).await;
         assert_eq!(res.is_error, Some(false));
 
-        let out: SearchMenuOutput = serde_json::from_value(res.structured_content.unwrap()).unwrap();
+        let out: SearchMenuOutput =
+            serde_json::from_value(res.structured_content.unwrap()).unwrap();
         let allergen_name = allergen.as_db_str();
 
         for item in &out.items {
@@ -341,16 +367,37 @@ async fn test_prohibited_safety_vocabulary_never_used() {
         let lower_voice = content_text.to_lowercase();
 
         // 1. Voice text assertions
-        assert!(!lower_voice.contains("safe"), "Voice text used prohibited word 'safe': {}", content_text);
-        assert!(!lower_voice.contains("guaranteed"), "Voice text used prohibited word 'guaranteed': {}", content_text);
-        assert!(!lower_voice.contains("allergy-free"), "Voice text used prohibited word 'allergy-free': {}", content_text);
+        assert!(
+            !lower_voice.contains("safe"),
+            "Voice text used prohibited word 'safe': {}",
+            content_text
+        );
+        assert!(
+            !lower_voice.contains("guaranteed"),
+            "Voice text used prohibited word 'guaranteed': {}",
+            content_text
+        );
+        assert!(
+            !lower_voice.contains("allergy-free"),
+            "Voice text used prohibited word 'allergy-free': {}",
+            content_text
+        );
 
         // 2. Structured fields assertions
         if let Some(sc) = res.structured_content {
             let sc_str = sc.to_string().to_lowercase();
-            assert!(!sc_str.contains("\"safe\""), "Structured content contained 'safe'");
-            assert!(!sc_str.contains("guaranteed"), "Structured content contained 'guaranteed'");
-            assert!(!sc_str.contains("allergy-free"), "Structured content contained 'allergy-free'");
+            assert!(
+                !sc_str.contains("\"safe\""),
+                "Structured content contained 'safe'"
+            );
+            assert!(
+                !sc_str.contains("guaranteed"),
+                "Structured content contained 'guaranteed'"
+            );
+            assert!(
+                !sc_str.contains("allergy-free"),
+                "Structured content contained 'allergy-free'"
+            );
         }
     }
 }
@@ -372,7 +419,8 @@ async fn test_unverified_allergen_items_are_excluded() {
         ..Default::default()
     };
     let res_unconstrained = handle_search_menu(&pool, unconstrained).await;
-    let out_unconstrained: SearchMenuOutput = serde_json::from_value(res_unconstrained.structured_content.unwrap()).unwrap();
+    let out_unconstrained: SearchMenuOutput =
+        serde_json::from_value(res_unconstrained.structured_content.unwrap()).unwrap();
     assert!(out_unconstrained.items.iter().any(|it| it.id == 3));
 
     // 2. When ANY allergen exclusion is requested, unverified items MUST BE EXCLUDED
@@ -382,7 +430,8 @@ async fn test_unverified_allergen_items_are_excluded() {
         ..Default::default()
     };
     let res_constrained = handle_search_menu(&pool, constrained).await;
-    let out_constrained: SearchMenuOutput = serde_json::from_value(res_constrained.structured_content.unwrap()).unwrap();
+    let out_constrained: SearchMenuOutput =
+        serde_json::from_value(res_constrained.structured_content.unwrap()).unwrap();
 
     assert!(
         !out_constrained.items.iter().any(|it| it.id == 3),
@@ -409,11 +458,18 @@ async fn test_empty_results_truthful_suggestions() {
     let out: SearchMenuOutput = serde_json::from_value(res.structured_content.unwrap()).unwrap();
 
     assert_eq!(out.total_matches, 0);
-    assert!(!out.suggestions.is_empty(), "Suggestions must not be empty on zero match");
+    assert!(
+        !out.suggestions.is_empty(),
+        "Suggestions must not be empty on zero match"
+    );
 
     // Must truthfully calculate that relaxing the ₹50 budget yields the 4 beverages
     let price_suggestion = out.suggestions.iter().find(|s| s.contains("budget limit"));
-    assert!(price_suggestion.is_some(), "Expected suggestion about budget limit: {:?}", out.suggestions);
+    assert!(
+        price_suggestion.is_some(),
+        "Expected suggestion about budget limit: {:?}",
+        out.suggestions
+    );
     assert!(price_suggestion.unwrap().contains("4 dishes"));
 }
 
@@ -448,7 +504,13 @@ async fn test_tools_list_contains_both_tools_with_schemas_and_annotations() {
         .unwrap();
 
     let session_header = HeaderName::from_static("mcp-session-id");
-    let session_id = init_resp.headers().get(&session_header).unwrap().to_str().unwrap().to_string();
+    let session_id = init_resp
+        .headers()
+        .get(&session_header)
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .to_string();
 
     // 2. notifications/initialized
     client
@@ -481,18 +543,32 @@ async fn test_tools_list_contains_both_tools_with_schemas_and_annotations() {
 
     let list_raw = list_resp.text().await.unwrap();
     let list_json = extract_json_from_response(&list_raw);
-    let tools = list_json["result"]["tools"].as_array().expect("tools array");
+    let tools = list_json["result"]["tools"]
+        .as_array()
+        .expect("tools array");
 
     // Verify both tools exist
-    let _ping_tool = tools.iter().find(|t| t["name"] == "ping_restaurant").expect("ping_restaurant tool missing");
-    let search_tool = tools.iter().find(|t| t["name"] == "search_menu").expect("search_menu tool missing");
+    let _ping_tool = tools
+        .iter()
+        .find(|t| t["name"] == "ping_restaurant")
+        .expect("ping_restaurant tool missing");
+    let search_tool = tools
+        .iter()
+        .find(|t| t["name"] == "search_menu")
+        .expect("search_menu tool missing");
 
     // Verify search_menu schemas and annotations
     assert!(search_tool["description"].is_string());
     assert!(search_tool["inputSchema"].is_object());
     assert!(search_tool["outputSchema"].is_object());
-    assert_eq!(search_tool["inputSchema"]["$schema"], "https://json-schema.org/draft/2020-12/schema");
-    assert_eq!(search_tool["outputSchema"]["$schema"], "https://json-schema.org/draft/2020-12/schema");
+    assert_eq!(
+        search_tool["inputSchema"]["$schema"],
+        "https://json-schema.org/draft/2020-12/schema"
+    );
+    assert_eq!(
+        search_tool["outputSchema"]["$schema"],
+        "https://json-schema.org/draft/2020-12/schema"
+    );
 
     // Verify annotations
     let annotations = &search_tool["annotations"];
@@ -529,7 +605,13 @@ async fn test_tools_call_search_menu_returns_valid_structure_and_voice_text() {
         .unwrap();
 
     let session_header = HeaderName::from_static("mcp-session-id");
-    let session_id = init_resp.headers().get(&session_header).unwrap().to_str().unwrap().to_string();
+    let session_id = init_resp
+        .headers()
+        .get(&session_header)
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .to_string();
 
     // notifications/initialized
     client
@@ -612,7 +694,13 @@ async fn test_tools_call_search_menu_invalid_input_returns_tool_error() {
         .unwrap();
 
     let session_header = HeaderName::from_static("mcp-session-id");
-    let session_id = init_resp.headers().get(&session_header).unwrap().to_str().unwrap().to_string();
+    let session_id = init_resp
+        .headers()
+        .get(&session_header)
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .to_string();
 
     // notifications/initialized
     client
@@ -683,7 +771,13 @@ async fn test_sql_injection_safety_preserves_database() {
         .unwrap();
 
     let session_header = HeaderName::from_static("mcp-session-id");
-    let session_id = init_resp.headers().get(&session_header).unwrap().to_str().unwrap().to_string();
+    let session_id = init_resp
+        .headers()
+        .get(&session_header)
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .to_string();
 
     // notifications/initialized
     client
@@ -741,11 +835,26 @@ async fn test_search_latency_median_under_20ms() {
     let pool = setup_seeded_test_db().await;
 
     let queries = [
-        SearchMenuInput { query: Some("biryani".to_string()), ..Default::default() },
-        SearchMenuInput { dietary: Some(vec![DietaryTagFilter::Vegan]), ..Default::default() },
-        SearchMenuInput { exclude_allergens: Some(vec![AllergenFilter::Peanuts]), ..Default::default() },
-        SearchMenuInput { category: Some("Small Plates & Starters".to_string()), ..Default::default() },
-        SearchMenuInput { max_price: Some(400.0), ..Default::default() },
+        SearchMenuInput {
+            query: Some("biryani".to_string()),
+            ..Default::default()
+        },
+        SearchMenuInput {
+            dietary: Some(vec![DietaryTagFilter::Vegan]),
+            ..Default::default()
+        },
+        SearchMenuInput {
+            exclude_allergens: Some(vec![AllergenFilter::Peanuts]),
+            ..Default::default()
+        },
+        SearchMenuInput {
+            category: Some("Small Plates & Starters".to_string()),
+            ..Default::default()
+        },
+        SearchMenuInput {
+            max_price: Some(400.0),
+            ..Default::default()
+        },
     ];
 
     // Warm-up
@@ -767,7 +876,12 @@ async fn test_search_latency_median_under_20ms() {
 
     durations.sort();
     let median = durations[durations.len() / 2];
-    println!("Measured search latency: median = {:?}, min = {:?}, max = {:?}", median, durations[0], durations[durations.len() - 1]);
+    println!(
+        "Measured search latency: median = {:?}, min = {:?}, max = {:?}",
+        median,
+        durations[0],
+        durations[durations.len() - 1]
+    );
 
     // Prompt requirement: median search over seed data is under 20ms in test environment
     assert!(
