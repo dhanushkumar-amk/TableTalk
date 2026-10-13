@@ -242,6 +242,27 @@ pub struct CustomerPreference {
     pub value: String,
     pub source: PreferenceSource,
     pub created_at: String,
+    pub confirmed_at: Option<String>,
+    pub severity: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, sqlx::FromRow)]
+pub struct MemoryConsent {
+    pub id: i64,
+    pub customer_id: i64,
+    pub consent_version: String,
+    pub granted_at: String,
+    pub revoked_at: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, sqlx::FromRow)]
+pub struct ProfileToken {
+    pub id: i64,
+    pub customer_id: i64,
+    pub token_hash: String,
+    pub created_at: String,
+    pub last_used_at: Option<String>,
+    pub revoked_at: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, sqlx::FromRow)]

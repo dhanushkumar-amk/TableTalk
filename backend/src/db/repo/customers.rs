@@ -38,7 +38,7 @@ pub async fn get_customer_preferences(
 ) -> Result<Vec<CustomerPreference>, DbError> {
     let prefs = sqlx::query_as::<_, CustomerPreference>(
         r#"
-        SELECT id, customer_id, kind, value, source, created_at
+        SELECT id, customer_id, kind, value, source, created_at, confirmed_at, severity
         FROM customer_preferences
         WHERE customer_id = ?
         ORDER BY id ASC
