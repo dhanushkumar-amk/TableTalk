@@ -81,6 +81,36 @@ impl TableTalkServer {
         let result = crate::tools::search_menu::handle_search_menu(pool, input).await;
         Ok(result)
     }
+
+    /// Check dining table availability at the restaurant for a specific date, time, party size, and seating area.
+    #[tool(
+        description = "Check dining table availability at the restaurant for a specific date, time, party size, and seating area. Returns whether the requested slot is available with an allocated table, or suggests alternative nearby slots or dates if unavailable. Does NOT create a booking or hold a table. The caller must resolve relative date phrases like 'tomorrow' or 'next Friday' to a concrete ISO date (YYYY-MM-DD) in the restaurant timezone prior to calling.",
+        output_schema = rmcp::handler::server::tool::schema_for_output::<crate::availability::CheckAvailabilityOutput>(),
+        annotations(
+            read_only_hint = true,
+            idempotent_hint = true,
+            destructive_hint = false,
+            open_world_hint = false
+        )
+    )]
+    async fn check_availability(
+        &self,
+        Parameters(input): Parameters<crate::tools::check_availability::CheckAvailabilityInput>,
+    ) -> Result<rmcp::model::CallToolResult, rmcp::ErrorData> {
+        let pool = match &self.db {
+            Some(p) => p,
+            None => {
+                return Ok(rmcp::model::CallToolResult::error(vec![
+                    rmcp::model::ContentBlock::text(
+                        "Database connection pool is not configured on TableTalkServer.",
+                    ),
+                ]));
+            }
+        };
+
+        let result = crate::tools::check_availability::handle_check_availability(pool, input).await;
+        Ok(result)
+    }
 }
 
 #[tool_handler(router = self.tool_router)]

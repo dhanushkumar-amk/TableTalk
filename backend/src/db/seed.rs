@@ -5,7 +5,7 @@ use crate::db::{
         PreferenceKind, PreferenceSource,
     },
 };
-use chrono::{DateTime, Duration, Utc};
+use chrono::{DateTime, Datelike, Duration, TimeZone, Utc};
 use sqlx::SqlitePool;
 
 pub async fn seed_database(
@@ -703,18 +703,25 @@ pub async fn seed_database(
     let past_3d_start = (now - Duration::days(3)).to_rfc3339();
     let past_3d_end = (now - Duration::days(3) + Duration::minutes(90)).to_rfc3339();
 
-    // Future booking: Fully booked Friday 19:30 on Table 1, 2, 3, 4, 7 for conflict testing
-    let future_fri_start = (now + Duration::days(4))
-        .date_naive()
-        .and_hms_opt(19, 30, 0)
+    // Future booking: Fully booked Friday 19:30 on Table 3, 4, 5 for conflict testing
+    let tz: chrono_tz::Tz = "Asia/Kolkata".parse().unwrap();
+    let mut fri_date = now.date_naive();
+    loop {
+        fri_date = fri_date.succ_opt().unwrap_or(fri_date);
+        if fri_date.weekday() == chrono::Weekday::Fri {
+            break;
+        }
+    }
+    let fri_naive = fri_date.and_hms_opt(19, 30, 0).unwrap();
+    let future_fri_start = tz
+        .from_local_datetime(&fri_naive)
         .unwrap()
-        .and_utc()
+        .with_timezone(&Utc)
         .to_rfc3339();
-    let future_fri_end = (now + Duration::days(4))
-        .date_naive()
-        .and_hms_opt(21, 0, 0)
+    let future_fri_end = tz
+        .from_local_datetime(&(fri_naive + Duration::minutes(90)))
         .unwrap()
-        .and_utc()
+        .with_timezone(&Utc)
         .to_rfc3339();
 
     let bookings_data = [
