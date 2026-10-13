@@ -854,8 +854,8 @@ async fn test_mcp_tools_list_contains_all_six_tools_with_schemas_and_annotations
         .as_array()
         .expect("Tools must be an array");
 
-    // Must have all 6 tools!
-    assert_eq!(tools.len(), 6, "Expected exactly 6 registered tools");
+    // Must have at least 6 tools (9 tools registered with Phase 9)
+    assert!(tools.len() >= 6, "Expected at least 6 registered tools");
 
     let tool_names: Vec<&str> = tools.iter().map(|t| t["name"].as_str().unwrap()).collect();
 

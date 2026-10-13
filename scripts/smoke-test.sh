@@ -72,10 +72,10 @@ fi
 # Check 2: Inspector CLI tools/list
 echo "Testing Inspector CLI tools/list against ${MCP_URL}..."
 if INSPECTOR_OUT=$(npx --yes @modelcontextprotocol/inspector --cli "${MCP_URL}" --method tools/list 2>&1); then
-  if [[ "${INSPECTOR_OUT}" =~ "ping_restaurant" && "${INSPECTOR_OUT}" =~ "search_menu" && "${INSPECTOR_OUT}" =~ "check_availability" && "${INSPECTOR_OUT}" =~ "create_booking" && "${INSPECTOR_OUT}" =~ "cancel_booking" && "${INSPECTOR_OUT}" =~ "get_booking" ]]; then
-    log_pass "Inspector CLI tools/list discovered all six tools"
+  if [[ "${INSPECTOR_OUT}" =~ "ping_restaurant" && "${INSPECTOR_OUT}" =~ "search_menu" && "${INSPECTOR_OUT}" =~ "check_availability" && "${INSPECTOR_OUT}" =~ "create_booking" && "${INSPECTOR_OUT}" =~ "cancel_booking" && "${INSPECTOR_OUT}" =~ "get_booking" && "${INSPECTOR_OUT}" =~ "place_order" && "${INSPECTOR_OUT}" =~ "get_order" && "${INSPECTOR_OUT}" =~ "cancel_order" ]]; then
+    log_pass "Inspector CLI tools/list discovered all nine tools"
   else
-    log_fail "Inspector CLI tools/list output did not contain all six tools: ${INSPECTOR_OUT}"
+    log_fail "Inspector CLI tools/list output did not contain all nine tools: ${INSPECTOR_OUT}"
   fi
 else
   log_fail "Inspector CLI tools/list failed execution: ${INSPECTOR_OUT}"
@@ -209,6 +209,51 @@ if [[ "${CREATE_OUT}" =~ "confirmed" && "${CREATE_OUT}" =~ "TT-" ]]; then
   fi
 else
   log_fail "Inspector CLI create_booking failed: ${CREATE_OUT}"
+fi
+
+# Check 11: Place -> Get -> Cancel order lifecycle
+echo "Testing pickup order lifecycle: place_order -> get_order -> cancel_order..."
+ORDER_IDEMP_KEY="smoke-ord-$(node -e 'console.log(Date.now());')"
+
+ORDER_OUT=$(npx --yes @modelcontextprotocol/inspector --cli "${MCP_URL}" --method tools/call --tool-name place_order \
+  --tool-arg items='[{"item_id":1,"quantity":1,"notes":"Extra crisp"}]' \
+  --tool-arg guest_name="Smoke Orderer" \
+  --tool-arg idempotency_key="${ORDER_IDEMP_KEY}" 2>&1 || true)
+
+if [[ "${ORDER_OUT}" =~ "placed" && "${ORDER_OUT}" =~ "TO-" ]]; then
+  log_pass "Inspector CLI place_order succeeded"
+  ORDER_CODE=$(echo "${ORDER_OUT}" | grep -oE "TO-[A-Z0-9]{5}" | head -n 1)
+  if [[ -n "${ORDER_CODE}" ]]; then
+    # Get order
+    GET_ORD_OUT=$(npx --yes @modelcontextprotocol/inspector --cli "${MCP_URL}" --method tools/call --tool-name get_order \
+      --tool-arg order_code="${ORDER_CODE}" \
+      --tool-arg guest_name="Smoke Orderer" 2>&1 || true)
+    if [[ "${GET_ORD_OUT}" =~ "found" && "${GET_ORD_OUT}" =~ "${ORDER_CODE}" ]]; then
+      log_pass "Inspector CLI get_order found order ${ORDER_CODE}"
+    else
+      log_fail "Inspector CLI get_order failed for ${ORDER_CODE}: ${GET_ORD_OUT}"
+    fi
+
+    # Cancel order
+    CANCEL_ORD_OUT=$(npx --yes @modelcontextprotocol/inspector --cli "${MCP_URL}" --method tools/call --tool-name cancel_order \
+      --tool-arg order_code="${ORDER_CODE}" \
+      --tool-arg guest_name="Smoke Orderer" \
+      --tool-arg reason="Smoke test cancel" 2>&1 || true)
+    if [[ "${CANCEL_ORD_OUT}" =~ "cancelled" ]]; then
+      log_pass "Inspector CLI cancel_order successfully cancelled ${ORDER_CODE}"
+    else
+      log_fail "Inspector CLI cancel_order failed for ${ORDER_CODE}: ${CANCEL_ORD_OUT}"
+    fi
+  else
+    log_fail "Could not extract order code from place_order output"
+  fi
+else
+  # If closed because of current time/day in test environment, verify truthful outcome
+  if [[ "${ORDER_OUT}" =~ "closed" || "${ORDER_OUT}" =~ "pickup_too_soon" ]]; then
+    log_pass "Inspector CLI place_order returned expected business outcome (${ORDER_OUT})"
+  else
+    log_fail "Inspector CLI place_order failed: ${ORDER_OUT}"
+  fi
 fi
 
 echo "--------------------------------------------------"
