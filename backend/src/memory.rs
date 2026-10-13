@@ -747,6 +747,23 @@ pub async fn forget_me_tx(
         .await?
         .rows_affected() as i64;
 
+        // 2b. Delete waitlist entries, holds, and negotiations linked to customer or guest name
+        sqlx::query("DELETE FROM waitlist_entries WHERE customer_id = ? OR guest_name = ?")
+            .bind(cust_id)
+            .bind(&customer.display_name)
+            .execute(&mut *conn)
+            .await?;
+
+        sqlx::query("DELETE FROM slot_holds WHERE guest_name = ?")
+            .bind(&customer.display_name)
+            .execute(&mut *conn)
+            .await?;
+
+        sqlx::query("DELETE FROM negotiations WHERE guest_name = ?")
+            .bind(&customer.display_name)
+            .execute(&mut *conn)
+            .await?;
+
         // 3. Audit event (opaque ID only, no PII)
         sqlx::query(
             r#"
@@ -774,6 +791,9 @@ pub async fn forget_me_tx(
                 "preferences".to_string(),
                 "profile_tokens".to_string(),
                 "consent_records".to_string(),
+                "waitlist_entries".to_string(),
+                "slot_holds".to_string(),
+                "negotiations".to_string(),
             ],
             scrubbed_business_records: ScrubbedBusinessRecordsSummary {
                 scrubbed_orders: orders_affected,

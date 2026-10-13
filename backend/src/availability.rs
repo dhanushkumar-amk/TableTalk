@@ -1199,6 +1199,18 @@ pub fn generate_availability_voice_text(output: &CheckAvailabilityOutput) -> Str
             )
         }
         "unavailable" => {
+            if output.reason_detail.as_deref() == Some("temporarily held, may free up soon") {
+                if output.alternatives.is_empty() {
+                    return "That table is temporarily held and may free up soon. Would you like to check back in a few minutes?".to_string();
+                } else {
+                    let first = &output.alternatives[0];
+                    let alt_time = extract_spoken_time(&first.start_local);
+                    return format!(
+                        "That table is temporarily held and may free up soon, but I have {}. Would that work for you?",
+                        alt_time
+                    );
+                }
+            }
             if output.alternatives.is_empty() {
                 format!(
                     "I don't have a table available for {} on {} around {}. Would you like to check another day?",

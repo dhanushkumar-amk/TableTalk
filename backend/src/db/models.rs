@@ -124,6 +124,34 @@ pub enum Actor {
     Admin,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, sqlx::Type)]
+#[sqlx(rename_all = "snake_case")]
+pub enum HoldStatus {
+    Active,
+    Converted,
+    Released,
+    Expired,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, sqlx::Type)]
+#[sqlx(rename_all = "snake_case")]
+pub enum NegotiationStatus {
+    Open,
+    Accepted,
+    Abandoned,
+    Expired,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, sqlx::Type)]
+#[sqlx(rename_all = "snake_case")]
+pub enum WaitlistStatus {
+    Waiting,
+    Offered,
+    Booked,
+    Cancelled,
+    Expired,
+}
+
 // --- Entity Structs ---
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, sqlx::FromRow)]
@@ -356,4 +384,56 @@ pub struct AuditEvent {
     pub actor: Actor,
     pub payload_json: Option<String>,
     pub created_at: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, sqlx::FromRow)]
+pub struct Negotiation {
+    pub id: i64,
+    pub guest_name: String,
+    pub date: String,
+    pub time: String,
+    pub party_size: i64,
+    pub area: Option<String>,
+    pub duration_minutes: i64,
+    pub round: i64,
+    pub offered_slots: String,
+    pub status: NegotiationStatus,
+    pub created_at: String,
+    pub expires_at: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, sqlx::FromRow)]
+pub struct WaitlistEntry {
+    pub id: i64,
+    pub code: String,
+    pub guest_name: String,
+    pub contact: Option<String>,
+    pub party_size: i64,
+    pub date: String,
+    pub window_start: String,
+    pub window_end: String,
+    pub area: String,
+    pub duration_minutes: i64,
+    pub status: WaitlistStatus,
+    pub customer_id: Option<i64>,
+    pub created_at: String,
+    pub expires_at: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, sqlx::FromRow)]
+pub struct SlotHold {
+    pub id: i64,
+    pub table_id: i64,
+    pub start_at: String,
+    pub end_at: String,
+    pub status: HoldStatus,
+    pub expires_at: String,
+    pub guest_name: String,
+    pub party_size: i64,
+    pub area: String,
+    pub token_hash: String,
+    pub negotiation_id: Option<i64>,
+    pub waitlist_entry_id: Option<i64>,
+    pub created_at: String,
+    pub updated_at: String,
 }

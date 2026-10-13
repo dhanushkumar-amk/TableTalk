@@ -75,6 +75,9 @@ pub struct CreateBookingInput {
 
     /// Optional profile bearer token to link booking, default guest name, and honor seating preferences.
     pub profile_token: Option<String>,
+
+    /// Optional negotiate flag. When true and requested reservation is unavailable, returns negotiation_id and ranked alternative options.
+    pub negotiate: Option<bool>,
 }
 
 fn tool_validation_error(message: impl Into<String>) -> CallToolResult {
@@ -202,6 +205,7 @@ pub async fn handle_create_booking_with_clock(
                 special_requests: input.special_requests.as_deref(),
                 idempotency_key: input.idempotency_key.as_deref(),
                 customer_id: customer_id_resolved,
+                negotiate: input.negotiate.unwrap_or(false),
             };
 
             match create_booking_tx(pool, tx_req_pref, &engine_config, clock).await {
@@ -223,6 +227,7 @@ pub async fn handle_create_booking_with_clock(
                         special_requests: input.special_requests.as_deref(),
                         idempotency_key: input.idempotency_key.as_deref(),
                         customer_id: customer_id_resolved,
+                        negotiate: input.negotiate.unwrap_or(false),
                     };
                     let outcome_any = match create_booking_tx(
                         pool,
@@ -256,6 +261,7 @@ pub async fn handle_create_booking_with_clock(
                 special_requests: input.special_requests.as_deref(),
                 idempotency_key: input.idempotency_key.as_deref(),
                 customer_id: customer_id_resolved,
+                negotiate: input.negotiate.unwrap_or(false),
             };
             let out = match create_booking_tx(pool, tx_req, &engine_config, clock).await {
                 Ok(o) => o,
@@ -281,6 +287,7 @@ pub async fn handle_create_booking_with_clock(
             special_requests: input.special_requests.as_deref(),
             idempotency_key: input.idempotency_key.as_deref(),
             customer_id: customer_id_resolved,
+            negotiate: input.negotiate.unwrap_or(false),
         };
         let out = match create_booking_tx(pool, tx_req, &engine_config, clock).await {
             Ok(o) => o,

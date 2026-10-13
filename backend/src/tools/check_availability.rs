@@ -193,6 +193,47 @@ pub async fn handle_check_availability_with_clock(
         }
     };
 
+    let now_iso = clock.now().to_rfc3339();
+    let active_holds: Vec<(i64, i64, String, String, String, i64)> = sqlx::query_as(
+        r#"
+        SELECT id, table_id, start_at, end_at, guest_name, party_size
+        FROM slot_holds
+        WHERE status = 'active'
+          AND expires_at > ?
+          AND start_at < ?
+          AND end_at > ?
+        "#,
+    )
+    .bind(&now_iso)
+    .bind(&search_end_utc.to_rfc3339())
+    .bind(&search_start_utc.to_rfc3339())
+    .fetch_all(pool)
+    .await
+    .unwrap_or_default();
+
+    let mut combined_bookings = active_bookings.clone();
+    for (hold_id, table_id, start_at, end_at, guest_name, party_size) in &active_holds {
+        combined_bookings.push(crate::db::models::Booking {
+            id: format!("hold_{}", hold_id),
+            confirmation_code: format!("HOLD-{}", hold_id),
+            customer_id: None,
+            guest_name: guest_name.clone(),
+            party_size: *party_size,
+            start_at: start_at.clone(),
+            end_at: end_at.clone(),
+            status: crate::db::models::BookingStatus::Pending,
+            table_id: Some(*table_id),
+            special_requests: None,
+            deposit_status: crate::db::models::DepositStatus::None,
+            deposit_amount_cents: 0,
+            created_at: now_iso.clone(),
+            updated_at: now_iso.clone(),
+            cancelled_at: None,
+            guest_phone: None,
+            guest_email: None,
+        });
+    }
+
     // 4. Execute pure availability engine
     let query = AvailabilityQuery {
         date: parsed_date,
@@ -205,16 +246,32 @@ pub async fn handle_check_availability_with_clock(
 
     let engine_config = AvailabilityConfig::default();
 
-    let output = check_availability_engine(
-        query,
+    let mut output = check_availability_engine(
+        query.clone(),
         &config,
         &opening_hours,
         &special_closures,
         &active_tables,
-        &active_bookings,
+        &combined_bookings,
         &engine_config,
         clock,
     );
+
+    if !active_holds.is_empty() && output.status != "available" {
+        let output_without_holds = check_availability_engine(
+            query,
+            &config,
+            &opening_hours,
+            &special_closures,
+            &active_tables,
+            &active_bookings,
+            &engine_config,
+            clock,
+        );
+        if output_without_holds.status == "available" {
+            output.reason_detail = Some("temporarily held, may free up soon".to_string());
+        }
+    }
 
     // 5. Generate spoken voice text
     let voice_text = generate_availability_voice_text(&output);

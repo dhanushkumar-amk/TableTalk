@@ -5,6 +5,7 @@ pub mod db;
 pub mod http;
 pub mod memory;
 pub mod menu_search;
+pub mod negotiation;
 pub mod ordering;
 pub mod server;
 pub mod tools;

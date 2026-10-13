@@ -330,6 +330,8 @@ pub struct BookingSummary {
     pub status: String,
     pub special_requests: Option<String>,
     pub created_at: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
@@ -346,6 +348,10 @@ pub struct CreateBookingOutput {
     pub profile_applied: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub seat_preference_honored: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub negotiation_id: Option<i64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub negotiation_options: Option<Vec<crate::negotiation::NegotiationOption>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
@@ -439,6 +445,7 @@ pub struct CreateBookingTxRequest<'a> {
     pub special_requests: Option<&'a str>,
     pub idempotency_key: Option<&'a str>,
     pub customer_id: Option<i64>,
+    pub negotiate: bool,
 }
 
 pub struct CancelBookingTxRequest<'a> {
@@ -534,6 +541,8 @@ pub async fn create_booking_tx(
                         note: "availability is a snapshot, not a reservation".to_string(),
                         profile_applied: None,
                         seat_preference_honored: None,
+                        negotiation_id: None,
+                        negotiation_options: None,
                     };
                     let voice_text = "This idempotency key was previously used with different booking details. Please use a new key or check your request.".to_string();
                     return Ok(CreateBookingOutcome::IdempotencyConflict {
@@ -582,6 +591,8 @@ pub async fn create_booking_tx(
                 note: "availability is a snapshot, not a reservation".to_string(),
                 profile_applied: None,
                 seat_preference_honored: None,
+                negotiation_id: None,
+                negotiation_options: None,
             };
             let voice_text = format!(
                 "You already have {} active reservations, which is the maximum allowed. Please cancel an existing booking before making a new one.",
@@ -636,6 +647,46 @@ pub async fn create_booking_tx(
         .fetch_all(&mut *conn)
         .await?;
 
+        let now_iso = clock.now().to_rfc3339();
+        let active_holds: Vec<(i64, i64, String, String, String, i64)> = sqlx::query_as(
+            r#"
+            SELECT id, table_id, start_at, end_at, guest_name, party_size
+            FROM slot_holds
+            WHERE status = 'active'
+              AND expires_at > ?
+              AND start_at < ?
+              AND end_at > ?
+            "#,
+        )
+        .bind(&now_iso)
+        .bind(&search_end_iso)
+        .bind(&search_start_iso)
+        .fetch_all(&mut *conn)
+        .await?;
+
+        let mut all_bookings = day_bookings;
+        for (hold_id, table_id, start_at, end_at, guest_name, party_size) in active_holds {
+            all_bookings.push(Booking {
+                id: format!("hold_{}", hold_id),
+                confirmation_code: format!("HOLD-{}", hold_id),
+                customer_id: None,
+                guest_name,
+                party_size,
+                start_at,
+                end_at,
+                status: BookingStatus::Pending,
+                table_id: Some(table_id),
+                special_requests: None,
+                deposit_status: DepositStatus::None,
+                deposit_amount_cents: 0,
+                created_at: now_iso.clone(),
+                updated_at: now_iso.clone(),
+                cancelled_at: None,
+                guest_phone: None,
+                guest_email: None,
+            });
+        }
+
         // 6. Run pure availability engine inside the lock
         let parsed_time = NaiveTime::parse_from_str(req.time, "%H:%M")
             .map_err(|e| sqlx::Error::Protocol(format!("Invalid time format: {}", e)))?;
@@ -661,13 +712,63 @@ pub async fn create_booking_tx(
             &opening_hours,
             &special_closures,
             &tables,
-            &day_bookings,
+            &all_bookings,
             engine_config,
             clock,
         );
 
         if avail_res.status != "available" || avail_res.slot.is_none() {
-            sqlx::query("ROLLBACK").execute(&mut *conn).await?;
+            let (neg_id, neg_options) = if req.negotiate {
+                let neg_ttl = clock.now() + Duration::minutes(crate::negotiation::DEFAULT_NEGOTIATION_TTL_MINUTES);
+                let dur = req.duration_minutes.unwrap_or(restaurant.dining_duration_minutes);
+                let neg_id = sqlx::query(
+                    r#"
+                    INSERT INTO negotiations (
+                        guest_name, date, time, party_size, area,
+                        duration_minutes, round, offered_slots, status,
+                        created_at, expires_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, 1, '[]', 'open', ?, ?)
+                    "#,
+                )
+                .bind(req.guest_name)
+                .bind(req.date)
+                .bind(req.time)
+                .bind(req.party_size)
+                .bind(req.area)
+                .bind(dur)
+                .bind(&now_utc_iso)
+                .bind(&neg_ttl.to_rfc3339())
+                .execute(&mut *conn)
+                .await?
+                .last_insert_rowid();
+
+                let mut opts = Vec::new();
+                for (idx, alt) in avail_res.alternatives.iter().take(3).enumerate() {
+                    opts.push(crate::negotiation::NegotiationOption {
+                        option_id: format!("opt_{}", idx + 1),
+                        start_local: alt.start_local.clone(),
+                        end_local: alt.end_local.clone(),
+                        area: alt.area.clone(),
+                        table_label: Some(alt.table_label.clone()),
+                        minutes_from_requested: alt.minutes_from_requested,
+                        score_reasons: vec![
+                            if alt.minutes_from_requested == 0 { "exact_time".to_string() } else { "close_to_requested_time".to_string() },
+                            if alt.different_day { "different_day".to_string() } else { "same_day".to_string() },
+                        ],
+                        rank: idx + 1,
+                    });
+                }
+                (Some(neg_id), Some(opts))
+            } else {
+                (None, None)
+            };
+
+            if neg_id.is_some() {
+                sqlx::query("COMMIT").execute(&mut *conn).await?;
+            } else {
+                sqlx::query("ROLLBACK").execute(&mut *conn).await?;
+            }
+
             let output = CreateBookingOutput {
                 status: avail_res.status.clone(),
                 reason: avail_res.reason.clone(),
@@ -679,6 +780,8 @@ pub async fn create_booking_tx(
                 note: "availability is a snapshot, not a reservation".to_string(),
                 profile_applied: None,
                 seat_preference_honored: None,
+                negotiation_id: neg_id,
+                negotiation_options: neg_options,
             };
             let voice_text = generate_availability_voice_text(&avail_res);
             return Ok(CreateBookingOutcome::Unavailable { output, voice_text });
@@ -1058,6 +1161,34 @@ pub async fn cancel_booking_tx(
         } else {
             Some("Cancelled within the free cancellation window.".to_string())
         };
+
+        // 8b. Run waitlist matcher for freed table slot in the same transaction
+        if let Some(t_id) = booking.table_id {
+            let t_area: Option<String> = sqlx::query_scalar("SELECT area FROM dining_tables WHERE id = ?")
+                .bind(t_id)
+                .fetch_optional(&mut *conn)
+                .await?;
+            let area_str = t_area.unwrap_or_else(|| "indoor".to_string());
+
+            if let Ok(dt_utc) = DateTime::parse_from_rfc3339(&booking.start_at) {
+                let rest_tz: Tz = restaurant.timezone.parse().unwrap_or(chrono_tz::Asia::Kolkata);
+                let local_dt = dt_utc.with_timezone(&rest_tz);
+                let date_str = local_dt.format("%Y-%m-%d").to_string();
+                let time_str = local_dt.format("%H:%M").to_string();
+
+                let _ = crate::negotiation::match_waitlist_for_slot(
+                    &mut *conn,
+                    t_id,
+                    &booking.start_at,
+                    &booking.end_at,
+                    &area_str,
+                    &date_str,
+                    &time_str,
+                    clock,
+                )
+                .await;
+            }
+        }
 
         // 9. Commit transaction
         sqlx::query("COMMIT").execute(&mut *conn).await?;
