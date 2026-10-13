@@ -3,6 +3,7 @@ pub mod booking;
 pub mod config;
 pub mod db;
 pub mod http;
+pub mod memory;
 pub mod menu_search;
 pub mod ordering;
 pub mod server;

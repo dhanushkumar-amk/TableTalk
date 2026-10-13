@@ -35,6 +35,34 @@ async fn main() {
         return;
     }
 
+    if args.len() > 1 && args[1] == "purge-expired" {
+        info!("Initializing database pool and running migrations...");
+        let pool = tabletalk_backend::db::init_pool(&config.database_url)
+            .await
+            .unwrap_or_else(|err| panic!("Failed to initialize database: {}", err));
+
+        let days: i64 = if args.len() > 2 {
+            args[2]
+                .parse()
+                .unwrap_or(tabletalk_backend::memory::DEFAULT_RETENTION_DAYS)
+        } else {
+            tabletalk_backend::memory::DEFAULT_RETENTION_DAYS
+        };
+
+        info!("Purging expired profiles older than {} days...", days);
+        let clock = tabletalk_backend::availability::SystemClock;
+        let purged = tabletalk_backend::memory::purge_expired_profiles(&pool, days, &clock)
+            .await
+            .unwrap_or_else(|err| panic!("Failed to purge expired profiles: {}", err));
+
+        println!("==================================================");
+        println!(" Expired Profiles Purge Completed");
+        println!(" Purged Profiles Count: {}", purged);
+        println!(" Retention Threshold: {} days", days);
+        println!("==================================================");
+        return;
+    }
+
     info!("Initializing database pool and applying migrations...");
     let pool = tabletalk_backend::db::init_pool(&config.database_url)
         .await
