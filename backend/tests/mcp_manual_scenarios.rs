@@ -43,6 +43,7 @@ async fn run_and_print_nine_manual_scenarios() {
         allergen_acknowledgement: None,
         order_notes: Some("Please include cutlery".to_string()),
         idempotency_key: Some("manual_idemp_key_001".to_string()),
+        profile_token: None,
     };
     let res1 = handle_place_order_with_clock(&pool, normal_input.clone(), &clock).await;
     let json1 = serde_json::to_string_pretty(&res1).unwrap();
@@ -74,6 +75,7 @@ async fn run_and_print_nine_manual_scenarios() {
         }),
         order_notes: None,
         idempotency_key: Some("manual_idemp_key_002".to_string()),
+        profile_token: None,
     };
     let res3 = handle_place_order_with_clock(&pool, peanut_conflict_input, &clock).await;
     println!("{}", serde_json::to_string_pretty(&res3).unwrap());
@@ -93,6 +95,7 @@ async fn run_and_print_nine_manual_scenarios() {
         allergen_acknowledgement: None,
         order_notes: None,
         idempotency_key: Some("manual_idemp_key_003".to_string()),
+        profile_token: None,
     };
     let res4 = handle_place_order_with_clock(&pool, ambi_input, &clock).await;
     println!("{}", serde_json::to_string_pretty(&res4).unwrap());
@@ -112,6 +115,7 @@ async fn run_and_print_nine_manual_scenarios() {
         allergen_acknowledgement: None,
         order_notes: None,
         idempotency_key: Some("manual_idemp_key_004".to_string()),
+        profile_token: None,
     };
     let res5 = handle_place_order_with_clock(&pool, too_soon_input, &clock).await;
     println!("{}", serde_json::to_string_pretty(&res5).unwrap());
@@ -134,6 +138,7 @@ async fn run_and_print_nine_manual_scenarios() {
         allergen_acknowledgement: None,
         order_notes: None,
         idempotency_key: Some("manual_idemp_key_005".to_string()),
+        profile_token: None,
     };
     let res6 = handle_place_order_with_clock(&pool, closed_input, &tuesday_clock).await;
     println!("{}", serde_json::to_string_pretty(&res6).unwrap());
@@ -165,6 +170,7 @@ async fn run_and_print_nine_manual_scenarios() {
         allergen_acknowledgement: None,
         order_notes: None,
         idempotency_key: None,
+        profile_token: None,
     };
     let res9 = handle_place_order_with_clock(&pool, invalid_input, &clock).await;
     println!("{}", serde_json::to_string_pretty(&res9).unwrap());

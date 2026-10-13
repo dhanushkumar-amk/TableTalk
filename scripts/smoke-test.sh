@@ -72,10 +72,10 @@ fi
 # Check 2: Inspector CLI tools/list
 echo "Testing Inspector CLI tools/list against ${MCP_URL}..."
 if INSPECTOR_OUT=$(npx --yes @modelcontextprotocol/inspector --cli "${MCP_URL}" --method tools/list 2>&1); then
-  if [[ "${INSPECTOR_OUT}" =~ "ping_restaurant" && "${INSPECTOR_OUT}" =~ "search_menu" && "${INSPECTOR_OUT}" =~ "check_availability" && "${INSPECTOR_OUT}" =~ "create_booking" && "${INSPECTOR_OUT}" =~ "cancel_booking" && "${INSPECTOR_OUT}" =~ "get_booking" && "${INSPECTOR_OUT}" =~ "place_order" && "${INSPECTOR_OUT}" =~ "get_order" && "${INSPECTOR_OUT}" =~ "cancel_order" ]]; then
-    log_pass "Inspector CLI tools/list discovered all nine tools"
+  if [[ "${INSPECTOR_OUT}" =~ "ping_restaurant" && "${INSPECTOR_OUT}" =~ "search_menu" && "${INSPECTOR_OUT}" =~ "check_availability" && "${INSPECTOR_OUT}" =~ "create_booking" && "${INSPECTOR_OUT}" =~ "cancel_booking" && "${INSPECTOR_OUT}" =~ "get_booking" && "${INSPECTOR_OUT}" =~ "place_order" && "${INSPECTOR_OUT}" =~ "get_order" && "${INSPECTOR_OUT}" =~ "cancel_order" && "${INSPECTOR_OUT}" =~ "enable_memory" && "${INSPECTOR_OUT}" =~ "get_profile" && "${INSPECTOR_OUT}" =~ "remember_preference" && "${INSPECTOR_OUT}" =~ "forget_preference" && "${INSPECTOR_OUT}" =~ "get_usual_order" && "${INSPECTOR_OUT}" =~ "rotate_profile_token" && "${INSPECTOR_OUT}" =~ "forget_me" ]]; then
+    log_pass "Inspector CLI tools/list discovered all sixteen tools"
   else
-    log_fail "Inspector CLI tools/list output did not contain all nine tools: ${INSPECTOR_OUT}"
+    log_fail "Inspector CLI tools/list output did not contain all sixteen tools: ${INSPECTOR_OUT}"
   fi
 else
   log_fail "Inspector CLI tools/list failed execution: ${INSPECTOR_OUT}"
@@ -254,6 +254,51 @@ else
   else
     log_fail "Inspector CLI place_order failed: ${ORDER_OUT}"
   fi
+# Check 12: Memory lifecycle: enable_memory -> remember_preference -> get_usual_order -> forget_me
+echo "Testing memory lifecycle: enable_memory -> remember_preference -> get_usual_order -> forget_me..."
+ENABLE_OUT=$(npx --yes @modelcontextprotocol/inspector --cli "${MCP_URL}" --method tools/call --tool-name enable_memory \
+  --tool-arg guest_name="Smoke Memory User" \
+  --tool-arg consent_acknowledged=true 2>&1 || true)
+
+if [[ "${ENABLE_OUT}" =~ "enabled" && "${ENABLE_OUT}" =~ "tt_prof_" ]]; then
+  log_pass "Inspector CLI enable_memory succeeded"
+  SMOKE_TOKEN=$(echo "${ENABLE_OUT}" | grep -oE "tt_prof_[A-Za-z0-9_-]+" | head -n 1)
+
+  if [[ -n "${SMOKE_TOKEN}" ]]; then
+    # Remember preference
+    REM_OUT=$(npx --yes @modelcontextprotocol/inspector --cli "${MCP_URL}" --method tools/call --tool-name remember_preference \
+      --tool-arg profile_token="${SMOKE_TOKEN}" \
+      --tool-arg kind="dietary" \
+      --tool-arg value="vegetarian" 2>&1 || true)
+    if [[ "${REM_OUT}" =~ "remembered" ]]; then
+      log_pass "Inspector CLI remember_preference succeeded"
+    else
+      log_fail "Inspector CLI remember_preference failed: ${REM_OUT}"
+    fi
+
+    # Usual order
+    USUAL_OUT=$(npx --yes @modelcontextprotocol/inspector --cli "${MCP_URL}" --method tools/call --tool-name get_usual_order \
+      --tool-arg profile_token="${SMOKE_TOKEN}" 2>&1 || true)
+    if [[ "${USUAL_OUT}" =~ "suggested" || "${USUAL_OUT}" =~ "no_history" ]]; then
+      log_pass "Inspector CLI get_usual_order succeeded (${USUAL_OUT:0:60}...)"
+    else
+      log_fail "Inspector CLI get_usual_order failed: ${USUAL_OUT}"
+    fi
+
+    # Forget me
+    FORGET_OUT=$(npx --yes @modelcontextprotocol/inspector --cli "${MCP_URL}" --method tools/call --tool-name forget_me \
+      --tool-arg profile_token="${SMOKE_TOKEN}" \
+      --tool-arg confirm=true 2>&1 || true)
+    if [[ "${FORGET_OUT}" =~ "forgotten" ]]; then
+      log_pass "Inspector CLI forget_me succeeded"
+    else
+      log_fail "Inspector CLI forget_me failed: ${FORGET_OUT}"
+    fi
+  else
+    log_fail "Could not extract profile token from enable_memory response"
+  fi
+else
+  log_fail "Inspector CLI enable_memory failed: ${ENABLE_OUT}"
 fi
 
 echo "--------------------------------------------------"
