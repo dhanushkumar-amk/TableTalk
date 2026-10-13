@@ -33,6 +33,9 @@ jobs:
       - name: Run unit and integration tests
         run: cargo test
 
+      - name: Verify database migrations and seed execution
+        run: cargo run -- seed
+
       - name: Set up Node.js for Inspector CLI
         uses: actions/setup-node@v4
         with:

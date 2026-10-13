@@ -1,5 +1,5 @@
 use std::net::SocketAddr;
-use tabletalk_backend::{build_router, Config};
+use tabletalk_backend::{build_router_with_db, Config};
 use tracing::info;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 
@@ -14,6 +14,45 @@ async fn main() {
         .with(tracing_subscriber::fmt::layer())
         .init();
 
+    let args: Vec<String> = std::env::args().collect();
+    if args.len() > 1 && (args[1] == "seed" || args[1] == "init-db") {
+        info!("Initializing database pool and running migrations...");
+        let pool = tabletalk_backend::db::init_pool(&config.database_url)
+            .await
+            .unwrap_or_else(|err| panic!("Failed to initialize database: {}", err));
+
+        info!("Seeding database with deterministic fictional data...");
+        tabletalk_backend::db::seed_database(&pool, None)
+            .await
+            .unwrap_or_else(|err| panic!("Failed to seed database: {}", err));
+
+        println!("==================================================");
+        println!(" Database Seed Completed Successfully");
+        println!(" Database URL: {}", config.database_url);
+        println!("--------------------------------------------------");
+        print_table_counts(&pool).await;
+        println!("==================================================");
+        return;
+    }
+
+    info!("Initializing database pool and applying migrations...");
+    let pool = tabletalk_backend::db::init_pool(&config.database_url)
+        .await
+        .unwrap_or_else(|err| panic!("Failed to initialize database: {}", err));
+
+    if config.seed_on_start {
+        let restaurant_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM restaurant")
+            .fetch_one(&pool)
+            .await
+            .unwrap_or(0);
+        if restaurant_count == 0 {
+            info!("SEED_ON_START is true and database is unseeded; seeding now...");
+            tabletalk_backend::db::seed_database(&pool, None)
+                .await
+                .unwrap_or_else(|err| panic!("Failed to seed database on startup: {}", err));
+        }
+    }
+
     let addr = SocketAddr::from(([0, 0, 0, 0], config.port));
     let listener = tokio::net::TcpListener::bind(addr)
         .await
@@ -24,7 +63,7 @@ async fn main() {
         addr, addr
     );
 
-    let app = build_router(&config);
+    let app = build_router_with_db(&config, Some(pool));
 
     axum::serve(listener, app)
         .with_graceful_shutdown(shutdown_signal())
@@ -32,6 +71,39 @@ async fn main() {
         .unwrap_or_else(|err| panic!("Server runtime encountered fatal error: {}", err));
 
     info!("TableTalk server gracefully shut down");
+}
+
+async fn print_table_counts(pool: &sqlx::SqlitePool) {
+    let tables = [
+        "restaurant",
+        "opening_hours",
+        "special_closures",
+        "dining_tables",
+        "menu_categories",
+        "menu_items",
+        "dietary_tags",
+        "allergens",
+        "menu_item_dietary_tags",
+        "menu_item_allergens",
+        "customers",
+        "customer_preferences",
+        "bookings",
+        "orders",
+        "order_items",
+        "payments",
+        "audit_events",
+    ];
+
+    println!("{:<28} | {:<8}", "Table Name", "Row Count");
+    println!("{:-<28}-|-{:-<8}", "", "");
+    for table in tables {
+        let count_query = format!("SELECT COUNT(*) FROM {}", table);
+        let count: i64 = sqlx::query_scalar(&count_query)
+            .fetch_one(pool)
+            .await
+            .unwrap_or(-1);
+        println!("{:<28} | {:<8}", table, count);
+    }
 }
 
 async fn shutdown_signal() {
