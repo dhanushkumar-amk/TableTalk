@@ -291,6 +291,218 @@ impl TableTalkServer {
         let result = crate::tools::get_order::handle_get_order(pool, input).await;
         Ok(result)
     }
+
+    /// Opt into personalized dining memory and profile storage.
+    #[tool(
+        description = "Opt into personalized dining memory and profile storage. Requires explicit guest consent ('consent_acknowledged: true'). Returns a secure bearer profile token ONCE which the caller must store securely. Never call without asking the guest first.",
+        output_schema = rmcp::handler::server::tool::schema_for_output::<crate::memory::EnableMemoryOutput>(),
+        annotations(
+            read_only_hint = false,
+            idempotent_hint = false,
+            destructive_hint = false,
+            open_world_hint = false
+        )
+    )]
+    async fn enable_memory(
+        &self,
+        Parameters(input): Parameters<crate::tools::enable_memory::EnableMemoryInput>,
+    ) -> Result<rmcp::model::CallToolResult, rmcp::ErrorData> {
+        let pool = match &self.db {
+            Some(p) => p,
+            None => {
+                return Ok(rmcp::model::CallToolResult::error(vec![
+                    rmcp::model::ContentBlock::text(
+                        "Database connection pool is not configured on TableTalkServer.",
+                    ),
+                ]));
+            }
+        };
+
+        let result = crate::tools::enable_memory::handle_enable_memory(pool, input).await;
+        Ok(result)
+    }
+
+    /// Retrieve the guest's saved dining profile, masked contact, preferences, and data export.
+    #[tool(
+        description = "Retrieve the guest's saved dining profile, masked contact information, preferences, counts, allergy reconfirmation status, and complete data export using their profile token.",
+        output_schema = rmcp::handler::server::tool::schema_for_output::<crate::memory::GetProfileOutput>(),
+        annotations(
+            read_only_hint = true,
+            idempotent_hint = true,
+            destructive_hint = false,
+            open_world_hint = false
+        )
+    )]
+    async fn get_profile(
+        &self,
+        Parameters(input): Parameters<crate::tools::get_profile::GetProfileInput>,
+    ) -> Result<rmcp::model::CallToolResult, rmcp::ErrorData> {
+        let pool = match &self.db {
+            Some(p) => p,
+            None => {
+                return Ok(rmcp::model::CallToolResult::error(vec![
+                    rmcp::model::ContentBlock::text(
+                        "Database connection pool is not configured on TableTalkServer.",
+                    ),
+                ]));
+            }
+        };
+
+        let result = crate::tools::get_profile::handle_get_profile(pool, input).await;
+        Ok(result)
+    }
+
+    /// Save or update a guest dining preference.
+    #[tool(
+        description = "Save or update a guest dining preference (allergy, dietary tag, seating preference, favorite menu item, or note). Values are validated against official registers and menu items. Deduplicates existing entries.",
+        output_schema = rmcp::handler::server::tool::schema_for_output::<crate::memory::RememberPreferenceOutput>(),
+        annotations(
+            read_only_hint = false,
+            idempotent_hint = true,
+            destructive_hint = false,
+            open_world_hint = false
+        )
+    )]
+    async fn remember_preference(
+        &self,
+        Parameters(input): Parameters<crate::tools::remember_preference::RememberPreferenceInput>,
+    ) -> Result<rmcp::model::CallToolResult, rmcp::ErrorData> {
+        let pool = match &self.db {
+            Some(p) => p,
+            None => {
+                return Ok(rmcp::model::CallToolResult::error(vec![
+                    rmcp::model::ContentBlock::text(
+                        "Database connection pool is not configured on TableTalkServer.",
+                    ),
+                ]));
+            }
+        };
+
+        let result =
+            crate::tools::remember_preference::handle_remember_preference(pool, input).await;
+        Ok(result)
+    }
+
+    /// Remove a saved preference from the guest profile.
+    #[tool(
+        description = "Remove a saved preference from the guest profile. Removing an allergy requires explicit confirmation ('confirm_remove_allergy: true') and alerts the guest that removal affects profile storage only.",
+        output_schema = rmcp::handler::server::tool::schema_for_output::<crate::memory::ForgetPreferenceOutput>(),
+        annotations(
+            read_only_hint = false,
+            idempotent_hint = true,
+            destructive_hint = true,
+            open_world_hint = false
+        )
+    )]
+    async fn forget_preference(
+        &self,
+        Parameters(input): Parameters<crate::tools::forget_preference::ForgetPreferenceInput>,
+    ) -> Result<rmcp::model::CallToolResult, rmcp::ErrorData> {
+        let pool = match &self.db {
+            Some(p) => p,
+            None => {
+                return Ok(rmcp::model::CallToolResult::error(vec![
+                    rmcp::model::ContentBlock::text(
+                        "Database connection pool is not configured on TableTalkServer.",
+                    ),
+                ]));
+            }
+        };
+
+        let result = crate::tools::forget_preference::handle_forget_preference(pool, input).await;
+        Ok(result)
+    }
+
+    /// Retrieve the guest's usual order suggestion.
+    #[tool(
+        description = "Retrieve the guest's 'usual order' suggestion computed deterministically from past order history. Re-validates items against live menu prices, stock availability, and profile allergies without placing an order.",
+        output_schema = rmcp::handler::server::tool::schema_for_output::<crate::memory::GetUsualOrderOutput>(),
+        annotations(
+            read_only_hint = true,
+            idempotent_hint = true,
+            destructive_hint = false,
+            open_world_hint = false
+        )
+    )]
+    async fn get_usual_order(
+        &self,
+        Parameters(input): Parameters<crate::tools::get_usual_order::GetUsualOrderInput>,
+    ) -> Result<rmcp::model::CallToolResult, rmcp::ErrorData> {
+        let pool = match &self.db {
+            Some(p) => p,
+            None => {
+                return Ok(rmcp::model::CallToolResult::error(vec![
+                    rmcp::model::ContentBlock::text(
+                        "Database connection pool is not configured on TableTalkServer.",
+                    ),
+                ]));
+            }
+        };
+
+        let result = crate::tools::get_usual_order::handle_get_usual_order(pool, input).await;
+        Ok(result)
+    }
+
+    /// Rotate the guest's profile bearer token atomically.
+    #[tool(
+        description = "Rotate the guest's profile bearer token atomically. Issues a new cryptographically random token and permanently revokes the previous token.",
+        output_schema = rmcp::handler::server::tool::schema_for_output::<crate::memory::RotateProfileTokenOutput>(),
+        annotations(
+            read_only_hint = false,
+            idempotent_hint = false,
+            destructive_hint = false,
+            open_world_hint = false
+        )
+    )]
+    async fn rotate_profile_token(
+        &self,
+        Parameters(input): Parameters<crate::tools::rotate_profile_token::RotateProfileTokenInput>,
+    ) -> Result<rmcp::model::CallToolResult, rmcp::ErrorData> {
+        let pool = match &self.db {
+            Some(p) => p,
+            None => {
+                return Ok(rmcp::model::CallToolResult::error(vec![
+                    rmcp::model::ContentBlock::text(
+                        "Database connection pool is not configured on TableTalkServer.",
+                    ),
+                ]));
+            }
+        };
+
+        let result =
+            crate::tools::rotate_profile_token::handle_rotate_profile_token(pool, input).await;
+        Ok(result)
+    }
+
+    /// Permanently hard-delete the guest profile and preferences ('Right to Be Forgotten').
+    #[tool(
+        description = "Permanently hard-delete the guest profile, consent records, tokens, and dining preferences ('Right to Be Forgotten'). Unlinks and anonymizes historical order and booking business records in one atomic transaction.",
+        output_schema = rmcp::handler::server::tool::schema_for_output::<crate::memory::ForgetMeOutput>(),
+        annotations(
+            read_only_hint = false,
+            idempotent_hint = true,
+            destructive_hint = true,
+            open_world_hint = false
+        )
+    )]
+    async fn forget_me(
+        &self,
+        Parameters(input): Parameters<crate::tools::forget_me::ForgetMeInput>,
+    ) -> Result<rmcp::model::CallToolResult, rmcp::ErrorData> {
+        let pool = match &self.db {
+            Some(p) => p,
+            None => {
+                return Ok(rmcp::model::CallToolResult::error(vec![
+                    rmcp::model::ContentBlock::text(
+                        "Database connection pool is not configured on TableTalkServer.",
+                    ),
+                ]));
+            }
+        };
+
+        let result = crate::tools::forget_me::handle_forget_me(pool, input).await;
+        Ok(result)
+    }
 }
 
 #[tool_handler(router = self.tool_router)]

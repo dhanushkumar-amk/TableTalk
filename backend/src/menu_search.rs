@@ -26,6 +26,18 @@ impl DietaryTagFilter {
             Self::NutFree => "nut_free",
         }
     }
+
+    pub fn from_db_str(s: &str) -> Option<Self> {
+        match s.to_ascii_lowercase().as_str() {
+            "vegan" => Some(Self::Vegan),
+            "vegetarian" => Some(Self::Vegetarian),
+            "gluten_free" | "gluten-free" => Some(Self::GlutenFree),
+            "dairy_free" | "dairy-free" => Some(Self::DairyFree),
+            "halal" => Some(Self::Halal),
+            "nut_free" | "nut-free" => Some(Self::NutFree),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
@@ -58,6 +70,22 @@ impl AllergenFilter {
             Self::Fish => "fish",
         }
     }
+
+    pub fn from_db_str(s: &str) -> Option<Self> {
+        match s.to_ascii_lowercase().as_str() {
+            "peanuts" | "peanut" => Some(Self::Peanuts),
+            "tree_nuts" | "tree nuts" | "treenuts" | "tree nut" | "nuts" => Some(Self::TreeNuts),
+            "dairy" | "milk" => Some(Self::Dairy),
+            "gluten" | "wheat" => Some(Self::Gluten),
+            "soy" | "soya" => Some(Self::Soy),
+            "sesame" => Some(Self::Sesame),
+            "mustard" => Some(Self::Mustard),
+            "shellfish" | "crustacean" => Some(Self::Shellfish),
+            "egg" | "eggs" => Some(Self::Egg),
+            "fish" => Some(Self::Fish),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema, Default)]
@@ -72,7 +100,7 @@ pub enum SortOption {
 
 // --- Tool Output Models ---
 
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 pub struct PriceDisplay {
     /// Price in minor currency units (paise)
     pub amount_minor: i64,
@@ -128,6 +156,10 @@ pub struct SearchMenuOutput {
     pub suggestions: Vec<String>,
     /// Standard allergen handling notice for kitchen operations
     pub allergen_notice: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub profile_applied: Option<bool>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub needs_reconfirmation: Vec<String>,
 }
 
 pub const ALLERGEN_NOTICE: &str =
@@ -557,6 +589,8 @@ pub async fn execute_menu_search(
         items: item_cards,
         suggestions,
         allergen_notice: ALLERGEN_NOTICE.to_string(),
+        profile_applied: None,
+        needs_reconfirmation: vec![],
     })
 }
 

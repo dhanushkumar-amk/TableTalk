@@ -366,6 +366,10 @@ pub struct PlaceOrderOutput {
     pub earliest_pickup_local: Option<String>,
     pub allergen_notice: String,
     pub idempotent_replay: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub profile_applied: Option<bool>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub needs_reconfirmation: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq)]
@@ -688,6 +692,7 @@ pub struct PlaceOrderTxRequest<'a> {
     pub allergen_ack: Option<&'a AllergenAcknowledgement>,
     pub order_notes: Option<&'a str>,
     pub idempotency_key: Option<&'a str>,
+    pub customer_id: Option<i64>,
 }
 
 pub struct CancelOrderTxRequest<'a> {
@@ -776,6 +781,8 @@ pub async fn place_order_tx(
                         earliest_pickup_local: None,
                         allergen_notice: ALLERGEN_NOTICE.to_string(),
                         idempotent_replay: false,
+                profile_applied: None,
+                needs_reconfirmation: vec![],
                     };
                     let voice_text = "That idempotency key was already used for a different request. Please generate a new key or reuse the original parameters.".to_string();
                     return Ok(PlaceOrderOutcome::IdempotencyConflict { output, voice_text });
@@ -808,6 +815,8 @@ pub async fn place_order_tx(
                 earliest_pickup_local: None,
                 allergen_notice: ALLERGEN_NOTICE.to_string(),
                 idempotent_replay: false,
+                profile_applied: None,
+                needs_reconfirmation: vec![],
             };
             let voice_text = format!(
                 "You already have {} active orders, which is our limit. Please wait until your current order is completed before placing another.",
@@ -847,6 +856,8 @@ pub async fn place_order_tx(
                         earliest_pickup_local: None,
                         allergen_notice: ALLERGEN_NOTICE.to_string(),
                         idempotent_replay: false,
+                profile_applied: None,
+                needs_reconfirmation: vec![],
                     };
                     let voice_text = format!("I couldn't find an item with ID {}. Would you like me to search the menu for you?", id);
                     return Ok(PlaceOrderOutcome::UnknownItem { output, voice_text });
@@ -882,6 +893,8 @@ pub async fn place_order_tx(
                         earliest_pickup_local: None,
                         allergen_notice: ALLERGEN_NOTICE.to_string(),
                         idempotent_replay: false,
+                profile_applied: None,
+                needs_reconfirmation: vec![],
                     };
                     let voice_text = generate_ambiguous_item_voice_text(name_query, &output.candidates);
                     return Ok(PlaceOrderOutcome::AmbiguousItem { output, voice_text });
@@ -915,6 +928,8 @@ pub async fn place_order_tx(
                             earliest_pickup_local: None,
                             allergen_notice: ALLERGEN_NOTICE.to_string(),
                             idempotent_replay: false,
+                profile_applied: None,
+                needs_reconfirmation: vec![],
                         };
                         let voice_text = generate_ambiguous_item_voice_text(name_query, &output.candidates);
                         return Ok(PlaceOrderOutcome::AmbiguousItem { output, voice_text });
@@ -931,6 +946,8 @@ pub async fn place_order_tx(
                             earliest_pickup_local: None,
                             allergen_notice: ALLERGEN_NOTICE.to_string(),
                             idempotent_replay: false,
+                profile_applied: None,
+                needs_reconfirmation: vec![],
                         };
                         let voice_text = format!("I couldn't find '{}' on the menu. Would you like me to check what's available?", name_query);
                         return Ok(PlaceOrderOutcome::UnknownItem { output, voice_text });
@@ -954,6 +971,8 @@ pub async fn place_order_tx(
                     earliest_pickup_local: None,
                     allergen_notice: ALLERGEN_NOTICE.to_string(),
                     idempotent_replay: false,
+                profile_applied: None,
+                needs_reconfirmation: vec![],
                 };
                 let voice_text = format!("I'm sorry, but {} is currently sold out. Would you like to pick something else?", item.name);
                 return Ok(PlaceOrderOutcome::ItemUnavailable { output, voice_text });
@@ -1091,6 +1110,8 @@ pub async fn place_order_tx(
                         earliest_pickup_local: None,
                         allergen_notice: ALLERGEN_NOTICE.to_string(),
                         idempotent_replay: false,
+                profile_applied: None,
+                needs_reconfirmation: vec![],
                     };
                     let voice_text = generate_allergen_conflict_voice_text(&conflicting_lines, &alternatives);
                     return Ok(PlaceOrderOutcome::AllergenConflict { output, voice_text });
@@ -1141,6 +1162,8 @@ pub async fn place_order_tx(
                 earliest_pickup_local: None,
                 allergen_notice: ALLERGEN_NOTICE.to_string(),
                 idempotent_replay: false,
+                profile_applied: None,
+                needs_reconfirmation: vec![],
             };
             let voice_text = format!(
                 "This order total exceeds our maximum limit of ₹{}. Please contact the restaurant directly for large catering orders.",
@@ -1233,6 +1256,8 @@ pub async fn place_order_tx(
                 earliest_pickup_local: None,
                 allergen_notice: ALLERGEN_NOTICE.to_string(),
                 idempotent_replay: false,
+                profile_applied: None,
+                needs_reconfirmation: vec![],
             };
             let voice_text = "The restaurant is closed today for a special event. We are not accepting pickup orders.".to_string();
             return Ok(PlaceOrderOutcome::Closed { output, voice_text });
@@ -1256,6 +1281,8 @@ pub async fn place_order_tx(
                 earliest_pickup_local: None,
                 allergen_notice: ALLERGEN_NOTICE.to_string(),
                 idempotent_replay: false,
+                profile_applied: None,
+                needs_reconfirmation: vec![],
             };
             let voice_text = "The restaurant is closed today. Please check back on our next open day.".to_string();
             return Ok(PlaceOrderOutcome::Closed { output, voice_text });
@@ -1292,6 +1319,8 @@ pub async fn place_order_tx(
                 earliest_pickup_local: None,
                 allergen_notice: ALLERGEN_NOTICE.to_string(),
                 idempotent_replay: false,
+                profile_applied: None,
+                needs_reconfirmation: vec![],
             };
             let voice_text = format!(
                 "The kitchen is not accepting pickup orders at {}. Please select a time during our regular service hours.",
@@ -1314,6 +1343,8 @@ pub async fn place_order_tx(
                 earliest_pickup_local: Some(earliest_feasible_local.to_rfc3339()),
                 allergen_notice: ALLERGEN_NOTICE.to_string(),
                 idempotent_replay: false,
+                profile_applied: None,
+                needs_reconfirmation: vec![],
             };
             let voice_text = "Pickup orders must be placed for today. Would you like to set your pickup for later today?".to_string();
             return Ok(PlaceOrderOutcome::PickupTooSoon { output, voice_text });
@@ -1337,6 +1368,8 @@ pub async fn place_order_tx(
                 earliest_pickup_local: Some(earliest_feasible_local.to_rfc3339()),
                 allergen_notice: ALLERGEN_NOTICE.to_string(),
                 idempotent_replay: false,
+                profile_applied: None,
+                needs_reconfirmation: vec![],
             };
             let voice_text = format!(
                 "The kitchen needs about {} minutes to prepare your order. The earliest pickup time is {}. Would that work for you?",
@@ -1381,11 +1414,12 @@ pub async fn place_order_tx(
                 currency, notes, guest_name, guest_phone, guest_email,
                 stated_allergens, created_at, updated_at
             )
-            VALUES (?, ?, NULL, NULL, 'pickup', 'placed', ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, NULL, 'pickup', 'placed', ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             "#,
         )
         .bind(&order_id)
         .bind(&order_code)
+        .bind(req.customer_id)
         .bind(&pickup_utc_iso)
         .bind(subtotal_cents)
         .bind(tax_cents)
@@ -1469,6 +1503,8 @@ pub async fn place_order_tx(
             earliest_pickup_local: Some(earliest_feasible_local.to_rfc3339()),
             allergen_notice: ALLERGEN_NOTICE.to_string(),
             idempotent_replay: false,
+            profile_applied: None,
+            needs_reconfirmation: vec![],
         };
 
         // 15. Record idempotency key if provided

@@ -342,6 +342,10 @@ pub struct CreateBookingOutput {
     pub alternatives: Vec<AlternativeSlot>,
     pub cancellation_policy: Option<String>,
     pub note: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub profile_applied: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub seat_preference_honored: Option<bool>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
@@ -528,6 +532,8 @@ pub async fn create_booking_tx(
                         alternatives: vec![],
                         cancellation_policy: None,
                         note: "availability is a snapshot, not a reservation".to_string(),
+                        profile_applied: None,
+                        seat_preference_honored: None,
                     };
                     let voice_text = "This idempotency key was previously used with different booking details. Please use a new key or check your request.".to_string();
                     return Ok(CreateBookingOutcome::IdempotencyConflict {
@@ -574,6 +580,8 @@ pub async fn create_booking_tx(
                 alternatives: vec![],
                 cancellation_policy: None,
                 note: "availability is a snapshot, not a reservation".to_string(),
+                profile_applied: None,
+                seat_preference_honored: None,
             };
             let voice_text = format!(
                 "You already have {} active reservations, which is the maximum allowed. Please cancel an existing booking before making a new one.",
@@ -669,6 +677,8 @@ pub async fn create_booking_tx(
                 alternatives: avail_res.alternatives.clone(),
                 cancellation_policy: None,
                 note: "availability is a snapshot, not a reservation".to_string(),
+                profile_applied: None,
+                seat_preference_honored: None,
             };
             let voice_text = generate_availability_voice_text(&avail_res);
             return Ok(CreateBookingOutcome::Unavailable { output, voice_text });
@@ -804,6 +814,8 @@ pub async fn create_booking_tx(
             alternatives: vec![],
             cancellation_policy: Some(cancellation_policy),
             note: "availability is a snapshot, not a reservation".to_string(),
+            profile_applied: None,
+            seat_preference_honored: None,
         };
 
         // 11. Record idempotency key if provided
@@ -1605,6 +1617,8 @@ mod tests {
                 "Free cancellation up to 6 hours prior to reservation.".to_string(),
             ),
             note: "availability is a snapshot, not a reservation".to_string(),
+            profile_applied: None,
+            seat_preference_honored: None,
         };
 
         let voice_text = generate_create_booking_voice_text(&out);

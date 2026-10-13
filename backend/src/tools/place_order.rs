@@ -42,6 +42,9 @@ pub struct PlaceOrderInput {
     /// Optional idempotency key (8-64 characters matching [a-zA-Z0-9_.-]).
     /// Strongly recommended on retries to ensure at-most-once order placement.
     pub idempotency_key: Option<String>,
+
+    /// Optional profile bearer token (e.g. 'tt_prof_...') to link order, default guest name, and enforce stored allergies.
+    pub profile_token: Option<String>,
 }
 
 fn tool_validation_error(message: impl Into<String>) -> CallToolResult {
@@ -61,10 +64,140 @@ pub async fn handle_place_order_with_clock(
 ) -> CallToolResult {
     let req_id = uuid::Uuid::new_v4();
 
+    // Profile token resolution and allergy merging
+    let (
+        customer_id,
+        guest_name_resolved,
+        profile_applied,
+        needs_reconfirmation,
+        effective_allergen_ack,
+    ) = if let Some(token_raw) = input
+        .profile_token
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+    {
+        let rate_limiter = crate::memory::get_token_rate_limiter();
+        match crate::memory::resolve_profile_token(pool, token_raw, rate_limiter, clock).await {
+            Ok(Some(customer)) => {
+                let cust_id = customer.id;
+                let display_name = if input.guest_name.trim().is_empty() {
+                    customer.display_name.clone()
+                } else {
+                    input.guest_name.clone()
+                };
+
+                // Fetch customer's stored allergies
+                let allergies: Vec<(String, Option<String>)> = sqlx::query_as(
+                        "SELECT value, confirmed_at FROM customer_preferences WHERE customer_id = ? AND kind = 'allergy'"
+                    )
+                    .bind(cust_id)
+                    .fetch_all(pool)
+                    .await
+                    .unwrap_or_default();
+
+                let mut reconf = Vec::new();
+                let reconf_cutoff = clock.now()
+                    - chrono::Duration::days(crate::memory::ALLERGY_RECONFIRMATION_DAYS);
+                let mut avoid_filters = Vec::new();
+
+                for (allergy_name, confirmed_at) in allergies {
+                    let is_stale = match &confirmed_at {
+                        Some(ts) => match chrono::DateTime::parse_from_rfc3339(ts) {
+                            Ok(dt) => dt.with_timezone(&chrono::Utc) < reconf_cutoff,
+                            Err(_) => true,
+                        },
+                        None => true,
+                    };
+                    if is_stale && !reconf.contains(&allergy_name) {
+                        reconf.push(allergy_name.clone());
+                    }
+
+                    if let Some(filter) =
+                        crate::menu_search::AllergenFilter::from_db_str(&allergy_name)
+                    {
+                        avoid_filters.push(filter);
+                    }
+                }
+
+                // Merge guest-supplied list into profile list (guest can add, but cannot remove profile allergies)
+                let mut merged_avoid = avoid_filters.clone();
+                let has_profile_allergies = !avoid_filters.is_empty();
+                if let Some(ref ack) = input.allergen_acknowledgement {
+                    for user_avoid in &ack.allergens_to_avoid {
+                        if !merged_avoid.contains(user_avoid) {
+                            merged_avoid.push(*user_avoid);
+                        }
+                    }
+                }
+
+                // Stored profile allergies must strictly block conflicts and cannot be bypassed
+                let acknowledged = if has_profile_allergies {
+                    false
+                } else {
+                    input
+                        .allergen_acknowledgement
+                        .as_ref()
+                        .map(|a| a.acknowledged)
+                        .unwrap_or(false)
+                };
+
+                let effective_ack = Some(AllergenAcknowledgement {
+                    allergens_to_avoid: merged_avoid,
+                    acknowledged,
+                });
+
+                (
+                    Some(cust_id),
+                    display_name,
+                    Some(true),
+                    reconf,
+                    effective_ack,
+                )
+            }
+            Ok(None) => {
+                // Profile not found / invalid token
+                let output = crate::ordering::PlaceOrderOutput {
+                        status: "profile_not_found".to_string(),
+                        reason: Some("Profile not found or invalid profile token.".to_string()),
+                        reason_detail: Some("Stored preferences and allergies could not be applied. Please verify your profile token.".to_string()),
+                        order: None,
+                        price_changes: vec![],
+                        candidates: vec![],
+                        alternatives: vec![],
+                        earliest_pickup_local: None,
+                        allergen_notice: crate::menu_search::ALLERGEN_NOTICE.to_string(),
+                        idempotent_replay: false,
+                        profile_applied: Some(false),
+                        needs_reconfirmation: vec![],
+                    };
+                let mut res = CallToolResult::structured(serde_json::to_value(&output).unwrap());
+                res.content = vec![ContentBlock::text(
+                    "Profile not found. Stored dining preferences and allergies were not applied.",
+                )];
+                return res;
+            }
+            Err(e) => {
+                return CallToolResult::error(vec![ContentBlock::text(format!(
+                    "Database error resolving profile token: {}",
+                    e
+                ))]);
+            }
+        }
+    } else {
+        (
+            None,
+            input.guest_name.clone(),
+            None,
+            vec![],
+            input.allergen_acknowledgement.clone(),
+        )
+    };
+
     // 1. Validation check for tool execution errors
     if let Err(val_err) = validate_order_request(
         &input.items,
-        &input.guest_name,
+        &guest_name_resolved,
         input.phone.as_deref(),
         input.email.as_deref(),
         input.order_notes.as_deref(),
@@ -77,17 +210,18 @@ pub async fn handle_place_order_with_clock(
     let tx_req = PlaceOrderTxRequest {
         items: &input.items,
         pickup_time: input.pickup_time.as_deref(),
-        guest_name: &input.guest_name,
+        guest_name: &guest_name_resolved,
         phone: input.phone.as_deref(),
         email: input.email.as_deref(),
-        allergen_ack: input.allergen_acknowledgement.as_ref(),
+        allergen_ack: effective_allergen_ack.as_ref(),
         order_notes: input.order_notes.as_deref(),
         idempotency_key: input.idempotency_key.as_deref(),
+        customer_id,
     };
 
     match place_order_tx(pool, tx_req, clock).await {
         Ok(outcome) => {
-            let (output, voice_text) = match outcome {
+            let (mut output, mut voice_text) = match outcome {
                 PlaceOrderOutcome::Placed { output, voice_text } => {
                     let code_prefix = output
                         .order
@@ -139,6 +273,22 @@ pub async fn handle_place_order_with_clock(
                     (output, voice_text)
                 }
             };
+
+            if let Some(applied) = profile_applied {
+                output.profile_applied = Some(applied);
+                output.needs_reconfirmation = needs_reconfirmation.clone();
+                if applied {
+                    if !voice_text.contains("Stored allergy preferences") {
+                        voice_text
+                            .push_str(" Stored allergy preferences were applied to your order.");
+                    }
+                    if !needs_reconfirmation.is_empty() {
+                        voice_text.push_str(
+                            " Please confirm if your allergy restrictions are still current.",
+                        );
+                    }
+                }
+            }
 
             let structured_val = match serde_json::to_value(&output) {
                 Ok(v) => v,
