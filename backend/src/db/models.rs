@@ -143,6 +143,9 @@ pub struct RestaurantConfig {
     pub updated_at: String,
     pub cancellation_cutoff_hours: i64,
     pub late_cancellation_fee_cents: i64,
+    pub tax_rate_basis_points: i64,
+    pub last_order_before_close_minutes: i64,
+    pub phone: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, sqlx::FromRow)]
@@ -270,6 +273,7 @@ pub struct IdempotencyKeyRecord {
     pub request_hash: String,
     pub response_json: String,
     pub booking_id: Option<String>,
+    pub order_id: Option<String>,
     pub created_at: String,
     pub expires_at: String,
 }
@@ -277,6 +281,7 @@ pub struct IdempotencyKeyRecord {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, sqlx::FromRow)]
 pub struct Order {
     pub id: String,
+    pub order_code: String,
     pub customer_id: Option<i64>,
     pub booking_id: Option<String>,
     pub order_type: OrderType,
@@ -288,8 +293,13 @@ pub struct Order {
     pub total_cents: i64,
     pub currency: String,
     pub notes: Option<String>,
+    pub guest_name: String,
+    pub guest_phone: Option<String>,
+    pub guest_email: Option<String>,
+    pub stated_allergens: Option<String>,
     pub created_at: String,
     pub updated_at: String,
+    pub cancelled_at: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, sqlx::FromRow)]
@@ -297,8 +307,10 @@ pub struct OrderItem {
     pub id: i64,
     pub order_id: String,
     pub menu_item_id: i64,
+    pub item_name: String,
     pub quantity: i64,
     pub unit_price_cents: i64,
+    pub currency: String,
     pub notes: Option<String>,
 }
 

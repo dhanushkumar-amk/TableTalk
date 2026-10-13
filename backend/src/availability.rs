@@ -1372,6 +1372,9 @@ mod tests {
             updated_at: "2026-10-01T00:00:00Z".to_string(),
             cancellation_cutoff_hours: 6,
             late_cancellation_fee_cents: 0,
+            tax_rate_basis_points: 500,
+            last_order_before_close_minutes: 30,
+            phone: "+91 80 4567 8900".to_string(),
         }
     }
 

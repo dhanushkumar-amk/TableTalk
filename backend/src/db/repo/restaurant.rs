@@ -10,7 +10,8 @@ pub async fn get_config(pool: &SqlitePool) -> Result<RestaurantConfig, DbError> 
         SELECT id, name, timezone, currency, dining_duration_minutes, slot_granularity_minutes,
                max_party_size, lead_time_minutes, booking_horizon_days, deposit_required_party_size,
                deposit_amount_per_person_cents, created_at, updated_at,
-               cancellation_cutoff_hours, late_cancellation_fee_cents
+               cancellation_cutoff_hours, late_cancellation_fee_cents,
+               tax_rate_basis_points, last_order_before_close_minutes, phone
         FROM restaurant
         WHERE id = 1
         "#,
