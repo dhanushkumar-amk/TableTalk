@@ -72,8 +72,8 @@ fi
 # Check 2: Inspector CLI tools/list
 echo "Testing Inspector CLI tools/list against ${MCP_URL}..."
 if INSPECTOR_OUT=$(npx --yes @modelcontextprotocol/inspector --cli "${MCP_URL}" --method tools/list 2>&1); then
-  if [[ "${INSPECTOR_OUT}" =~ "ping_restaurant" && "${INSPECTOR_OUT}" =~ "search_menu" ]]; then
-    log_pass "Inspector CLI tools/list discovered both ping_restaurant and search_menu"
+  if [[ "${INSPECTOR_OUT}" =~ "ping_restaurant" && "${INSPECTOR_OUT}" =~ "search_menu" && "${INSPECTOR_OUT}" =~ "check_availability" ]]; then
+    log_pass "Inspector CLI tools/list discovered ping_restaurant, search_menu, and check_availability"
   else
     log_fail "Inspector CLI tools/list output did not contain expected tools: ${INSPECTOR_OUT}"
   fi
@@ -152,6 +152,19 @@ if SEARCH_OUT=$(npx --yes @modelcontextprotocol/inspector --cli "${MCP_URL}" --m
   fi
 else
   log_fail "Inspector CLI tools/call search_menu failed execution: ${SEARCH_OUT}"
+fi
+
+# Check 9: Inspector CLI tools/call check_availability
+echo "Testing Inspector CLI tools/call check_availability..."
+AVAIL_DATE=$(node -e 'const d=new Date(); d.setDate(d.getDate()+3); if (d.getDay() === 2) d.setDate(d.getDate()+1); console.log(d.toISOString().slice(0,10));')
+if AVAIL_OUT=$(npx --yes @modelcontextprotocol/inspector --cli "${MCP_URL}" --method tools/call --tool-name check_availability --tool-arg date="${AVAIL_DATE}" --tool-arg time="19:30" --tool-arg party_size="2" 2>&1); then
+  if [[ "${AVAIL_OUT}" =~ "available" || "${AVAIL_OUT}" =~ "book" || "${AVAIL_OUT}" =~ "table" ]]; then
+    log_pass "Inspector CLI tools/call check_availability succeeded: ${AVAIL_DATE} 19:30"
+  else
+    log_fail "Inspector CLI tools/call check_availability missing expected response: ${AVAIL_OUT}"
+  fi
+else
+  log_fail "Inspector CLI tools/call check_availability failed execution: ${AVAIL_OUT}"
 fi
 
 echo "--------------------------------------------------"
