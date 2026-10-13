@@ -188,8 +188,43 @@ A running log of unexpected friction, hurdles, bugs, or developer experience iss
   - *Expected*: Concurrent requests queue up and serialize cleanly; exactly one wins and others observe the updated state
   - *Actual*: Standard `pool.begin()` issues `BEGIN DEFERRED` by default in SQLite. Multiple connections acquire shared read locks simultaneously; when both subsequently attempt an `INSERT` to claim the slot, SQLite fails to upgrade the shared lock to an exclusive lock, resulting in `SQLITE_BUSY: database is locked` deadlock collisions.
 - **Severity**: High
-- **Workaround**: Explicitly executed `conn.execute("BEGIN IMMEDIATE").await` at transaction commencement. This immediately grabs SQLite's `RESERVED` lock, serializing all subsequent write transactions deterministically and allowing the busy timeout (5000ms) to queue callers smoothly without deadlock upgrades.
-- **Suggestion**: Document in SQLx SQLite guidelines that write transactions under concurrency should always begin with `BEGIN IMMEDIATE` rather than default deferred transactions.
+### SQLite Connection Pool Sizing and Lock Contention Under Concurrency Bursts
+- **Date**: 2026-10-13
+- **Task attempted**: Running 20 concurrent `place_order` requests against test in-memory/temp SQLite pools
+- **Steps taken**:
+  1. Spawned 20 parallel Tokio tasks hitting `BEGIN IMMEDIATE` order placement transactions
+  2. With default pool sizes (e.g. 5 connections), multiple workers waited for pool acquisition while holders waited for database locks
+- **Expected vs actual**:
+  - *Expected*: All 20 concurrent tasks complete without connection exhaustion
+  - *Actual*: Workers faced pool acquisition delays and potential `PoolTimedOut` if max connections were too low or pool acquisition timeout was too short
+- **Severity**: Medium
+- **Workaround**: Configured SQLite test and production pools with `max_connections(20)` and `busy_timeout(Duration::from_secs(10))`, ensuring connections are acquired and released within tight async scopes.
+- **Suggestion**: Document in SQLx SQLite best practices that when using `BEGIN IMMEDIATE` for write concurrency, connection pool size should be sized to match expected concurrent writer bursts, paired with generous busy timeouts.
+
+### Operating Hours vs Feasibility Order Precedence
+- **Date**: 2026-10-13
+- **Task attempted**: Validating pickup orders placed on closed days or outside business hours
+- **Steps taken**:
+  1. Checked prep time feasibility (`target_pickup < earliest_feasible`) before checking restaurant operating hours
+- **Expected vs actual**:
+  - *Expected*: Ordering on a closed day (e.g. Tuesday) returns `status: "closed"`, informing the guest the restaurant is closed today
+  - *Actual*: Since `target_pickup` was evaluated against `earliest_feasible` first, the system returned `status: "pickup_too_soon"`, misleading the guest into thinking the restaurant was open later that day
+- **Severity**: Medium
+- **Workaround**: Re-ordered validation sequence so that restaurant closed status (`closed_day`) and last-order cutoff (`outside_hours`) are evaluated before relative feasibility comparisons.
+- **Suggestion**: Ensure business availability constraints (calendar/schedule) always strictly precede dynamic capacity or preparation time constraints.
+
+### Schema Foreign Key Column Name Discrepancy (`tag_id` vs `dietary_tag_id`)
+- **Date**: 2026-10-13
+- **Task attempted**: Querying dietary tags for ordered menu items from `menu_item_dietary_tags`
+- **Steps taken**:
+  1. Wrote SQL query joining `menu_item_dietary_tags` on `dietary_tag_id`
+- **Expected vs actual**:
+  - *Expected*: Column named `dietary_tag_id` matching entity name
+  - *Actual*: SQLite returned `no such column: dietary_tag_id` because table schema uses `tag_id`
+- **Severity**: Low
+- **Workaround**: Updated SQL queries to reference `tag_id`.
+- **Suggestion**: Standardize foreign key naming conventions across all migration scripts (`entity_id` everywhere).
+
 
 
 

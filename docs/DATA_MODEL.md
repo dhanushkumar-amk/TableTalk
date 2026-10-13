@@ -444,4 +444,83 @@ All customer names, telephone numbers, and email addresses present in seed scrip
 > 3. Zero plaintext PII logging at `INFO` or higher log levels (enforced in TableTalk code).
 > 4. Documented data retention, anonymization, and right-to-be-forgotten deletion workflows.
 
+---
+
+## 10. Orders and Pricing Architecture (Phase 9)
+
+### 10.1 Order Lifecycle State Machine
+Orders progress through a strict deterministic state machine:
+
+```mermaid
+stateDiagram-v2
+    [*] --> draft
+    draft --> placed : place_order (verified)
+    draft --> cancelled : abandoned
+    placed --> preparing : kitchen start
+    placed --> cancelled : cancel_order (guest / staff)
+    preparing --> ready : kitchen ready
+    preparing --> cancelled : kitchen exception
+    ready --> completed : customer pickup
+    cancelled --> [*]
+    completed --> [*]
+```
+
+**Allowed Transitions**:
+- `draft` $\rightarrow$ `placed`, `cancelled`
+- `placed` $\rightarrow$ `preparing`, `cancelled`
+- `preparing` $\rightarrow$ `ready`, `cancelled`
+- `ready` $\rightarrow$ `completed`
+
+**Illegal Transitions (Strictly Rejected)**:
+- `cancelled` $\rightarrow$ any state (cannot resurrect cancelled orders)
+- `completed` $\rightarrow$ `cancelled` (cannot cancel picked-up food)
+- `placed` $\rightarrow$ `ready` or `completed` (skipping kitchen prep is disallowed)
+- Any transition from a terminal state (`cancelled`, `completed`) back to active states
+
+In Phase 9, `place_order` exclusively creates `placed` orders. `cancel_order` is permitted while `placed`. If the order advances to `preparing` or later, voice cancellation is rejected with `not_cancellable`.
+
+### 10.2 Server-Side Pricing & Snapshot Integrity
+1. **Client Never Sends Prices**:
+   The MCP tool client accepts only item identifiers and quantities. Prices passed by clients are ignored or rejected.
+2. **Immutable Price Snapshots**:
+   Inside `BEGIN IMMEDIATE`, each line captures:
+   - `unit_price_cents`: Database price at the instant of order creation.
+   - `line_name`: Item name snapshot.
+   - `currency`: Default ISO currency (`INR`).
+   Subsequent price updates to `menu_items` never alter historical orders.
+3. **Pure Integer Arithmetic**:
+   All money calculations are performed in integer minor units (paise). Floating-point types are strictly forbidden. Line totals and subtotals use checked addition (`checked_add`) and checked multiplication (`checked_mul`) with explicit overflow errors (`OrderValidationError::PricingOverflow`).
+4. **Tax Calculation & Rounding Rule**:
+   Tax is computed from the restaurant's configured tax rate in basis points (500 bps = 5% GST):
+   $$\text{tax\_cents} = \left\lfloor \frac{\text{subtotal\_cents} \times \text{tax\_rate\_bps} + 5000}{10000} \right\rfloor$$
+   This represents standard **round-half-up** rounding per order. If no tax rate is configured, tax is 0 cents and items are billed as listed.
+
+### 10.3 Dynamic Kitchen Prep Time & Readiness Estimation
+To prevent unrealistic pickup promises, the engine computes readiness deterministically:
+$$\text{estimated\_ready} = \text{order\_time} + \max_{i}(\text{prep\_time}_i) + (3\text{ minutes} \times N_{\text{active}})$$
+where $N_{\text{active}}$ is the count of currently active orders (`placed` or `preparing`).
+- **Slot Grid Snapping**: The estimated readiness is snapped **up** to the restaurant's 15-minute slot grid to determine `earliest_feasible_pickup`.
+- **Too Soon Rejection**: If the caller requests a pickup time earlier than this earliest feasible time, the order is not placed; the tool returns `status: "pickup_too_soon"` along with `earliest_pickup_local`.
+
+### 10.4 Idempotency Scope Separation
+The `idempotency_keys` table uses the compound namespace `(key, tool_name)`:
+- Keys for `create_booking` and `place_order` are partitioned by `tool_name = 'place_order'`.
+- Booking IDs and Order IDs occupy separate foreign key columns (`booking_id`, `order_id`).
+- Identical replay returns the stored order snapshot with `idempotent_replay: true`.
+- Modified payload replay returns `status: "idempotency_conflict"`.
+
+### 10.5 Human-Friendly Order Codes
+- **Format**: `TO-XXXXX` (`TO-` prefix for TakeOut / Order vs `TT-` for TableTalk booking).
+- **Alphabet**: 31-character Crockford-like safe alphabet (`0-9`, `A-Z` excluding confusing letters `I`, `L`, `O`, `U`).
+- **Normalizer**: Case-insensitive; maps lookalike characters (`O`/`o` $\rightarrow$ `0`, `I`/`i`/`L`/`l` $\rightarrow$ `1`).
+
+### 10.6 Logging, Privacy & Audit Trail
+- **Zero PII Logging**: `guest_name`, phone, email, notes, and stated allergens are strictly redacted from `INFO`-level and `DEBUG`-level application logs.
+- **Audit Events**: Written to `audit_events` with `event_type = 'order_placed'` or `'order_cancelled'`. Metadata JSON stores only `{ "order_code_prefix": "TO-GW..." }` and entity ID. No guest contact information or allergens are ever recorded in audit trails.
+- **Abuse Protections**:
+  - Maximum 3 active orders per guest name.
+  - Maximum ₹25,000 minor unit total per order.
+  - Maximum 20 lines and 20 items per line.
+
+
 

@@ -246,7 +246,7 @@ All checklist items below have been formally proven by automated tests in `backe
 - [x] **JSON-RPC Conformance**: Rejects pre-initialization calls with HTTP 422 (`test_edge_case_d`); returns `-32601` for unknown methods (`test_edge_case_c`); rejects batch requests (`test_edge_case_i`).
 - [x] **Client Notifications & Ping**: Correctly handles notifications with HTTP 202 empty body (`test_edge_case_k`) and handles `ping` / `notifications/cancelled` (`test_edge_case_m`).
 - [x] **Request Timeout & Concurrency**: Cuts off hung requests with HTTP 408 (`test_request_timeout_cutoff`); handles 50 concurrent sessions with 0 errors/panics at p50 111ms / p95 116ms (`test_50_concurrent_sessions_and_latency`).
-- [x] **Tool Naming**: All six tool names (`ping_restaurant`, `search_menu`, `check_availability`, `create_booking`, `cancel_booking`, `get_booking`) conform to `[A-Za-z0-9_.-]` within 1–128 characters.
+- [x] **Tool Naming**: All nine tool names (`ping_restaurant`, `search_menu`, `check_availability`, `create_booking`, `cancel_booking`, `get_booking`, `place_order`, `get_order`, `cancel_order`) conform to `[A-Za-z0-9_.-]` within 1–128 characters.
 - [x] **JSON Schema Dialect**: Tools export schemas in Draft 2020-12 format.
 - [x] **Parameterless Tools**: Zero-parameter calls fall back gracefully to defaults.
 - [x] **Domain Error Separation**: Tool execution errors return `isError: true` inside tool results, not JSON-RPC protocol error codes.
@@ -257,6 +257,11 @@ All checklist items below have been formally proven by automated tests in `backe
   - `cancel_booking`: `readOnlyHint: false`, `destructiveHint: true`, `idempotentHint: true`, `openWorldHint: false`.
   - `get_booking`: `readOnlyHint: true`, `destructiveHint: false`, `idempotentHint: true`, `openWorldHint: false`.
   - All side effects run in strict SQLite `BEGIN IMMEDIATE` write transactions with audit trail events and anti-enumeration protections.
+- [x] **Transactional Ordering Tools & Pricing Integrity (Phase 9)**:
+  - `place_order`: `readOnlyHint: false`, `destructiveHint: false`, `idempotentHint: true` (with key), `openWorldHint: false`.
+  - `cancel_order`: `readOnlyHint: false`, `destructiveHint: true`, `idempotentHint: true`, `openWorldHint: false`.
+  - `get_order`: `readOnlyHint: true`, `destructiveHint: false`, `idempotentHint: true`, `openWorldHint: false`.
+  - Pure integer arithmetic in minor units (paise), server-side price snapshots, round-half-up tax calculation, allergen conflict rejection with unverified data blocks, dynamic kitchen prep estimation with slot grid snapping, and rate-limited anti-enumeration cancellations.
 
 ---
 
@@ -264,9 +269,11 @@ All checklist items below have been formally proven by automated tests in `backe
 
 The following capabilities are intentionally deferred per the project roadmap:
 
-1. **Orders & Payment Ledgers**: Ordering tools (`add_order_item`, `submit_order`) and deposit/payment workflows are deferred to Phase 9+.
-2. **Persistent Session Storage**: Sessions are managed in-memory via `LocalSessionManager`. Server restarts invalidate existing sessions (clients must re-initialize). Distributed session persistence (Redis/DynamoDB) is deferred.
-3. **Authentication & Authorization**: The `/mcp` transport does not yet require OAuth 2.0 Bearer tokens or API keys (scheduled for future security phase).
-4. **Bedrock / LLM Orchestration**: No AWS Bedrock or LLM agent orchestration logic is wired yet (scheduled for later phases).
-5. **Table Combining**: Physical table combining for large parties exceeding single-table capacities is deferred to future capacity engine extensions.
+1. **Payments & Deposits**: Online payments, credit card capture, deposit processing, and payment ledgers are deferred to Phase 12. Orders are strictly `"unpaid_pay_at_pickup"`.
+2. **Session Memory & "Your Usual"**: Contextual state across dialogues and customer past favorites ("the usual") are deferred to Phase 10.
+3. **Rich Cards / UI Elements**: MCP UI widgets and visual interactive order cards are deferred to Phase 13.
+4. **Persistent Session Storage**: Sessions are managed in-memory via `LocalSessionManager`. Server restarts invalidate existing sessions (clients must re-initialize). Distributed session persistence (Redis/DynamoDB) is deferred.
+5. **Authentication & Authorization**: The `/mcp` transport does not yet require OAuth 2.0 Bearer tokens or API keys (scheduled for future security phase).
+6. **Bedrock / LLM Orchestration**: Direct AWS Bedrock agent wiring is scheduled for later phases.
+
 

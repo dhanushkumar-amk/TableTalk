@@ -1277,7 +1277,7 @@ If testing using the MCP Inspector Web UI:
    - Select transport: **Streamable HTTP** (or Server-Sent Events / HTTP)
    - Enter Server URL: `http://127.0.0.1:8080/mcp`
    - Click **Connect**
-4. Verify the **Tools** tab shows 6 registered tools: `ping_restaurant`, `search_menu`, `check_availability`, `create_booking`, `cancel_booking`, `get_booking`.
+4. Verify the **Tools** tab shows registered tools: `ping_restaurant`, `search_menu`, `check_availability`, `create_booking`, `cancel_booking`, `get_booking`, `place_order`, `get_order`, `cancel_order`.
 5. Select `create_booking`:
    - Enter `date`: `"2026-10-24"`, `time`: `"19:30"`, `party_size`: `2`, `guest_name`: `"Jane Doe"`
    - Click **Run Tool**
@@ -1290,6 +1290,663 @@ If testing using the MCP Inspector Web UI:
    - Enter the `confirmation_code` and `guest_name`: `"Jane Doe"`
    - Click **Run Tool**
    - Verify status `cancelled` and confirmation speech.
+
+---
+
+## 11. Phase 9 Pickup Order Lifecycle Verification (`place_order`, `get_order`, `cancel_order`)
+
+**Date**: 2026-10-13  
+**Server Target**: `http://127.0.0.1:8088/mcp`  
+**Tools Tested**: `place_order`, `get_order`, `cancel_order`  
+**Allergen Invariants**: Strictly zero prohibited safety words ("safe", "guaranteed", "allergy-free").
+
+### Scenario 1: A Normal Order (Placed)
+**Request Arguments**:
+```json
+{
+  "items": [
+    {
+      "item_id": 1,
+      "quantity": 2,
+      "notes": "Extra crispy leaves"
+    },
+    {
+      "item_id": 25,
+      "quantity": 2
+    }
+  ],
+  "pickup_time": "13:15",
+  "guest_name": "Aarav Mehta",
+  "idempotency_key": "manual_idemp_key_001"
+}
+```
+**Verbatim MCP Output**:
+```json
+{
+  "resultType": "complete",
+  "content": [
+    {
+      "type": "text",
+      "text": "I've placed your pickup order for 4 items totaling one thousand one hundred seventy-six rupees, ready at one fifteen in the afternoon. Your order code is T O G W T 4 K. Pay at pickup. Please let us know if you have any allergies."
+    }
+  ],
+  "structuredContent": {
+    "allergen_notice": "Kitchen handles common allergens including dairy, peanuts, tree nuts, and gluten. Please inform restaurant staff of any severe allergies before ordering.",
+    "alternatives": [],
+    "candidates": [],
+    "earliest_pickup_local": "2026-10-21T12:45:00+05:30",
+    "idempotent_replay": false,
+    "order": {
+      "created_at": "2026-10-21T07:00:00+00:00",
+      "guest_name": "Aarav Mehta",
+      "lines": [
+        {
+          "allergens": [
+            "dairy"
+          ],
+          "dietary_tags": [
+            "vegetarian",
+            "gluten_free",
+            "nut_free"
+          ],
+          "item_id": 1,
+          "line_total": {
+            "amount_minor": 76000,
+            "currency": "INR",
+            "display": "₹760"
+          },
+          "name": "Crisp Palak Chaat",
+          "notes": "Extra crispy leaves",
+          "quantity": 2,
+          "unit_price": {
+            "amount_minor": 38000,
+            "currency": "INR",
+            "display": "₹380"
+          }
+        },
+        {
+          "allergens": [
+            "dairy",
+            "gluten"
+          ],
+          "dietary_tags": [
+            "vegetarian",
+            "nut_free"
+          ],
+          "item_id": 25,
+          "line_total": {
+            "amount_minor": 36000,
+            "currency": "INR",
+            "display": "₹360"
+          },
+          "name": "Truffle Garlic Butter Naan",
+          "notes": null,
+          "quantity": 2,
+          "unit_price": {
+            "amount_minor": 18000,
+            "currency": "INR",
+            "display": "₹180"
+          }
+        }
+      ],
+      "order_code": "TO-GWT4K",
+      "payment_status": "unpaid_pay_at_pickup",
+      "pickup_time_local": "2026-10-21T13:15:00+05:30",
+      "stated_allergens": null,
+      "status": "placed",
+      "subtotal": {
+        "amount_minor": 112000,
+        "currency": "INR",
+        "display": "₹1120"
+      },
+      "tax": {
+        "amount_minor": 5600,
+        "currency": "INR",
+        "display": "₹56"
+      },
+      "total": {
+        "amount_minor": 117600,
+        "currency": "INR",
+        "display": "₹1176"
+      }
+    },
+    "price_changes": [],
+    "reason": null,
+    "reason_detail": null,
+    "status": "placed"
+  },
+  "isError": false
+}
+```
+
+---
+
+### Scenario 2: Idempotent Replay with Same Key
+**Request Arguments**: Identical to Scenario 1 with `idempotency_key="manual_idemp_key_001"`.  
+**Verbatim MCP Output**:
+```json
+{
+  "resultType": "complete",
+  "content": [
+    {
+      "type": "text",
+      "text": "I've placed your pickup order for 4 items totaling one thousand one hundred seventy-six rupees, ready at one fifteen in the afternoon. Your order code is T O G W T 4 K. Pay at pickup. Please let us know if you have any allergies."
+    }
+  ],
+  "structuredContent": {
+    "allergen_notice": "Kitchen handles common allergens including dairy, peanuts, tree nuts, and gluten. Please inform restaurant staff of any severe allergies before ordering.",
+    "alternatives": [],
+    "candidates": [],
+    "earliest_pickup_local": "2026-10-21T12:45:00+05:30",
+    "idempotent_replay": true,
+    "order": {
+      "created_at": "2026-10-21T07:00:00+00:00",
+      "guest_name": "Aarav Mehta",
+      "lines": [
+        {
+          "allergens": [
+            "dairy"
+          ],
+          "dietary_tags": [
+            "vegetarian",
+            "gluten_free",
+            "nut_free"
+          ],
+          "item_id": 1,
+          "line_total": {
+            "amount_minor": 76000,
+            "currency": "INR",
+            "display": "₹760"
+          },
+          "name": "Crisp Palak Chaat",
+          "notes": "Extra crispy leaves",
+          "quantity": 2,
+          "unit_price": {
+            "amount_minor": 38000,
+            "currency": "INR",
+            "display": "₹380"
+          }
+        },
+        {
+          "allergens": [
+            "dairy",
+            "gluten"
+          ],
+          "dietary_tags": [
+            "vegetarian",
+            "nut_free"
+          ],
+          "item_id": 25,
+          "line_total": {
+            "amount_minor": 36000,
+            "currency": "INR",
+            "display": "₹360"
+          },
+          "name": "Truffle Garlic Butter Naan",
+          "notes": null,
+          "quantity": 2,
+          "unit_price": {
+            "amount_minor": 18000,
+            "currency": "INR",
+            "display": "₹180"
+          }
+        }
+      ],
+      "order_code": "TO-GWT4K",
+      "payment_status": "unpaid_pay_at_pickup",
+      "pickup_time_local": "2026-10-21T13:15:00+05:30",
+      "stated_allergens": null,
+      "status": "placed",
+      "subtotal": {
+        "amount_minor": 112000,
+        "currency": "INR",
+        "display": "₹1120"
+      },
+      "tax": {
+        "amount_minor": 5600,
+        "currency": "INR",
+        "display": "₹56"
+      },
+      "total": {
+        "amount_minor": 117600,
+        "currency": "INR",
+        "display": "₹1176"
+      }
+    },
+    "price_changes": [],
+    "reason": null,
+    "reason_detail": null,
+    "status": "placed"
+  },
+  "isError": false
+}
+```
+
+---
+
+### Scenario 3: Allergen Conflict (Peanut Allergy)
+**Request Arguments**:
+```json
+{
+  "items": [
+    {
+      "item_id": 5,
+      "quantity": 1
+    }
+  ],
+  "pickup_time": "13:15",
+  "guest_name": "Pooja Hegde",
+  "allergen_acknowledgement": {
+    "allergens_to_avoid": ["peanuts"],
+    "acknowledged": false
+  },
+  "idempotency_key": "manual_idemp_key_002"
+}
+```
+**Verbatim MCP Output**:
+```json
+{
+  "resultType": "complete",
+  "content": [
+    {
+      "type": "text",
+      "text": "The Kurkuri Bhindi Tartlets is listed as containing peanuts, which you asked to avoid. Would you like to try the Crisp Palak Chaat instead?"
+    }
+  ],
+  "structuredContent": {
+    "allergen_notice": "Kitchen handles common allergens including dairy, peanuts, tree nuts, and gluten. Please inform restaurant staff of any severe allergies before ordering.",
+    "alternatives": [
+      "Crisp Palak Chaat",
+      "Dahi Puri Spheres",
+      "Gunpowder Idli Bites"
+    ],
+    "candidates": [],
+    "earliest_pickup_local": null,
+    "idempotent_replay": false,
+    "order": null,
+    "price_changes": [],
+    "reason": "allergen_conflict",
+    "reason_detail": "Order contains items conflicting with requested allergen restrictions: [\"Kurkuri Bhindi Tartlets\"]",
+    "status": "allergen_conflict"
+  },
+  "isError": false
+}
+```
+
+---
+
+### Scenario 4: Ambiguous Item Name
+**Request Arguments**:
+```json
+{
+  "items": [
+    {
+      "item_name": "biryani",
+      "quantity": 1
+    }
+  ],
+  "pickup_time": "13:15",
+  "guest_name": "Vikram Seth",
+  "idempotency_key": "manual_idemp_key_003"
+}
+```
+**Verbatim MCP Output**:
+```json
+{
+  "resultType": "complete",
+  "content": [
+    {
+      "type": "text",
+      "text": "I found multiple dishes matching biryani. Did you mean the Nizami Subz Dum Biryani or the Awadhi Dum Murgh Biryani?"
+    }
+  ],
+  "structuredContent": {
+    "allergen_notice": "Kitchen handles common allergens including dairy, peanuts, tree nuts, and gluten. Please inform restaurant staff of any severe allergies before ordering.",
+    "alternatives": [],
+    "candidates": [
+      {
+        "item_id": 21,
+        "name": "Nizami Subz Dum Biryani",
+        "price": {
+          "amount_minor": 46000,
+          "currency": "INR",
+          "display": "₹460"
+        }
+      },
+      {
+        "item_id": 22,
+        "name": "Awadhi Dum Murgh Biryani",
+        "price": {
+          "amount_minor": 58000,
+          "currency": "INR",
+          "display": "₹580"
+        }
+      },
+      {
+        "item_id": 23,
+        "name": "Dum Gosht Biryani",
+        "price": {
+          "amount_minor": 68000,
+          "currency": "INR",
+          "display": "₹680"
+        }
+      }
+    ],
+    "earliest_pickup_local": null,
+    "idempotent_replay": false,
+    "order": null,
+    "price_changes": [],
+    "reason": "ambiguous_item",
+    "reason_detail": "Query 'biryani' matched multiple items.",
+    "status": "ambiguous_item"
+  },
+  "isError": false
+}
+```
+
+---
+
+### Scenario 5: Pickup Time Too Soon
+**Request Arguments**:
+```json
+{
+  "items": [
+    {
+      "item_id": 1,
+      "quantity": 1
+    }
+  ],
+  "pickup_time": "12:35",
+  "guest_name": "Rahul Bose",
+  "idempotency_key": "manual_idemp_key_004"
+}
+```
+*(Order placed at 12:30; 12 min prep time yields 12:42, snapped to 12:45 slot).*  
+**Verbatim MCP Output**:
+```json
+{
+  "resultType": "complete",
+  "content": [
+    {
+      "type": "text",
+      "text": "The kitchen needs about 15 minutes to prepare your order. The earliest pickup time is twelve forty-five in the afternoon. Would that work for you?"
+    }
+  ],
+  "structuredContent": {
+    "allergen_notice": "Kitchen handles common allergens including dairy, peanuts, tree nuts, and gluten. Please inform restaurant staff of any severe allergies before ordering.",
+    "alternatives": [],
+    "candidates": [],
+    "earliest_pickup_local": "2026-10-21T12:45:00+05:30",
+    "idempotent_replay": false,
+    "order": null,
+    "price_changes": [],
+    "reason": "pickup_too_soon",
+    "reason_detail": "Requested pickup time 12:35 is before the earliest feasible preparation time 12:45.",
+    "status": "pickup_too_soon"
+  },
+  "isError": false
+}
+```
+
+---
+
+### Scenario 6: Closed Hours Request
+**Request Arguments**:
+```json
+{
+  "items": [
+    {
+      "item_id": 1,
+      "quantity": 1
+    }
+  ],
+  "pickup_time": "13:15",
+  "guest_name": "Neha Sharma",
+  "idempotency_key": "manual_idemp_key_005"
+}
+```
+*(Placed on a Tuesday when restaurant is closed).*  
+**Verbatim MCP Output**:
+```json
+{
+  "resultType": "complete",
+  "content": [
+    {
+      "type": "text",
+      "text": "The restaurant is closed today. Please check back on our next open day."
+    }
+  ],
+  "structuredContent": {
+    "allergen_notice": "Kitchen handles common allergens including dairy, peanuts, tree nuts, and gluten. Please inform restaurant staff of any severe allergies before ordering.",
+    "alternatives": [],
+    "candidates": [],
+    "earliest_pickup_local": null,
+    "idempotent_replay": false,
+    "order": null,
+    "price_changes": [],
+    "reason": "closed_day",
+    "reason_detail": "The restaurant is closed on this day of the week.",
+    "status": "closed"
+  },
+  "isError": false
+}
+```
+
+---
+
+### Scenario 7: `get_order` with Wrong Name (Anti-Enumeration Defense)
+**Request Arguments**:
+```json
+{
+  "order_code": "TO-GWT4K",
+  "guest_name": "Wrong Guest"
+}
+```
+**Verbatim MCP Output**:
+```json
+{
+  "resultType": "complete",
+  "content": [
+    {
+      "type": "text",
+      "text": "I couldn't find an order with that code and name. Please check the code and the name on the order."
+    }
+  ],
+  "structuredContent": {
+    "message": "No matching order found for the provided order code and guest name.",
+    "order": null,
+    "status": "not_found"
+  },
+  "isError": false
+}
+```
+*(Note: Byte-identical to an unknown order code like `TO-99999` with `Wrong Guest`).*
+
+---
+
+### Scenario 8: `cancel_order` (Successful Cancellation)
+**Request Arguments**:
+```json
+{
+  "order_code": "TO-GWT4K",
+  "guest_name": "Aarav Mehta",
+  "reason": "Meeting rescheduled"
+}
+```
+**Verbatim MCP Output**:
+```json
+{
+  "resultType": "complete",
+  "content": [
+    {
+      "type": "text",
+      "text": "Your pickup order under code T O G W T 4 K has been cancelled. No charge was incurred."
+    }
+  ],
+  "structuredContent": {
+    "already_cancelled": false,
+    "order": {
+      "created_at": "2026-10-21T07:00:00+00:00",
+      "guest_name": "Aarav Mehta",
+      "lines": [
+        {
+          "allergens": [
+            "dairy"
+          ],
+          "dietary_tags": [
+            "vegetarian",
+            "gluten_free",
+            "nut_free"
+          ],
+          "item_id": 1,
+          "line_total": {
+            "amount_minor": 76000,
+            "currency": "INR",
+            "display": "₹760"
+          },
+          "name": "Crisp Palak Chaat",
+          "notes": "Extra crispy leaves",
+          "quantity": 2,
+          "unit_price": {
+            "amount_minor": 38000,
+            "currency": "INR",
+            "display": "₹380"
+          }
+        },
+        {
+          "allergens": [
+            "dairy",
+            "gluten"
+          ],
+          "dietary_tags": [
+            "vegetarian",
+            "nut_free"
+          ],
+          "item_id": 25,
+          "line_total": {
+            "amount_minor": 36000,
+            "currency": "INR",
+            "display": "₹360"
+          },
+          "name": "Truffle Garlic Butter Naan",
+          "notes": null,
+          "quantity": 2,
+          "unit_price": {
+            "amount_minor": 18000,
+            "currency": "INR",
+            "display": "₹180"
+          }
+        }
+      ],
+      "order_code": "TO-GWT4K",
+      "payment_status": "unpaid_pay_at_pickup",
+      "pickup_time_local": "2026-10-21T07:45:00+00:00",
+      "stated_allergens": null,
+      "status": "cancelled",
+      "subtotal": {
+        "amount_minor": 112000,
+        "currency": "INR",
+        "display": "₹1120"
+      },
+      "tax": {
+        "amount_minor": 5600,
+        "currency": "INR",
+        "display": "₹56"
+      },
+      "total": {
+        "amount_minor": 117600,
+        "currency": "INR",
+        "display": "₹1176"
+      }
+    },
+    "policy_note": "Order cancelled successfully prior to preparation.",
+    "reason": null,
+    "reason_detail": null,
+    "status": "cancelled"
+  },
+  "isError": false
+}
+```
+
+---
+
+### Scenario 9: Invalid Argument Rejected as Tool Error (`isError: true`)
+**Request Arguments**:
+```json
+{
+  "items": [],
+  "guest_name": "Aarav Mehta"
+}
+```
+**Verbatim MCP Output**:
+```json
+{
+  "resultType": "complete",
+  "content": [
+    {
+      "type": "text",
+      "text": "Order must contain between 1 and 20 items. Received 0."
+    }
+  ],
+  "isError": true
+}
+```
+
+---
+
+## 12. Manual Inspector UI Step-by-Step Guide for Ordering
+
+If verifying using the MCP Inspector Web UI (`npx @modelcontextprotocol/inspector`):
+
+1. **Start Server**:
+   ```bash
+   PORT=8080 cargo run --manifest-path backend/Cargo.toml --bin mcp_tabletalk_backend
+   ```
+2. **Launch Inspector UI**:
+   ```bash
+   npx @modelcontextprotocol/inspector
+   ```
+3. **Connect**:
+   - Transport: **Streamable HTTP**
+   - URL: `http://127.0.0.1:8080/mcp`
+   - Click **Connect**
+4. **Verify Registered Tools**:
+   Ensure all 9 tools appear in the list:
+   - `ping_restaurant`
+   - `search_menu`
+   - `check_availability`
+   - `create_booking`
+   - `cancel_booking`
+   - `get_booking`
+   - `place_order`
+   - `get_order`
+   - `cancel_order`
+5. **Test `place_order`**:
+   - In tool dropdown, select `place_order`.
+   - Arguments JSON:
+     ```json
+     {
+       "items": [
+         { "item_id": 1, "quantity": 1 }
+       ],
+       "guest_name": "Dev User",
+       "pickup_time": "14:00"
+     }
+     ```
+   - Click **Run Tool**.
+   - Verify `status: "placed"`, `order_code` starting with `TO-`, and spoken voice text with price and time.
+6. **Test `get_order`**:
+   - Select `get_order`.
+   - Enter `order_code` from step 5, and `guest_name`: `"Dev User"`.
+   - Click **Run Tool**.
+   - Verify `status: "found"` and full line summary with prices.
+7. **Test `cancel_order`**:
+   - Select `cancel_order`.
+   - Enter `order_code` and `guest_name`: `"Dev User"`.
+   - Click **Run Tool**.
+   - Verify `status: "cancelled"` and `already_cancelled: false`.
+   - Re-run with the same arguments: verify `status: "already_cancelled"` and `already_cancelled: true`.
+
 
 
 

@@ -18,6 +18,9 @@ This document serves as the canonical reference for all MCP tools exposed by the
 | `create_booking` | Phase 8 | No | Yes (with key) | Transactionally create a table reservation with idempotency and race safety. |
 | `cancel_booking` | Phase 8 | No (destructive) | Yes | Cancel an existing reservation with guest-name verification and anti-enumeration. |
 | `get_booking` | Phase 8 | Yes | Yes | Read-only reservation summary lookup verified by guest name. |
+| `place_order` | Phase 9 | No | Yes (with key) | Transactionally place a pickup order with integer pricing, allergen protection, and dynamic prep estimation. |
+| `get_order` | Phase 9 | Yes | Yes | Read-only pickup order summary lookup verified by guest name. |
+| `cancel_order` | Phase 9 | No (destructive) | Yes | Cancel an existing placed pickup order with guest-name verification and rate-limited anti-enumeration. |
 
 ---
 
@@ -617,4 +620,343 @@ Dialect: JSON Schema Draft 2020-12
   "required": ["status", "message"]
 }
 ```
+
+---
+
+## 9. Tool: `place_order`
+
+### 9.1 Purpose & Role in Agentic Workflow
+`place_order` transactionally creates a takeout/pickup food order at "The Saffron Nebula Bistro". It enforces server-side pricing integrity, strict allergen conflict blocking with unverified data protection, dynamic kitchen preparation time estimation, and idempotent retries.
+
+All orders in Phase 9 are pickup-only with payment status fixed to `"unpaid_pay_at_pickup"`. No payments, deposits, session memory, or kitchen display systems are enabled in this phase.
+
+### 9.2 Caller Responsibilities (LLM Prompting Guidance)
+- **Do Not Invent Prices**: The caller must never pass prices. Prices are computed purely server-side from active menu records.
+- **Do Not Invent Pickup Times**: If the guest has no specific time preference, omit `pickup_time`; the engine automatically computes and assigns the earliest feasible pickup time based on kitchen load.
+- **Item Resolution**: Callers should prefer passing `item_id` obtained from `search_menu`. If passing `item_name`, provide exact names. Ambiguous names return candidate dishes so the caller can ask the guest for clarification.
+- **Allergen Rules**: If the guest expresses allergen restrictions, pass them in `allergen_acknowledgement.allergens_to_avoid`.
+
+### 9.3 Annotations
+```json
+{
+  "readOnlyHint": false,
+  "destructiveHint": false,
+  "idempotentHint": true,
+  "openWorldHint": false
+}
+```
+
+### 9.4 Input Schema
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "item_id": { "type": ["integer", "null"] },
+          "item_name": { "type": ["string", "null"] },
+          "quantity": { "type": "integer", "minimum": 1, "maximum": 20 },
+          "notes": { "type": ["string", "null"], "maxLength": 140 }
+        },
+        "required": ["quantity"]
+      },
+      "minItems": 1,
+      "maxItems": 20,
+      "description": "1-20 order line items. Provide either item_id or item_name for each line."
+    },
+    "pickup_time": {
+      "type": ["string", "null"],
+      "description": "Optional local HH:MM or ISO timestamp for pickup today. Do not invent times; defaults to earliest feasible pickup time."
+    },
+    "guest_name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 80,
+      "description": "Name of the guest picking up the order."
+    },
+    "phone": { "type": ["string", "null"] },
+    "email": { "type": ["string", "null"] },
+    "allergen_acknowledgement": {
+      "type": ["object", "null"],
+      "properties": {
+        "allergens_to_avoid": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["dairy", "egg", "fish", "shellfish", "tree_nuts", "peanuts", "wheat", "soy", "sesame", "gluten", "mustard", "celery", "lupin", "molluscs", "sulphites"]
+          }
+        },
+        "acknowledged": { "type": "boolean" }
+      },
+      "required": ["allergens_to_avoid", "acknowledged"]
+    },
+    "order_notes": { "type": ["string", "null"], "maxLength": 300 },
+    "idempotency_key": { "type": ["string", "null"], "maxLength": 128 }
+  },
+  "required": ["items", "guest_name"]
+}
+```
+
+### 9.5 Output Schema
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "status": {
+      "type": "string",
+      "enum": [
+        "placed",
+        "item_unavailable",
+        "unknown_item",
+        "ambiguous_item",
+        "pickup_too_soon",
+        "closed",
+        "allergen_conflict",
+        "limit_exceeded",
+        "idempotency_conflict",
+        "invalid_request"
+      ]
+    },
+    "reason": { "type": ["string", "null"] },
+    "reason_detail": { "type": ["string", "null"] },
+    "order": {
+      "type": ["object", "null"],
+      "properties": {
+        "order_code": { "type": "string" },
+        "guest_name": { "type": "string" },
+        "status": { "type": "string" },
+        "pickup_time_local": { "type": "string" },
+        "lines": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "item_id": { "type": "integer" },
+              "name": { "type": "string" },
+              "quantity": { "type": "integer" },
+              "unit_price": {
+                "type": "object",
+                "properties": {
+                  "amount_minor": { "type": "integer" },
+                  "currency": { "type": "string" },
+                  "display": { "type": "string" }
+                },
+                "required": ["amount_minor", "currency", "display"]
+              },
+              "line_total": {
+                "type": "object",
+                "properties": {
+                  "amount_minor": { "type": "integer" },
+                  "currency": { "type": "string" },
+                  "display": { "type": "string" }
+                },
+                "required": ["amount_minor", "currency", "display"]
+              },
+              "notes": { "type": ["string", "null"] },
+              "allergens": { "type": "array", "items": { "type": "string" } },
+              "dietary_tags": { "type": "array", "items": { "type": "string" } }
+            },
+            "required": ["item_id", "name", "quantity", "unit_price", "line_total", "allergens", "dietary_tags"]
+          }
+        },
+        "subtotal": {
+          "type": "object",
+          "properties": {
+            "amount_minor": { "type": "integer" },
+            "currency": { "type": "string" },
+            "display": { "type": "string" }
+          },
+          "required": ["amount_minor", "currency", "display"]
+        },
+        "tax": {
+          "type": "object",
+          "properties": {
+            "amount_minor": { "type": "integer" },
+            "currency": { "type": "string" },
+            "display": { "type": "string" }
+          },
+          "required": ["amount_minor", "currency", "display"]
+        },
+        "total": {
+          "type": "object",
+          "properties": {
+            "amount_minor": { "type": "integer" },
+            "currency": { "type": "string" },
+            "display": { "type": "string" }
+          },
+          "required": ["amount_minor", "currency", "display"]
+        },
+        "payment_status": { "type": "string" },
+        "stated_allergens": { "type": ["string", "null"] },
+        "created_at": { "type": "string" }
+      },
+      "required": ["order_code", "guest_name", "status", "pickup_time_local", "lines", "subtotal", "tax", "total", "payment_status", "created_at"]
+    },
+    "price_changes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "item_id": { "type": "integer" },
+          "item_name": { "type": "string" },
+          "current_price": {
+            "type": "object",
+            "properties": {
+              "amount_minor": { "type": "integer" },
+              "currency": { "type": "string" },
+              "display": { "type": "string" }
+            },
+            "required": ["amount_minor", "currency", "display"]
+          }
+        },
+        "required": ["item_id", "item_name", "current_price"]
+      }
+    },
+    "candidates": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "item_id": { "type": "integer" },
+          "name": { "type": "string" },
+          "price": {
+            "type": "object",
+            "properties": {
+              "amount_minor": { "type": "integer" },
+              "currency": { "type": "string" },
+              "display": { "type": "string" }
+            },
+            "required": ["amount_minor", "currency", "display"]
+          }
+        },
+        "required": ["item_id", "name", "price"]
+      }
+    },
+    "alternatives": { "type": "array", "items": { "type": "string" } },
+    "earliest_pickup_local": { "type": ["string", "null"] },
+    "allergen_notice": { "type": "string" },
+    "idempotent_replay": { "type": "boolean" }
+  },
+  "required": [
+    "status",
+    "price_changes",
+    "candidates",
+    "alternatives",
+    "allergen_notice",
+    "idempotent_replay"
+  ]
+}
+```
+
+### 9.6 Status and Reason Codes
+| Status | Reason | Meaning / Next Caller Action |
+|---|---|---|
+| `placed` | `null` | Order successfully written inside `BEGIN IMMEDIATE`. Read confirmation speech to guest. |
+| `allergen_conflict` | `allergen_conflict` | At least one item contains or may contain avoided allergen, or allergen data is unverified. Suggest returned alternatives. |
+| `ambiguous_item` | `ambiguous_item` | An `item_name` matched multiple menu items. Ask guest to clarify using returned `candidates`. |
+| `unknown_item` | `unknown_item` | An `item_id` or `item_name` does not exist on the active menu. |
+| `item_unavailable` | `item_unavailable` | Item is out of stock (`available = false`). |
+| `pickup_too_soon` | `pickup_too_soon` | Requested time is earlier than prep time + queue allowance. Suggest `earliest_pickup_local`. |
+| `closed` | `closed_day` / `outside_hours` | Restaurant is closed or order cutoff passed. |
+| `limit_exceeded` | `too_many_active_orders` / `order_total_exceeded` | Guest exceeded 3 active orders or ₹25,000 minor unit total. |
+| `idempotency_conflict` | `idempotency_conflict` | Idempotency key was replayed with altered request parameters. |
+| `invalid_request` | `empty_order` / `too_many_items` / etc. | Structural or business validation error. |
+
+---
+
+## 10. Tool: `get_order`
+
+### 10.1 Purpose & Role in Agentic Workflow
+Read-only order status inspection. Looks up an existing pickup order by its human-friendly code (`TO-XXXXX`) and guest name.
+
+### 10.2 Annotations
+```json
+{
+  "readOnlyHint": true,
+  "destructiveHint": false,
+  "idempotentHint": true,
+  "openWorldHint": false
+}
+```
+
+### 10.3 Input Schema
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "order_code": { "type": "string", "description": "Human-friendly code (e.g. 'TO-GWT4K')" },
+    "guest_name": { "type": "string", "description": "Full name of the guest who placed the order for verification." }
+  },
+  "required": ["order_code", "guest_name"]
+}
+```
+
+### 10.4 Output Schema
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "status": { "type": "string", "enum": ["found", "not_found"] },
+    "order": { "type": ["object", "null"] },
+    "message": { "type": "string" }
+  },
+  "required": ["status", "message"]
+}
+```
+
+---
+
+## 11. Tool: `cancel_order`
+
+### 11.1 Purpose & Role in Agentic Workflow
+Cancels a previously placed pickup order. Cancellation is strictly allowed only while the order is in `placed` status (before kitchen preparation begins). Double cancellations are idempotent.
+
+### 11.2 Annotations
+```json
+{
+  "readOnlyHint": false,
+  "destructiveHint": true,
+  "idempotentHint": true,
+  "openWorldHint": false
+}
+```
+
+### 11.3 Input Schema
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "order_code": { "type": "string", "description": "Human-friendly code (e.g. 'TO-GWT4K')" },
+    "guest_name": { "type": "string", "description": "Full name of the guest for verification." },
+    "reason": { "type": ["string", "null"], "maxLength": 200, "description": "Optional cancellation reason." }
+  },
+  "required": ["order_code", "guest_name"]
+}
+```
+
+### 11.4 Output Schema
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "status": { "type": "string", "enum": ["cancelled", "already_cancelled", "not_found", "not_cancellable", "limit_exceeded"] },
+    "already_cancelled": { "type": "boolean" },
+    "order": { "type": ["object", "null"] },
+    "policy_note": { "type": ["string", "null"] },
+    "reason": { "type": ["string", "null"] },
+    "reason_detail": { "type": ["string", "null"] }
+  },
+  "required": ["status", "already_cancelled"]
+}
+```
+
 

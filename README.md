@@ -305,6 +305,73 @@ cargo run -- seed
      }'
    ```
 
+10. **Place a pickup order (`place_order`)**:
+    ```bash
+    curl -i -X POST http://localhost:8080/mcp \
+      -H "Content-Type: application/json" \
+      -H "mcp-session-id: <SESSION_ID>" \
+      -H "mcp-protocol-version: 2025-11-25" \
+      -d '{
+        "jsonrpc": "2.0",
+        "id": 9,
+        "method": "tools/call",
+        "params": {
+          "name": "place_order",
+          "arguments": {
+            "items": [
+              {"item_id": 1, "quantity": 2, "notes": "Extra crispy leaves"},
+              {"item_id": 25, "quantity": 2}
+            ],
+            "pickup_time": "13:15",
+            "guest_name": "Aarav Mehta",
+            "idempotency_key": "order-idem-aarav-001"
+          }
+        }
+      }'
+    ```
+    *Returns status `"placed"`, order code (e.g. `TO-GWT4K`), itemized pricing, round-half-up tax, and natural voice confirmation.*
+
+11. **Lookup order summary (`get_order`)**:
+    ```bash
+    curl -i -X POST http://localhost:8080/mcp \
+      -H "Content-Type: application/json" \
+      -H "mcp-session-id: <SESSION_ID>" \
+      -H "mcp-protocol-version: 2025-11-25" \
+      -d '{
+        "jsonrpc": "2.0",
+        "id": 10,
+        "method": "tools/call",
+        "params": {
+          "name": "get_order",
+          "arguments": {
+            "order_code": "TO-GWT4K",
+            "guest_name": "Aarav Mehta"
+          }
+        }
+      }'
+    ```
+
+12. **Cancel order (`cancel_order`)**:
+    ```bash
+    curl -i -X POST http://localhost:8080/mcp \
+      -H "Content-Type: application/json" \
+      -H "mcp-session-id: <SESSION_ID>" \
+      -H "mcp-protocol-version: 2025-11-25" \
+      -d '{
+        "jsonrpc": "2.0",
+        "id": 11,
+        "method": "tools/call",
+        "params": {
+          "name": "cancel_order",
+          "arguments": {
+            "order_code": "TO-GWT4K",
+            "guest_name": "Aarav Mehta",
+            "reason": "Meeting rescheduled"
+          }
+        }
+      }'
+    ```
+
 For verbatim commands and recorded responses, see [docs/MCP_VERIFICATION.md](docs/MCP_VERIFICATION.md) and tool specifications in [docs/MCP_TOOLS.md](docs/MCP_TOOLS.md).
 
 ---

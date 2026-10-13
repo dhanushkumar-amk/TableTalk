@@ -88,4 +88,20 @@ Feedback and evaluation of core developer tools and platform components used in 
 - **Onboarding experience**: Straightforward once SQLite locking mechanics (`SHARED`, `RESERVED`, `EXCLUSIVE`) are understood.
 - **Would I build with it again**: **Yes** — For embedded single-node services, SQLite WAL mode with `BEGIN IMMEDIATE` delivers sub-15ms write latencies while guaranteeing 100% transactional safety.
 
+---
+
+## Phase 9 Ordering Engine: Integer Money Arithmetic & Allergen Safety Invariants
+
+- **What I used it for**: Building the transactional, money-handling order placement and cancellation engine (`backend/src/ordering.rs`), enforcing server-side integer pricing snapshots, allergen safety invariants (prohibiting unverified data overrides for severe allergens), dynamic prep time estimation, and natural spoken formatting.
+- **What worked well**:
+  - **Integer Arithmetic Safety**: Handling money exclusively in minor units (paise) via Rust's primitive `i64` with checked arithmetic (`checked_add`, `checked_mul`) completely eliminates floating-point rounding hazards and currency drift. Tax calculation with 500 bps (5% GST) rounded half up `(subtotal * 500 + 5000) / 10000` is deterministic and 100% reproducible across platforms.
+  - **Allergen State Machine & Safety Invariants**: Distinguishing between verified allergen presence vs unverified allergen data (`is_unverified`) allowed us to strictly enforce safety: callers cannot override unverified data warnings for severe allergen categories even with `acknowledged: true`. Zero prohibited safety words (`"safe"`, `"guaranteed"`, `"allergy-free"`) are used across code, text, or docs.
+  - **Spoken Text Formatting**: Rendering spoken numbers into natural words (e.g., `"one thousand one hundred seventy-six rupees"`, `"seven fifteen in the evening"`, and spaced order codes `"T O G W T 4 K"`) provides a conversational voice assistant experience that reads naturally without stutter or awkward abbreviations.
+- **What needs work**:
+  - Natural language number formatting requires careful handling of compound numbers (e.g., tens and units) to avoid discarding thousands and hundreds accumulators during string assembly.
+  - In voice assistants, keeping order summaries concise (capping spoken lines to 3 items and summarizing remainder with `"and X more items"`) is essential to prevent user fatigue during speech synthesis.
+- **Onboarding experience**: Smooth and highly reliable.
+- **Would I build with it again**: **Yes** — Pure Rust domain models with injected mock clocks and integer money math make financial and safety-critical ordering engines simple to test and impossible to compromise from client input.
+
+
 
