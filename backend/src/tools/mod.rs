@@ -1,3 +1,4 @@
+pub mod accept_offer;
 pub mod cancel_booking;
 pub mod cancel_order;
 pub mod check_availability;
@@ -9,12 +10,20 @@ pub mod get_booking;
 pub mod get_order;
 pub mod get_profile;
 pub mod get_usual_order;
+pub mod get_waitlist_status;
+pub mod join_waitlist;
+pub mod leave_waitlist;
+pub mod negotiate_booking;
 pub mod ping;
 pub mod place_order;
+pub mod release_offer;
 pub mod remember_preference;
 pub mod rotate_profile_token;
 pub mod search_menu;
 
+pub use accept_offer::{
+    handle_accept_offer, handle_accept_offer_with_clock, AcceptOfferInput, AcceptOfferOutput,
+};
 pub use cancel_booking::{
     handle_cancel_booking, handle_cancel_booking_with_clock, CancelBookingInput,
 };
@@ -36,8 +45,26 @@ pub use get_profile::{handle_get_profile, handle_get_profile_with_clock, GetProf
 pub use get_usual_order::{
     handle_get_usual_order, handle_get_usual_order_with_clock, GetUsualOrderInput,
 };
+pub use get_waitlist_status::{
+    handle_get_waitlist_status, handle_get_waitlist_status_with_clock, GetWaitlistStatusInput,
+    GetWaitlistStatusOutput,
+};
+pub use join_waitlist::{
+    handle_join_waitlist, handle_join_waitlist_with_clock, JoinWaitlistInput, JoinWaitlistOutput,
+};
+pub use leave_waitlist::{
+    handle_leave_waitlist, handle_leave_waitlist_with_clock, LeaveWaitlistInput,
+    LeaveWaitlistOutput,
+};
+pub use negotiate_booking::{
+    handle_negotiate_booking, handle_negotiate_booking_with_clock, NegotiateBookingInput,
+    NegotiateBookingOutput, NegotiationFlexibility,
+};
 pub use ping::{handle_ping, PingInput, PingOutput};
 pub use place_order::{handle_place_order, handle_place_order_with_clock, PlaceOrderInput};
+pub use release_offer::{
+    handle_release_offer, handle_release_offer_with_clock, ReleaseOfferInput, ReleaseOfferOutput,
+};
 pub use remember_preference::{
     handle_remember_preference, handle_remember_preference_with_clock, RememberPreferenceInput,
 };

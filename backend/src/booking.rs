@@ -677,7 +677,7 @@ pub async fn create_booking_tx(
                 status: BookingStatus::Pending,
                 table_id: Some(table_id),
                 special_requests: None,
-                deposit_status: DepositStatus::None,
+                deposit_status: crate::db::models::DepositStatus::None,
                 deposit_amount_cents: 0,
                 created_at: now_iso.clone(),
                 updated_at: now_iso.clone(),
@@ -737,7 +737,7 @@ pub async fn create_booking_tx(
                 .bind(req.area)
                 .bind(dur)
                 .bind(&now_utc_iso)
-                .bind(&neg_ttl.to_rfc3339())
+                .bind(neg_ttl.to_rfc3339())
                 .execute(&mut *conn)
                 .await?
                 .last_insert_rowid();
@@ -906,6 +906,7 @@ pub async fn create_booking_tx(
             status: "confirmed".to_string(),
             special_requests: req.special_requests.map(|s| s.trim().to_string()),
             created_at: now_utc_iso.clone(),
+            source: None,
         };
 
         let output = CreateBookingOutput {
@@ -919,6 +920,8 @@ pub async fn create_booking_tx(
             note: "availability is a snapshot, not a reservation".to_string(),
             profile_applied: None,
             seat_preference_honored: None,
+            negotiation_id: None,
+            negotiation_options: None,
         };
 
         // 11. Record idempotency key if provided
@@ -1177,7 +1180,7 @@ pub async fn cancel_booking_tx(
                 let time_str = local_dt.format("%H:%M").to_string();
 
                 let _ = crate::negotiation::match_waitlist_for_slot(
-                    &mut *conn,
+                    &mut conn,
                     t_id,
                     &booking.start_at,
                     &booking.end_at,
@@ -1288,7 +1291,7 @@ pub async fn get_booking_tx(
 
 // --- Helper: Build BookingSummary with local times and table details ---
 
-async fn build_booking_summary(
+pub async fn build_booking_summary(
     booking: &Booking,
     restaurant: &RestaurantConfig,
     conn: &mut sqlx::pool::PoolConnection<sqlx::Sqlite>,
@@ -1339,6 +1342,7 @@ async fn build_booking_summary(
         status: status_str.to_string(),
         special_requests: booking.special_requests.clone(),
         created_at: booking.created_at.clone(),
+        source: None,
     })
 }
 
@@ -1741,9 +1745,12 @@ mod tests {
                 status: "confirmed".to_string(),
                 special_requests: None,
                 created_at: "2026-10-13T12:00:00Z".to_string(),
+                source: None,
             }),
             idempotent_replay: false,
             alternatives: vec![],
+            negotiation_id: None,
+            negotiation_options: None,
             cancellation_policy: Some(
                 "Free cancellation up to 6 hours prior to reservation.".to_string(),
             ),

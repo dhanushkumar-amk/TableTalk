@@ -94,6 +94,7 @@ async fn test_happy_path_create_check_avail_and_cancel() {
         idempotency_key: Some("test_idemp_key_001".to_string()),
         customer_id: None,
         profile_token: None,
+        negotiate: None,
     };
 
     let res = handle_create_booking_with_clock(&pool, create_input, &clock).await;
@@ -183,6 +184,7 @@ async fn test_the_race_test_20_concurrent_requests_repeated_iterations() {
                 idempotency_key: None,
                 customer_id: None,
                 profile_token: None,
+                negotiate: None,
             },
             &clock,
         )
@@ -203,6 +205,7 @@ async fn test_the_race_test_20_concurrent_requests_repeated_iterations() {
                 idempotency_key: None,
                 customer_id: None,
                 profile_token: None,
+                negotiate: None,
             },
             &clock,
         )
@@ -231,6 +234,7 @@ async fn test_the_race_test_20_concurrent_requests_repeated_iterations() {
                     idempotency_key: None,
                     customer_id: None,
                     profile_token: None,
+                    negotiate: None,
                 };
                 handle_create_booking_with_clock(&p, input, &c).await
             }));
@@ -340,6 +344,7 @@ async fn test_concurrency_across_different_tables_all_succeed() {
                 idempotency_key: None,
                 customer_id: None,
                 profile_token: None,
+                negotiate: None,
             };
             handle_create_booking_with_clock(&p, input, &c).await
         }));
@@ -383,6 +388,7 @@ async fn test_idempotency_keys_replay_concurrency_and_conflict() {
         idempotency_key: Some(key.to_string()),
         customer_id: None,
         profile_token: None,
+        negotiate: None,
     };
 
     let res1 = handle_create_booking_with_clock(&pool, input1.clone(), &clock).await;
@@ -476,6 +482,7 @@ async fn test_best_fit_table_selection() {
         idempotency_key: None,
         customer_id: None,
         profile_token: None,
+        negotiate: None,
     };
 
     let res = handle_create_booking_with_clock(&pool, input, &clock).await;
@@ -518,6 +525,7 @@ async fn test_cancel_verification_byte_identical_responses_and_edge_cases() {
             idempotency_key: None,
             customer_id: None,
             profile_token: None,
+            negotiate: None,
         },
         &clock,
     )
@@ -661,6 +669,7 @@ async fn test_abuse_limits_max_active_bookings() {
                 idempotency_key: None,
                 customer_id: None,
                 profile_token: None,
+                negotiate: None,
             },
             &clock,
         )
@@ -686,6 +695,7 @@ async fn test_abuse_limits_max_active_bookings() {
             idempotency_key: None,
             customer_id: None,
             profile_token: None,
+            negotiate: None,
         },
         &clock,
     )
@@ -778,6 +788,7 @@ async fn test_privacy_logs_contain_no_pii() {
         idempotency_key: None,
         customer_id: None,
         profile_token: None,
+        negotiate: None,
     };
 
     let res = handle_create_booking_with_clock(&pool, input, &clock).await;
@@ -1080,6 +1091,7 @@ async fn test_booking_latency_median_under_30ms() {
             idempotency_key: None,
             customer_id: None,
             profile_token: None,
+            negotiate: None,
         };
 
         let t0 = std::time::Instant::now();

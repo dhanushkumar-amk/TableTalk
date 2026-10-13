@@ -503,6 +503,187 @@ impl TableTalkServer {
         let result = crate::tools::forget_me::handle_forget_me(pool, input).await;
         Ok(result)
     }
+
+    /// Negotiate dining options when preferred time or table is unavailable. Generates up to max_options ranked alternatives with explainable reason codes using deterministic integer scoring. Does NOT place a hold or create a booking. To hold or confirm an option, use accept_offer.
+    #[tool(
+        description = "Negotiate dining options when preferred time or table is unavailable. Generates up to max_options ranked alternatives with explainable reason codes using deterministic integer scoring. Does NOT place a hold or create a booking. To hold or confirm an option, use accept_offer.",
+        output_schema = rmcp::handler::server::tool::schema_for_output::<crate::tools::negotiate_booking::NegotiateBookingOutput>(),
+        annotations(
+            read_only_hint = false,
+            idempotent_hint = false,
+            destructive_hint = false,
+            open_world_hint = false
+        )
+    )]
+    async fn negotiate_booking(
+        &self,
+        Parameters(input): Parameters<crate::tools::negotiate_booking::NegotiateBookingInput>,
+    ) -> Result<rmcp::model::CallToolResult, rmcp::ErrorData> {
+        let pool = match &self.db {
+            Some(p) => p,
+            None => {
+                return Ok(rmcp::model::CallToolResult::error(vec![
+                    rmcp::model::ContentBlock::text(
+                        "Database connection pool is not configured on TableTalkServer.",
+                    ),
+                ]));
+            }
+        };
+
+        let result = crate::tools::negotiate_booking::handle_negotiate_booking(pool, input).await;
+        Ok(result)
+    }
+
+    /// Accept an option from an active negotiation or convert a previously held offer into a confirmed booking. When hold_only is true, places a short-lived hold (default 5 minutes) returning an offer_token. When hold_only is false or when offer_token is provided, completes the reservation.
+    #[tool(
+        description = "Accept an option from an active negotiation or convert a previously held offer into a confirmed booking. When hold_only is true, places a short-lived hold (default 5 minutes) returning an offer_token. When hold_only is false or when offer_token is provided, completes the reservation.",
+        output_schema = rmcp::handler::server::tool::schema_for_output::<crate::tools::accept_offer::AcceptOfferOutput>(),
+        annotations(
+            read_only_hint = false,
+            idempotent_hint = true,
+            destructive_hint = false,
+            open_world_hint = false
+        )
+    )]
+    async fn accept_offer(
+        &self,
+        Parameters(input): Parameters<crate::tools::accept_offer::AcceptOfferInput>,
+    ) -> Result<rmcp::model::CallToolResult, rmcp::ErrorData> {
+        let pool = match &self.db {
+            Some(p) => p,
+            None => {
+                return Ok(rmcp::model::CallToolResult::error(vec![
+                    rmcp::model::ContentBlock::text(
+                        "Database connection pool is not configured on TableTalkServer.",
+                    ),
+                ]));
+            }
+        };
+
+        let result = crate::tools::accept_offer::handle_accept_offer(pool, input).await;
+        Ok(result)
+    }
+
+    /// Release an active table hold, freeing the table for other guests or waitlist matching. Idempotent.
+    #[tool(
+        description = "Release an active table hold, freeing the table for other guests or waitlist matching. Idempotent.",
+        output_schema = rmcp::handler::server::tool::schema_for_output::<crate::tools::release_offer::ReleaseOfferOutput>(),
+        annotations(
+            read_only_hint = false,
+            idempotent_hint = true,
+            destructive_hint = false,
+            open_world_hint = false
+        )
+    )]
+    async fn release_offer(
+        &self,
+        Parameters(input): Parameters<crate::tools::release_offer::ReleaseOfferInput>,
+    ) -> Result<rmcp::model::CallToolResult, rmcp::ErrorData> {
+        let pool = match &self.db {
+            Some(p) => p,
+            None => {
+                return Ok(rmcp::model::CallToolResult::error(vec![
+                    rmcp::model::ContentBlock::text(
+                        "Database connection pool is not configured on TableTalkServer.",
+                    ),
+                ]));
+            }
+        };
+
+        let result = crate::tools::release_offer::handle_release_offer(pool, input).await;
+        Ok(result)
+    }
+
+    /// Join the dining waitlist for a specific date and time window when no tables are available. Returns a waitlist code and queue position. There are no push notifications; callers must poll get_waitlist_status.
+    #[tool(
+        description = "Join the dining waitlist for a specific date and time window when no tables are available. Returns a waitlist code and queue position. There are no push notifications; callers must poll get_waitlist_status.",
+        output_schema = rmcp::handler::server::tool::schema_for_output::<crate::tools::join_waitlist::JoinWaitlistOutput>(),
+        annotations(
+            read_only_hint = false,
+            idempotent_hint = true,
+            destructive_hint = false,
+            open_world_hint = false
+        )
+    )]
+    async fn join_waitlist(
+        &self,
+        Parameters(input): Parameters<crate::tools::join_waitlist::JoinWaitlistInput>,
+    ) -> Result<rmcp::model::CallToolResult, rmcp::ErrorData> {
+        let pool = match &self.db {
+            Some(p) => p,
+            None => {
+                return Ok(rmcp::model::CallToolResult::error(vec![
+                    rmcp::model::ContentBlock::text(
+                        "Database connection pool is not configured on TableTalkServer.",
+                    ),
+                ]));
+            }
+        };
+
+        let result = crate::tools::join_waitlist::handle_join_waitlist(pool, input).await;
+        Ok(result)
+    }
+
+    /// Check the status of a dining waitlist entry. Read-only. If a table opens up and is offered, returns an offer_token and hold expiry so the caller can call accept_offer.
+    #[tool(
+        description = "Check the status of a dining waitlist entry. Read-only. If a table opens up and is offered, returns an offer_token and hold expiry so the caller can call accept_offer.",
+        output_schema = rmcp::handler::server::tool::schema_for_output::<crate::tools::get_waitlist_status::GetWaitlistStatusOutput>(),
+        annotations(
+            read_only_hint = true,
+            idempotent_hint = true,
+            destructive_hint = false,
+            open_world_hint = false
+        )
+    )]
+    async fn get_waitlist_status(
+        &self,
+        Parameters(input): Parameters<crate::tools::get_waitlist_status::GetWaitlistStatusInput>,
+    ) -> Result<rmcp::model::CallToolResult, rmcp::ErrorData> {
+        let pool = match &self.db {
+            Some(p) => p,
+            None => {
+                return Ok(rmcp::model::CallToolResult::error(vec![
+                    rmcp::model::ContentBlock::text(
+                        "Database connection pool is not configured on TableTalkServer.",
+                    ),
+                ]));
+            }
+        };
+
+        let result =
+            crate::tools::get_waitlist_status::handle_get_waitlist_status(pool, input).await;
+        Ok(result)
+    }
+
+    /// Leave the dining waitlist and cancel any active offer hold. Idempotent.
+    #[tool(
+        description = "Leave the dining waitlist and cancel any active offer hold. Idempotent.",
+        output_schema = rmcp::handler::server::tool::schema_for_output::<crate::tools::leave_waitlist::LeaveWaitlistOutput>(),
+        annotations(
+            read_only_hint = false,
+            idempotent_hint = true,
+            destructive_hint = true,
+            open_world_hint = false
+        )
+    )]
+    async fn leave_waitlist(
+        &self,
+        Parameters(input): Parameters<crate::tools::leave_waitlist::LeaveWaitlistInput>,
+    ) -> Result<rmcp::model::CallToolResult, rmcp::ErrorData> {
+        let pool = match &self.db {
+            Some(p) => p,
+            None => {
+                return Ok(rmcp::model::CallToolResult::error(vec![
+                    rmcp::model::ContentBlock::text(
+                        "Database connection pool is not configured on TableTalkServer.",
+                    ),
+                ]));
+            }
+        };
+
+        let result = crate::tools::leave_waitlist::handle_leave_waitlist(pool, input).await;
+        Ok(result)
+    }
 }
 
 #[tool_handler(router = self.tool_router)]

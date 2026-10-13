@@ -1,4 +1,4 @@
-use crate::availability::AreaFilter;
+use crate::availability::{AreaFilter, Clock};
 use crate::db::models::{Area, WaitlistEntry, WaitlistStatus};
 use chrono::{DateTime, Duration, NaiveDate, NaiveTime, Timelike, Utc};
 use rand::RngCore;
@@ -28,7 +28,11 @@ pub fn generate_offer_token() -> (String, String) {
 
 /// Generate deterministic offer token for waitlist hold so caller of get_waitlist_status can receive it
 /// without storing plain token in database.
-pub fn generate_waitlist_offer_token(hold_id: i64, waitlist_code: &str, created_at: &str) -> (String, String) {
+pub fn generate_waitlist_offer_token(
+    hold_id: i64,
+    waitlist_code: &str,
+    created_at: &str,
+) -> (String, String) {
     let mut hasher = Sha256::new();
     hasher.update(b"tabletalk_waitlist_offer_salt:");
     hasher.update(hold_id.to_string().as_bytes());
@@ -195,7 +199,8 @@ pub fn score_candidate(
     // 2. Minutes from requested time
     let minutes_from_requested = {
         let req_total_mins = requested_time.hour() as i64 * 60 + requested_time.minute() as i64;
-        let cand_total_mins = candidate.start_local_time.hour() as i64 * 60 + candidate.start_local_time.minute() as i64;
+        let cand_total_mins = candidate.start_local_time.hour() as i64 * 60
+            + candidate.start_local_time.minute() as i64;
         (cand_total_mins - req_total_mins).abs()
     };
 
@@ -332,7 +337,12 @@ pub fn format_spoken_hold(area: &str, start_local: &str, minutes: i64) -> String
 
 /// Format waitlist offer voice text:
 /// Example: "A table for eight on the patio at seven thirty has opened up from the waitlist. I'm holding it for five minutes. Would you like to confirm?"
-pub fn format_spoken_waitlist_offer(party_size: i64, area: &str, start_local: &str, minutes: i64) -> String {
+pub fn format_spoken_waitlist_offer(
+    party_size: i64,
+    area: &str,
+    start_local: &str,
+    minutes: i64,
+) -> String {
     let party_phrase = match party_size {
         1 => "one person".to_string(),
         2 => "two".to_string(),
@@ -380,9 +390,19 @@ fn format_time_voice(time_str: &str) -> String {
         };
 
         let h_word = match h12 {
-            1 => "one", 2 => "two", 3 => "three", 4 => "four", 5 => "five",
-            6 => "six", 7 => "seven", 8 => "eight", 9 => "nine", 10 => "ten",
-            11 => "eleven", 12 => "twelve", _ => "unknown",
+            1 => "one",
+            2 => "two",
+            3 => "three",
+            4 => "four",
+            5 => "five",
+            6 => "six",
+            7 => "seven",
+            8 => "eight",
+            9 => "nine",
+            10 => "ten",
+            11 => "eleven",
+            12 => "twelve",
+            _ => "unknown",
         };
 
         if minute == 0 {
@@ -414,12 +434,13 @@ pub fn format_spoken_waitlist_code(code: &str) -> String {
 /// Match the first fitting waiting waitlist entry for a freed dining table and slot.
 /// Must be run inside an open write transaction (`conn`).
 /// Converts at most ONE fitting entry to 'offered' status and creates an active hold.
+#[allow(clippy::too_many_arguments)]
 pub async fn match_waitlist_for_slot(
     conn: &mut SqliteConnection,
     freed_table_id: i64,
     freed_start_at: &str,
     freed_end_at: &str,
-    freed_area: &str,
+    _freed_area: &str,
     target_date: &str,
     slot_start_time: &str, // HH:MM
     clock: &dyn Clock,
@@ -565,7 +586,8 @@ pub async fn match_waitlist_for_slot(
         .await?
         .last_insert_rowid();
 
-        let (_plain_token, real_hash) = generate_waitlist_offer_token(hold_id, &entry.code, &now_iso);
+        let (_plain_token, real_hash) =
+            generate_waitlist_offer_token(hold_id, &entry.code, &now_iso);
         sqlx::query("UPDATE slot_holds SET token_hash = ? WHERE id = ?")
             .bind(&real_hash)
             .bind(hold_id)
@@ -630,14 +652,7 @@ pub async fn sweep_expired_holds_and_negotiations(
                 let date_str = dt.format("%Y-%m-%d").to_string();
                 let time_str = dt.format("%H:%M").to_string();
                 let _ = match_waitlist_for_slot(
-                    &mut *conn,
-                    table_id,
-                    &start_at,
-                    &end_at,
-                    &area,
-                    &date_str,
-                    &time_str,
-                    clock,
+                    &mut conn, table_id, &start_at, &end_at, &area, &date_str, &time_str, clock,
                 )
                 .await;
             }

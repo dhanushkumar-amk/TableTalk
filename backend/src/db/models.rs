@@ -80,11 +80,27 @@ pub enum BookingStatus {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, sqlx::Type)]
 #[sqlx(rename_all = "snake_case")]
 pub enum DepositStatus {
-    None,
-    Required,
+    NotRequired,
+    RequiresPayment,
     Paid,
     Refunded,
+    PartiallyRefunded,
     Forfeited,
+    Expired,
+}
+
+impl DepositStatus {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            DepositStatus::NotRequired => "not_required",
+            DepositStatus::RequiresPayment => "requires_payment",
+            DepositStatus::Paid => "paid",
+            DepositStatus::Refunded => "refunded",
+            DepositStatus::PartiallyRefunded => "partially_refunded",
+            DepositStatus::Forfeited => "forfeited",
+            DepositStatus::Expired => "expired",
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, sqlx::Type)]
@@ -111,8 +127,37 @@ pub enum PaymentStatus {
     RequiresAction,
     Authorized,
     Captured,
+    PartiallyRefunded,
     Refunded,
     Failed,
+    Expired,
+    Voided,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, sqlx::Type)]
+#[sqlx(rename_all = "snake_case")]
+pub enum SessionStatus {
+    Open,
+    Completed,
+    Expired,
+    Cancelled,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, sqlx::Type)]
+#[sqlx(rename_all = "snake_case")]
+pub enum PaymentKind {
+    Deposit,
+    Refund,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, sqlx::Type)]
+#[sqlx(rename_all = "snake_case")]
+pub enum LedgerEntryType {
+    Authorize,
+    Capture,
+    Void,
+    Refund,
+    Adjustment,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, sqlx::Type)]
@@ -174,6 +219,17 @@ pub struct RestaurantConfig {
     pub tax_rate_basis_points: i64,
     pub last_order_before_close_minutes: i64,
     pub phone: String,
+    pub deposit_max_amount_cents: i64,
+    pub deposit_payment_deadline_minutes: i64,
+    pub deposit_refund_full_basis_points: i64,
+    pub deposit_refund_partial_basis_points: i64,
+    pub deposit_refund_full_hours: i64,
+    pub deposit_refund_partial_hours: i64,
+    pub deposit_peak_days: String,
+    pub deposit_peak_start_time: Option<String>,
+    pub deposit_peak_end_time: Option<String>,
+    pub deposit_demo_mode: bool,
+    pub deposit_decline_retry_limit: i64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, sqlx::FromRow)]
@@ -306,13 +362,21 @@ pub struct Booking {
     pub table_id: Option<i64>,
     pub special_requests: Option<String>,
     pub deposit_status: DepositStatus,
-    pub deposit_amount_cents: i64,
+    pub deposit_amount_minor: i64,
+    pub payment_deadline_at: Option<String>,
+    pub cancel_reason: Option<String>,
     pub created_at: String,
     pub updated_at: String,
     pub cancelled_at: Option<String>,
     pub guest_phone: Option<String>,
     pub guest_email: Option<String>,
 }
+
+/// Canonical SELECT column list for the bookings table. Keep in sync with the
+/// `Booking` struct field order above.
+pub const BOOKING_SELECT_COLUMNS: &str = "id, confirmation_code, customer_id, guest_name, party_size, \
+     start_at, end_at, status, table_id, special_requests, deposit_status, deposit_amount_minor, \
+     payment_deadline_at, cancel_reason, created_at, updated_at, cancelled_at, guest_phone, guest_email";
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, sqlx::FromRow)]
 pub struct IdempotencyKeyRecord {
@@ -368,10 +432,39 @@ pub struct Payment {
     pub id: String,
     pub booking_id: Option<String>,
     pub order_id: Option<String>,
-    pub amount_cents: i64,
+    pub session_id: Option<String>,
+    pub kind: PaymentKind,
+    pub amount_minor: i64,
     pub currency: String,
-    pub status: PaymentStatus,
+    pub provider: String,
     pub provider_reference: String,
+    pub status: PaymentStatus,
+    pub payer_name: Option<String>,
+    pub payer_contact: Option<String>,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, sqlx::FromRow)]
+pub struct PaymentSession {
+    pub id: String,
+    pub booking_id: String,
+    pub token_hash: String,
+    pub amount_minor: i64,
+    pub currency: String,
+    pub status: SessionStatus,
+    pub expires_at: String,
+    pub decline_count: i64,
+    pub created_at: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, sqlx::FromRow)]
+pub struct LedgerEntry {
+    pub id: i64,
+    pub payment_id: String,
+    pub entry_type: LedgerEntryType,
+    pub amount_minor: i64,
+    pub idempotency_key: String,
     pub created_at: String,
 }
 

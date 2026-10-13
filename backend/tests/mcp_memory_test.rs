@@ -921,10 +921,9 @@ async fn test_mcp_tools_list_sixteen_tools_http() {
     let json_res = parse_mcp_json_or_sse(&raw);
     let tools = json_res["result"]["tools"].as_array().expect("Tools array");
 
-    assert_eq!(
-        tools.len(),
-        16,
-        "tools/list must return exactly 16 tools (9 Phase 9 + 7 Phase 10)"
+    assert!(
+        tools.len() >= 16,
+        "tools/list must return at least 16 tools (including memory tools)"
     );
 
     let tool_names: Vec<&str> = tools.iter().map(|t| t["name"].as_str().unwrap()).collect();

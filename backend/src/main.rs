@@ -63,6 +63,26 @@ async fn main() {
         return;
     }
 
+    if args.len() > 1 && args[1] == "sweep" {
+        info!("Initializing database pool and running migrations...");
+        let pool = tabletalk_backend::db::init_pool(&config.database_url)
+            .await
+            .unwrap_or_else(|err| panic!("Failed to initialize database: {}", err));
+
+        info!("Sweeping expired holds, negotiations, and waitlist entries...");
+        let clock = tabletalk_backend::availability::SystemClock;
+        let swept =
+            tabletalk_backend::negotiation::sweep_expired_holds_and_negotiations(&pool, &clock)
+                .await
+                .unwrap_or_else(|err| panic!("Failed to sweep expired records: {}", err));
+
+        println!("==================================================");
+        println!(" Expiry Sweep Completed");
+        println!(" Swept Records Count: {}", swept);
+        println!("==================================================");
+        return;
+    }
+
     info!("Initializing database pool and applying migrations...");
     let pool = tabletalk_backend::db::init_pool(&config.database_url)
         .await

@@ -1,5 +1,5 @@
 use chrono::{TimeZone, Utc};
-use sqlx::{Row, SqlitePool};
+use sqlx::Row;
 use tabletalk_backend::{
     availability::FixedClock,
     db::{init_test_pool, seed_database},

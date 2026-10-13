@@ -205,8 +205,8 @@ pub async fn handle_check_availability_with_clock(
         "#,
     )
     .bind(&now_iso)
-    .bind(&search_end_utc.to_rfc3339())
-    .bind(&search_start_utc.to_rfc3339())
+    .bind(search_end_utc.to_rfc3339())
+    .bind(search_start_utc.to_rfc3339())
     .fetch_all(pool)
     .await
     .unwrap_or_default();
