@@ -23,6 +23,7 @@ impl Clock for SystemClock {
 }
 
 /// Deterministic clock with a fixed timestamp for tests.
+#[derive(Debug, Clone, Copy)]
 pub struct FixedClock(pub DateTime<Utc>);
 
 impl Clock for FixedClock {

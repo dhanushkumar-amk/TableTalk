@@ -5,8 +5,7 @@ use crate::{
         AvailabilityQuery, Clock,
     },
     db::models::{
-        Area, Booking, BookingStatus, DiningTable, OpeningHours, RestaurantConfig,
-        SpecialClosure,
+        Area, Booking, BookingStatus, DiningTable, OpeningHours, RestaurantConfig, SpecialClosure,
     },
 };
 use chrono::{DateTime, Duration, NaiveDate, NaiveTime, TimeZone, Utc};
@@ -92,6 +91,7 @@ pub fn generate_confirmation_code() -> String {
 /// - Trims and converts to uppercase.
 /// - Strips spaces, hyphens, and underscores.
 /// - Ensures the `TT-` prefix is present.
+///
 /// Tolerates inputs like `tt 8k4mz`, `8k4mz`, `TT-8K4MZ`.
 pub fn normalize_confirmation_code(input: &str) -> String {
     let upper = input.trim().to_ascii_uppercase();
@@ -100,8 +100,7 @@ pub fn normalize_confirmation_code(input: &str) -> String {
         .filter(|c| c.is_ascii_alphanumeric())
         .collect();
 
-    if clean.starts_with("TT") {
-        let body = &clean[2..];
+    if let Some(body) = clean.strip_prefix("TT") {
         format!("{}{}", CONFIRMATION_CODE_PREFIX, body)
     } else {
         format!("{}{}", CONFIRMATION_CODE_PREFIX, clean)
@@ -149,6 +148,7 @@ pub fn validate_idempotency_key(key: &str) -> bool {
         .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_' || c == '.')
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn validate_create_booking_request(
     date_str: &str,
     time_str: &str,
@@ -208,14 +208,13 @@ pub fn validate_create_booking_request(
 
     if let Some(e) = email {
         let e_trimmed = e.trim();
-        if !e_trimmed.is_empty() {
-            if !(3..=100).contains(&e_trimmed.len())
+        if !e_trimmed.is_empty()
+            && (!(3..=100).contains(&e_trimmed.len())
                 || !e_trimmed.contains('@')
                 || e_trimmed.starts_with('@')
-                || e_trimmed.ends_with('@')
-            {
-                return Err(BookingValidationError::InvalidEmail);
-            }
+                || e_trimmed.ends_with('@'))
+        {
+            return Err(BookingValidationError::InvalidEmail);
         }
     }
 
@@ -237,6 +236,7 @@ struct CanonicalBookingRequest<'a> {
     special_requests: Option<&'a str>,
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn compute_request_hash(
     date: &str,
     time: &str,
@@ -595,7 +595,7 @@ pub async fn create_booking_tx(
         .await?;
 
         let tables: Vec<DiningTable> = sqlx::query_as(
-            "SELECT id, label, capacity_min, capacity_max, area, is_active, created_at FROM dining_tables WHERE is_active = 1 ORDER BY capacity_max ASC, id ASC"
+            "SELECT id, label, capacity_min, capacity_max, area, is_active FROM dining_tables WHERE is_active = 1 ORDER BY capacity_max ASC, id ASC"
         )
         .fetch_all(&mut *conn)
         .await?;
@@ -1420,7 +1420,15 @@ mod tests {
         // Invalid time
         assert!(matches!(
             validate_create_booking_request(
-                "2026-10-17", "7:30pm", 4, "Alice", None, None, None, None, 12
+                "2026-10-17",
+                "7:30pm",
+                4,
+                "Alice",
+                None,
+                None,
+                None,
+                None,
+                12
             ),
             Err(BookingValidationError::InvalidTime(_))
         ));
@@ -1428,7 +1436,15 @@ mod tests {
         // Party size zero
         assert!(matches!(
             validate_create_booking_request(
-                "2026-10-17", "19:30", 0, "Alice", None, None, None, None, 12
+                "2026-10-17",
+                "19:30",
+                0,
+                "Alice",
+                None,
+                None,
+                None,
+                None,
+                12
             ),
             Err(BookingValidationError::InvalidPartySize(_, _))
         ));
@@ -1436,7 +1452,15 @@ mod tests {
         // Party size exceeding max
         assert!(matches!(
             validate_create_booking_request(
-                "2026-10-17", "19:30", 25, "Alice", None, None, None, None, 12
+                "2026-10-17",
+                "19:30",
+                25,
+                "Alice",
+                None,
+                None,
+                None,
+                None,
+                12
             ),
             Err(BookingValidationError::InvalidPartySize(_, _))
         ));
@@ -1444,7 +1468,15 @@ mod tests {
         // Empty guest name
         assert!(matches!(
             validate_create_booking_request(
-                "2026-10-17", "19:30", 2, "   ", None, None, None, None, 12
+                "2026-10-17",
+                "19:30",
+                2,
+                "   ",
+                None,
+                None,
+                None,
+                None,
+                12
             ),
             Err(BookingValidationError::InvalidGuestName)
         ));
@@ -1469,7 +1501,15 @@ mod tests {
         // Idempotency key too short (<8)
         assert!(matches!(
             validate_create_booking_request(
-                "2026-10-17", "19:30", 2, "Alice", None, None, None, Some("short"), 12
+                "2026-10-17",
+                "19:30",
+                2,
+                "Alice",
+                None,
+                None,
+                None,
+                Some("short"),
+                12
             ),
             Err(BookingValidationError::InvalidIdempotencyKey(_))
         ));
