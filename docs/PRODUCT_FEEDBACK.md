@@ -44,20 +44,16 @@ Feedback and evaluation of core developer tools and platform components used in 
 
 ---
 
-## AWS Services
+## SQLx 0.8 & SQLite (Persistence Layer)
 
-- **What I used it for**: 
-- **What worked well**: 
-- **What needs work**: 
-- **Onboarding experience**: 
-- **Would I build with it again**: [Yes / No] — [Why]
-
----
-
-## Kiro / AI Tools
-
-- **What I used it for**: 
-- **What worked well**: 
-- **What needs work**: 
-- **Onboarding experience**: 
-- **Would I build with it again**: [Yes / No] — [Why]
+- **What I used it for**: Relational schema persistence, embedded migrations, connection pooling with custom PRAGMAs (WAL, foreign keys, busy timeout), strongly-typed entity mapping with `FromRow`, and concurrency-safe table reservation transactions.
+- **What worked well**:
+  - `sqlx::migrate!("./migrations")` embeds schema migrations directly into the application binary, enabling self-bootstrapping databases in fresh container environments and in-memory test harnesses with zero external CLI requirements.
+  - Connection pooling with `SqlitePool` smoothly coordinates WAL mode, ensuring concurrent read operations (e.g. menu search, customer profile reads) are not blocked by write transactions.
+  - Strongly-typed enum mapping via `#[derive(sqlx::Type)]` with `#[sqlx(rename_all = "snake_case")]` provides exhaustive pattern matching in domain logic while seamlessly serializing to/from SQLite TEXT and CHECK constraints.
+  - In-memory SQLite testing (`sqlite::memory:`) makes automated unit and property testing blazing fast (7 comprehensive database integration and concurrency tests complete in ~100ms).
+- **What needs work**:
+  - Compile-time checked queries (`sqlx::query!`) require either a live database or pre-generated `.sqlx/` JSON metadata via `cargo-sqlx`. This creates significant developer friction when writing dynamic queries with optional filter predicates, making runtime `sqlx::query_as` and `QueryBuilder` far more practical for search-heavy workflows.
+  - SQLite's `INSERT OR REPLACE` deletes conflicting rows prior to insertion rather than performing an in-place update. In schemas with `ON DELETE RESTRICT` foreign keys, this triggers unexpected constraint failures during re-seeding unless `ON CONFLICT (...) DO UPDATE` or `INSERT OR IGNORE` is explicitly used.
+- **Onboarding experience**: Excellent documentation on crates.io and docs.rs. Adding features like `chrono` and `uuid` is transparent and well-integrated.
+- **Would I build with it again**: **Yes** — SQLx provides the ideal balance of async Tokio compatibility, compile-time type safety via derives, and embedded zero-maintenance persistence for embedded SQLite architectures.

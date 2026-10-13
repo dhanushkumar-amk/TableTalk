@@ -140,4 +140,31 @@ A running log of unexpected friction, hurdles, bugs, or developer experience iss
 - **Workaround**: Removed `server_runner.rs` and replaced it with direct cargo execution (`cargo run --bin tabletalk-backend`) and standard integration tests (`#[tokio::test]`), which execute cleanly.
 - **Suggestion**: Use standard Cargo integration test harnesses and avoid creating custom test binary entry points.
 
+### SQLite INSERT OR REPLACE Triggering Foreign Key Restrict Failure on Re-Seeding
+- **Date**: 2026-10-13
+- **Task attempted**: Making the database seeder idempotent across repeated test executions (`seed_database(&pool, None)`)
+- **Steps taken**:
+  1. Implemented initial seeder using `INSERT OR REPLACE INTO menu_items (...)`
+  2. Seeded database once, creating `menu_items`, `orders`, and `order_items` referencing item IDs with `ON DELETE RESTRICT`
+  3. Ran second seed to verify row count stability
+- **Expected vs actual**:
+  - *Expected*: Existing rows are updated in place or skipped, leaving counts identical
+  - *Actual*: SQLite panicked with `FOREIGN KEY constraint failed (error code 1811)`. In SQLite, `INSERT OR REPLACE` deletes the conflicting row before inserting the replacement. Because child table `order_items` had foreign keys with `ON DELETE RESTRICT`, deleting the parent row triggered an immediate constraint failure.
+- **Severity**: High
+- **Workaround**: Replaced `INSERT OR REPLACE INTO` with `INSERT INTO ... ON CONFLICT (id) DO UPDATE SET ...` (UPSERT) or `INSERT OR IGNORE INTO`, updating or skipping records in place without deleting parent keys.
+- **Suggestion**: Document in SQLite data modeling guides that `INSERT OR REPLACE` must never be used on parent tables with `ON DELETE RESTRICT` child references; use `ON CONFLICT (...) DO UPDATE` or `INSERT OR IGNORE` instead.
+
+### Lack of Native Exclusion Constraints for Overlap Prevention in SQLite
+- **Date**: 2026-10-13
+- **Task attempted**: Preventing double-booking of tables across concurrent reservation attempts
+- **Steps taken**:
+  1. Designed reservation model for `bookings` entity
+  2. Evaluated table-level exclusion constraints (available in PostgreSQL as `EXCLUDE USING GIST`)
+- **Expected vs actual**:
+  - *Expected*: Native declarative exclusion constraint prevents overlapping `(table_id, [start_at, end_at))` ranges
+  - *Actual*: SQLite does not support generalized exclusion constraints or range types
+- **Severity**: Medium
+- **Workaround**: Implemented repository-level concurrency primitive `try_reserve_table` using SQLite `BEGIN IMMEDIATE` transaction semantics. By obtaining the write lock prior to checking `start_at < existing_end AND end_at > existing_start`, concurrent reservations are serialized and race conditions are eliminated.
+- **Suggestion**: For SQLite-backed reservation systems, explicitly design transaction-level locking primitives with concurrency tests rather than relying on schema-only guards.
+
 

@@ -31,13 +31,21 @@ TableTalk is a restaurant Model Context Protocol (MCP) server that empowers voic
 tabletalk/
 ├── backend/                  # Cargo workspace member (Axum + Tokio)
 │   ├── Cargo.toml            # Backend dependencies
-│   ├── tests/                # Integration tests for MCP and health endpoints
+│   ├── migrations/           # Embedded SQL migrations
+│   │   └── 0001_initial_schema.sql
+│   ├── tests/                # Integration tests (MCP protocol, database integrity)
 │   └── src/
-│       ├── main.rs           # Startup & server runtime entrypoint
+│       ├── main.rs           # Startup & server runtime entrypoint (supports 'seed' CLI)
 │       ├── lib.rs            # Library exports for integration testing
 │       ├── config.rs         # Environment variable configuration
 │       ├── server.rs         # TableTalk MCP server handler & capabilities
 │       ├── http.rs           # Axum router, health check, CORS, Origin validation
+│       ├── db/               # Database persistence layer
+│       │   ├── mod.rs        # Connection pool setup, pragmas, migrations
+│       │   ├── error.rs      # DbError domain error types (thiserror)
+│       │   ├── models.rs     # Typed structs, newtypes, and domain enums
+│       │   ├── seed.rs       # Deterministic idempotent fictional data seeder
+│       │   └── repo/         # Repositories (restaurant, tables, menu, customers, bookings, orders)
 │       └── tools/            # MCP tool implementations
 │           ├── mod.rs
 │           └── ping.rs       # ping_restaurant hello-world tool
@@ -98,10 +106,34 @@ TableTalk backend accepts configuration via environment variables (see `.env.exa
 | `PORT` | Listening port for the Axum HTTP server | `8080` |
 | `ALLOWED_ORIGINS` | Comma-separated list of allowed origins for DNS rebinding protection and CORS | `http://localhost:5173,http://127.0.0.1:5173,http://localhost:8080,http://127.0.0.1:8080` |
 | `RUST_LOG` | Tracing logging filter | `info,tabletalk_backend=debug` |
+| `DATABASE_URL` | SQLite database connection string | `sqlite://data/tabletalk.db` |
+| `SEED_ON_START` | Seed database on boot if empty | `false` |
+| `RESTAURANT_TZ` | Establishment IANA timezone override | `Asia/Kolkata` |
 
 Copy the example configuration:
 ```bash
 cp .env.example .env
+```
+
+### 3. Database (SQLite / SQLx)
+
+TableTalk uses SQLite with Write-Ahead Logging (WAL) and foreign keys enabled. Migrations are embedded and apply automatically on server startup.
+
+#### Seeding the Database
+Populate the database with deterministic fictional seed data for "The Saffron Nebula Bistro" (14 tables, 35 menu items, 5 demo customers with preferences, past orders, and future bookings):
+```bash
+cargo run -- seed
+```
+Seeding is idempotent—running it multiple times leaves all row counts unchanged without duplicate data or foreign key violations.
+
+#### Resetting the Database
+To reset the database to a clean state:
+```bash
+# Delete the SQLite database file and WAL logs
+rm -f data/tabletalk.db*
+
+# Re-run migrations and seed
+cargo run -- seed
 ```
 
 ---
