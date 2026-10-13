@@ -3,6 +3,14 @@ name = "tabletalk-backend"
 version = "0.1.0"
 edition = "2021"
 
+[[bin]]
+name = "tabletalk-backend"
+path = "src/main.rs"
+
+[[bin]]
+name = "mcp_tabletalk_backend"
+path = "src/main.rs"
+
 [dependencies]
 axum = "0.8"
 tokio = { version = "1", features = ["full"] }

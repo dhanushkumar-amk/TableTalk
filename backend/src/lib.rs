@@ -1,6 +1,7 @@
 pub mod config;
 pub mod db;
 pub mod http;
+pub mod menu_search;
 pub mod server;
 pub mod tools;
 

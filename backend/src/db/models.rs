@@ -185,6 +185,7 @@ pub struct MenuItem {
     pub spice_level: i64,
     pub calories: Option<i64>,
     pub is_chefs_special: bool,
+    pub allergens_verified: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, sqlx::FromRow)]

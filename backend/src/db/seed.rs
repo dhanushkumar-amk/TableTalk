@@ -252,7 +252,7 @@ pub async fn seed_database(
         (2, 1, "Dahi Puri Spheres", "Semolina shells filled with spiced potato mash, sweet curd foam, and tangy mint water", 32000, "INR", 1, 10, None, 1, Some(260), 0),
         (3, 1, "Gunpowder Idli Bites", "Mini steamed rice cakes tossed in toasted podi masala and curry leaf coconut oil", 29000, "INR", 1, 10, None, 2, Some(220), 0),
         (4, 1, "Amritsari Fish Fingers", "Crispy ajwain-battered river sole with smoked radish pickle and lemon tartar", 46000, "INR", 1, 15, None, 2, Some(390), 0),
-        (5, 1, "Kurkuri Bhindi Tartlets", "Spiced shredded okra straws served over micro-herb salad and mango chutney", 34000, "INR", 1, 12, None, 1, Some(190), 0),
+        (5, 1, "Kurkuri Bhindi Tartlets", "Spiced shredded okra straws served with crushed roasted peanuts, micro-herb salad, and mango chutney", 34000, "INR", 1, 12, None, 1, Some(190), 0),
         (6, 1, "Truffle Mushroom Galouti", "Silken melt-in-the-mouth smoked portobello patties on miniature saffron sheermal", 45000, "INR", 1, 18, None, 1, Some(340), 1),
 
         // Tandoor & Grills (Cat 2)
@@ -266,7 +266,7 @@ pub async fn seed_database(
         // Curries & Mains (Cat 3)
         (13, 3, "Nebula Dal Makhani", "Black lentils slow-simmered for 36 hours over clay charcoal with fresh churned butter", 42000, "INR", 1, 15, Some("https://images.example.com/dal-makhani.jpg"), 1, Some(480), 1),
         (14, 3, "Paneer Lababdar", "Handcrafted cottage cheese in a velvety tomato-onion gravy scented with dried fenugreek", 49000, "INR", 1, 18, None, 1, Some(520), 0),
-        (15, 3, "Banarasi Baingan Bharta", "Smoked aubergine mash with green peas, charred shallots, and ginger juliennes", 39000, "INR", 1, 15, None, 2, Some(240), 0),
+        (15, 3, "Banarasi Baingan Bharta", "Smoked aubergine mash tempered with roasted peanuts, sesame seeds, green peas, and charred shallots", 39000, "INR", 1, 15, None, 2, Some(240), 0),
         (16, 3, "Pindi Chole Rawalpindi", "Dark slow-cooked chickpeas steeped in black tea broth, amchur, and caraway", 38000, "INR", 1, 15, None, 2, Some(350), 0),
         (17, 3, "Old Delhi Butter Chicken", "Pulled tandoori chicken simmered in silky strained plum tomato reduction and honey", 59000, "INR", 1, 20, Some("https://images.example.com/butter-chicken.jpg"), 1, Some(620), 0),
         (18, 3, "Kashmiri Rogan Josh", "Slow-braised spring lamb shanks in an aromatic liquor of Kashmiri mawal flower and fennel", 69000, "INR", 1, 25, None, 2, Some(660), 1),
@@ -358,8 +358,7 @@ pub async fn seed_database(
         (5, 1),
         (5, 2),
         (5, 3),
-        (5, 4),
-        (5, 6), // Bhindi: vegan, vegetarian, gluten_free, dairy_free, nut_free
+        (5, 4), // Bhindi: vegan, vegetarian, gluten_free, dairy_free (contains peanuts)
         (6, 2),
         (6, 6), // Truffle Galouti: vegetarian, nut_free
         (7, 2),
@@ -390,8 +389,7 @@ pub async fn seed_database(
         (15, 1),
         (15, 2),
         (15, 3),
-        (15, 4),
-        (15, 6), // Baingan: vegan, veg, gf, df, nut_free
+        (15, 4), // Baingan: vegan, veg, gf, df (contains peanuts & sesame)
         (16, 1),
         (16, 2),
         (16, 3),
@@ -481,7 +479,7 @@ pub async fn seed_database(
         (2, 4), // Dahi Puri: dairy, gluten
         // (3) Idli: no allergens
         (4, 10), // Fish Fingers: fish
-        // (5) Bhindi: no allergens
+        (5, 1),  // Bhindi: peanuts
         (6, 3),
         (6, 4), // Truffle Galouti: dairy, gluten
         (7, 3), // Paneer Tikka: dairy
@@ -494,7 +492,8 @@ pub async fn seed_database(
         (12, 8), // Tiger Prawns: shellfish
         (13, 3), // Dal Makhani: dairy (butter, cream)
         (14, 3), // Paneer Lababdar: dairy
-        // (15) Baingan: no allergens
+        (15, 1),
+        (15, 6), // Baingan: peanuts, sesame
         // (16) Chole: no allergens
         (17, 3), // Butter Chicken: dairy
         // (18) Rogan Josh: no allergens
@@ -1021,6 +1020,29 @@ pub async fn seed_database(
     )
     .bind(Actor::Seed)
     .bind(&now_iso)
+    .execute(pool)
+    .await?;
+
+    // 18. Sync FTS5 virtual table
+    sqlx::query(
+        r#"
+        DELETE FROM menu_items_fts;
+        INSERT INTO menu_items_fts (item_id, name, description, category_name, dietary_tags_text)
+        SELECT 
+            m.id,
+            m.name,
+            m.description,
+            c.name,
+            COALESCE((
+                SELECT GROUP_CONCAT(dt.name, ' ')
+                FROM menu_item_dietary_tags midt
+                JOIN dietary_tags dt ON dt.id = midt.tag_id
+                WHERE midt.menu_item_id = m.id
+            ), '')
+        FROM menu_items m
+        JOIN menu_categories c ON c.id = m.category_id;
+        "#,
+    )
     .execute(pool)
     .await?;
 

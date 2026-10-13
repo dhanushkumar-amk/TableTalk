@@ -35,28 +35,9 @@ echo "=================================================="
 echo " Starting TableTalk MCP Server on port ${PORT}..."
 echo "=================================================="
 
-BIN_PATH=""
-if [[ -n "${CARGO_TARGET_DIR:-}" && -x "${CARGO_TARGET_DIR}/debug/tabletalk-backend" ]]; then
-  BIN_PATH="${CARGO_TARGET_DIR}/debug/tabletalk-backend"
-elif [[ -n "${CARGO_TARGET_DIR:-}" && -x "${CARGO_TARGET_DIR}/debug/tabletalk-backend.exe" ]]; then
-  BIN_PATH="${CARGO_TARGET_DIR}/debug/tabletalk-backend.exe"
-elif [[ -x "/c/Users/dhanu/AppData/Local/cargo-target/tabletalk/debug/tabletalk-backend.exe" ]]; then
-  BIN_PATH="/c/Users/dhanu/AppData/Local/cargo-target/tabletalk/debug/tabletalk-backend.exe"
-elif [[ -x "target/debug/tabletalk-backend" ]]; then
-  BIN_PATH="target/debug/tabletalk-backend"
-elif [[ -x "target/debug/tabletalk-backend.exe" ]]; then
-  BIN_PATH="target/debug/tabletalk-backend.exe"
-fi
-
-if [[ -n "${BIN_PATH}" ]]; then
-  echo "Starting backend via pre-built binary: ${BIN_PATH}..."
-  PORT="${PORT}" RUST_LOG="warn" "${BIN_PATH}" &
-  SERVER_PID=$!
-else
-  echo "Starting backend via cargo run --bin tabletalk-backend..."
-  PORT="${PORT}" RUST_LOG="warn" cargo run --bin tabletalk-backend &
-  SERVER_PID=$!
-fi
+echo "Starting backend via cargo run --manifest-path backend/Cargo.toml --bin tabletalk-backend..."
+PORT="${PORT}" RUST_LOG="warn" cargo run --manifest-path backend/Cargo.toml --bin tabletalk-backend &
+SERVER_PID=$!
 
 # Wait for /health
 echo "Waiting for server to become healthy at ${BASE_URL}/health..."
@@ -91,10 +72,10 @@ fi
 # Check 2: Inspector CLI tools/list
 echo "Testing Inspector CLI tools/list against ${MCP_URL}..."
 if INSPECTOR_OUT=$(npx --yes @modelcontextprotocol/inspector --cli "${MCP_URL}" --method tools/list 2>&1); then
-  if [[ "${INSPECTOR_OUT}" =~ "ping_restaurant" ]]; then
-    log_pass "Inspector CLI tools/list discovered ping_restaurant"
+  if [[ "${INSPECTOR_OUT}" =~ "ping_restaurant" && "${INSPECTOR_OUT}" =~ "search_menu" ]]; then
+    log_pass "Inspector CLI tools/list discovered both ping_restaurant and search_menu"
   else
-    log_fail "Inspector CLI tools/list output did not contain ping_restaurant: ${INSPECTOR_OUT}"
+    log_fail "Inspector CLI tools/list output did not contain expected tools: ${INSPECTOR_OUT}"
   fi
 else
   log_fail "Inspector CLI tools/list failed execution: ${INSPECTOR_OUT}"
@@ -159,6 +140,18 @@ if [[ "${VERSION_STATUS}" == "400" ]]; then
   log_pass "Invalid mcp-protocol-version returned 400 Bad Request"
 else
   log_fail "Invalid mcp-protocol-version expected 400, got: ${VERSION_STATUS}"
+fi
+
+# Check 8: Inspector CLI tools/call search_menu with query
+echo "Testing Inspector CLI tools/call search_menu with query=biryani..."
+if SEARCH_OUT=$(npx --yes @modelcontextprotocol/inspector --cli "${MCP_URL}" --method tools/call --tool-name search_menu --tool-arg query=biryani 2>&1); then
+  if [[ "${SEARCH_OUT}" =~ "Biryani" || "${SEARCH_OUT}" =~ "biryani" || "${SEARCH_OUT}" =~ "rupees" ]]; then
+    log_pass "Inspector CLI tools/call search_menu succeeded with rich response"
+  else
+    log_fail "Inspector CLI tools/call search_menu missing expected text: ${SEARCH_OUT}"
+  fi
+else
+  log_fail "Inspector CLI tools/call search_menu failed execution: ${SEARCH_OUT}"
 fi
 
 echo "--------------------------------------------------"

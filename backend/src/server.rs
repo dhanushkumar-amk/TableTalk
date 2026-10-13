@@ -51,6 +51,36 @@ impl TableTalkServer {
         let output = handle_ping(input);
         Ok(rmcp::Json(output))
     }
+
+    /// Search the restaurant menu by dish name, ingredient, cuisine style, dietary needs, allergen exclusions, or budget.
+    #[tool(
+        description = "Search the restaurant menu by dish name, ingredient, cuisine style, dietary needs, allergen exclusions, or budget. Call this tool when the guest asks about food options, dishes, ingredients, or wants recommendations fitting dietary or allergen constraints. Do NOT call this tool for table reservations, checking table availability, placing orders, or checking opening hours.",
+        output_schema = rmcp::handler::server::tool::schema_for_output::<crate::menu_search::SearchMenuOutput>(),
+        annotations(
+            read_only_hint = true,
+            idempotent_hint = true,
+            destructive_hint = false,
+            open_world_hint = false
+        )
+    )]
+    async fn search_menu(
+        &self,
+        Parameters(input): Parameters<crate::tools::search_menu::SearchMenuInput>,
+    ) -> Result<rmcp::model::CallToolResult, rmcp::ErrorData> {
+        let pool = match &self.db {
+            Some(p) => p,
+            None => {
+                return Ok(rmcp::model::CallToolResult::error(vec![
+                    rmcp::model::ContentBlock::text(
+                        "Database connection pool is not configured on TableTalkServer.",
+                    ),
+                ]));
+            }
+        };
+
+        let result = crate::tools::search_menu::handle_search_menu(pool, input).await;
+        Ok(result)
+    }
 }
 
 #[tool_handler(router = self.tool_router)]

@@ -54,7 +54,7 @@ pub async fn list_menu_items(
         sqlx::query_as::<_, MenuItem>(
             r#"
             SELECT id, category_id, name, description, price_cents, currency,
-                   is_available, prep_time_minutes, image_url, spice_level, calories, is_chefs_special
+                   is_available, prep_time_minutes, image_url, spice_level, calories, is_chefs_special, allergens_verified
             FROM menu_items
             WHERE is_available = 1
             ORDER BY category_id ASC, id ASC
@@ -66,7 +66,7 @@ pub async fn list_menu_items(
         sqlx::query_as::<_, MenuItem>(
             r#"
             SELECT id, category_id, name, description, price_cents, currency,
-                   is_available, prep_time_minutes, image_url, spice_level, calories, is_chefs_special
+                   is_available, prep_time_minutes, image_url, spice_level, calories, is_chefs_special, allergens_verified
             FROM menu_items
             ORDER BY category_id ASC, id ASC
             "#,
@@ -91,7 +91,7 @@ pub async fn get_menu_item_by_id(
     let item = sqlx::query_as::<_, MenuItem>(
         r#"
         SELECT id, category_id, name, description, price_cents, currency,
-               is_available, prep_time_minutes, image_url, spice_level, calories, is_chefs_special
+               is_available, prep_time_minutes, image_url, spice_level, calories, is_chefs_special, allergens_verified
         FROM menu_items
         WHERE id = ?
         "#,
