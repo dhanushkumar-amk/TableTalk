@@ -10,6 +10,7 @@ use rmcp::{
 #[derive(Clone)]
 pub struct TableTalkServer {
     tool_router: ToolRouter<Self>,
+    pub db: Option<sqlx::SqlitePool>,
 }
 
 impl Default for TableTalkServer {
@@ -23,6 +24,14 @@ impl TableTalkServer {
     pub fn new() -> Self {
         Self {
             tool_router: Self::tool_router(),
+            db: None,
+        }
+    }
+
+    pub fn with_db(db: sqlx::SqlitePool) -> Self {
+        Self {
+            tool_router: Self::tool_router(),
+            db: Some(db),
         }
     }
 

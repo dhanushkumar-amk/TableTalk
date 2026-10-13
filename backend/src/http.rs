@@ -153,7 +153,15 @@ async fn validate_protocol_version(req: Request, next: Next) -> Response {
 
 /// Build the full application router with health check, MCP service, CORS, and security middleware.
 pub fn build_router(config: &Config) -> Router {
-    let server = TableTalkServer::new();
+    build_router_with_db(config, None)
+}
+
+/// Build the application router with an optional database connection pool wired into TableTalkServer.
+pub fn build_router_with_db(config: &Config, pool: Option<sqlx::SqlitePool>) -> Router {
+    let server = match pool {
+        Some(p) => TableTalkServer::with_db(p),
+        None => TableTalkServer::new(),
+    };
     let session_manager = Arc::new(LocalSessionManager::default());
 
     let mcp_config =
