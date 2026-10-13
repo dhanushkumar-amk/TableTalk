@@ -231,10 +231,75 @@ cargo run -- seed
        "params": {
          "name": "check_availability",
          "arguments": {
-           "date": "2026-10-16",
+           "date": "2026-10-23",
            "time": "19:30",
            "party_size": 2,
            "area": "indoor"
+         }
+       }
+     }'
+   ```
+
+7. **Create a booking (`create_booking`)**:
+   ```bash
+   curl -i -X POST http://localhost:8080/mcp \
+     -H "Content-Type: application/json" \
+     -H "mcp-session-id: <SESSION_ID>" \
+     -H "mcp-protocol-version: 2025-11-25" \
+     -d '{
+       "jsonrpc": "2.0",
+       "id": 6,
+       "method": "tools/call",
+       "params": {
+         "name": "create_booking",
+         "arguments": {
+           "date": "2026-10-23",
+           "time": "19:30",
+           "party_size": 2,
+           "guest_name": "Eleanor Vance",
+           "idempotency_key": "idem-eleanor-booking-001"
+         }
+       }
+     }'
+   ```
+   *Returns status `"confirmed"`, confirmation code (e.g. `TT-7PTUF`), and natural voice confirmation.*
+
+8. **Lookup booking summary (`get_booking`)**:
+   ```bash
+   curl -i -X POST http://localhost:8080/mcp \
+     -H "Content-Type: application/json" \
+     -H "mcp-session-id: <SESSION_ID>" \
+     -H "mcp-protocol-version: 2025-11-25" \
+     -d '{
+       "jsonrpc": "2.0",
+       "id": 7,
+       "method": "tools/call",
+       "params": {
+         "name": "get_booking",
+         "arguments": {
+           "confirmation_code": "TT-7PTUF",
+           "guest_name": "Eleanor Vance"
+         }
+       }
+     }'
+   ```
+
+9. **Cancel booking (`cancel_booking`)**:
+   ```bash
+   curl -i -X POST http://localhost:8080/mcp \
+     -H "Content-Type: application/json" \
+     -H "mcp-session-id: <SESSION_ID>" \
+     -H "mcp-protocol-version: 2025-11-25" \
+     -d '{
+       "jsonrpc": "2.0",
+       "id": 8,
+       "method": "tools/call",
+       "params": {
+         "name": "cancel_booking",
+         "arguments": {
+           "confirmation_code": "TT-7PTUF",
+           "guest_name": "Eleanor Vance",
+           "reason": "Change of plans"
          }
        }
      }'

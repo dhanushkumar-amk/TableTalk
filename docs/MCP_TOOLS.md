@@ -15,6 +15,9 @@ This document serves as the canonical reference for all MCP tools exposed by the
 | `ping_restaurant` | Phase 3 | Yes | Yes | Connectivity check and server metadata verification. |
 | `search_menu` | Phase 6 | Yes | Yes | Search food items with dietary and allergen filters and spoken prices. |
 | `check_availability` | Phase 7 | Yes | Yes | Check table availability, snap slot grid, and propose alternatives. |
+| `create_booking` | Phase 8 | No | Yes (with key) | Transactionally create a table reservation with idempotency and race safety. |
+| `cancel_booking` | Phase 8 | No (destructive) | Yes | Cancel an existing reservation with guest-name verification and anti-enumeration. |
+| `get_booking` | Phase 8 | Yes | Yes | Read-only reservation summary lookup verified by guest name. |
 
 ---
 
@@ -368,3 +371,250 @@ The assistant voice prompt is returned in the text `content` block accompanying 
   "isError": true
 }
 ```
+
+---
+
+## 6. Tool: `create_booking`
+
+### 6.1 Purpose & Role in Agentic Workflow
+`create_booking` executes the transactional write path for dining reservations. It takes validated reservation parameters, re-evaluates capacity *inside a `BEGIN IMMEDIATE` write transaction* (never trusting a prior availability snapshot), selects the optimal best-fit table, and inserts the confirmed booking atomically with audit trails and idempotency tracking.
+
+### 6.2 Caller Responsibilities & Idempotency Guidance
+- **Idempotency Key**: Callers are strongly advised to pass an `idempotency_key` (8–64 alphanumeric characters, hyphens, or underscores). On network retries or assistant loops, reusing the same key guarantees that identical parameters return the original booking (`idempotent_replay: true`) without creating duplicate bookings.
+- **Conflict Handling**: Sending the same `idempotency_key` with modified parameters results in status `"idempotency_conflict"` and creates no rows.
+- **Business Outcomes**: Slot unavailability (`"unavailable"`, `"closed"`, `"limit_exceeded"`) returns a standard successful tool response (`isError: false`) with structured alternatives and clear spoken text. Tool execution errors (`isError: true`) are reserved strictly for malformed inputs.
+
+### 6.3 Annotations
+```json
+{
+  "readOnlyHint": false,
+  "destructiveHint": false,
+  "idempotentHint": true,
+  "openWorldHint": false
+}
+```
+
+### 6.4 Input Schema
+Dialect: JSON Schema Draft 2020-12
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "date": {
+      "type": "string",
+      "description": "Local restaurant date in ISO format YYYY-MM-DD (e.g. '2026-10-17'). Must be a concrete calendar date within the 30-day reservation window."
+    },
+    "time": {
+      "type": "string",
+      "description": "Local 24-hour time in HH:MM format (e.g. '19:30'). Off-grid times are automatically snapped to 15-minute slot intervals."
+    },
+    "party_size": {
+      "type": "integer",
+      "format": "int64",
+      "description": "Number of guests (1-12)."
+    },
+    "guest_name": {
+      "type": "string",
+      "description": "Full name of the reservation holder (1-80 characters, trimmed)."
+    },
+    "phone": {
+      "type": ["string", "null"],
+      "description": "Optional contact phone number. Validated loosely; never logged in plaintext."
+    },
+    "email": {
+      "type": ["string", "null"],
+      "description": "Optional contact email address. Validated loosely; never logged in plaintext."
+    },
+    "area": {
+      "type": ["string", "null"],
+      "enum": ["any", "indoor", "patio", "bar"],
+      "description": "Preferred dining area ('indoor', 'patio', 'bar', 'any'). Defaults to 'any'."
+    },
+    "duration_minutes": {
+      "type": ["integer", "null"],
+      "format": "int64",
+      "description": "Optional custom dining duration in minutes (30-240). Defaults based on party size."
+    },
+    "special_requests": {
+      "type": ["string", "null"],
+      "description": "Optional dietary or seating requests (max 300 characters, stored as plain text)."
+    },
+    "idempotency_key": {
+      "type": ["string", "null"],
+      "description": "Optional 8-64 character string [a-zA-Z0-9_-]. Reusing the same key upon retries returns the existing booking safely."
+    },
+    "customer_id": {
+      "type": ["string", "null"],
+      "description": "Optional customer identifier for future CRM phases."
+    }
+  },
+  "required": ["date", "time", "party_size", "guest_name"]
+}
+```
+
+### 6.5 Output Schema
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "status": {
+      "type": "string",
+      "enum": ["confirmed", "unavailable", "closed", "invalid_request", "limit_exceeded", "idempotency_conflict"]
+    },
+    "reason": { "type": ["string", "null"] },
+    "reason_detail": { "type": ["string", "null"] },
+    "booking": {
+      "type": ["object", "null"],
+      "properties": {
+        "confirmation_code": { "type": "string" },
+        "guest_name": { "type": "string" },
+        "party_size": { "type": "integer" },
+        "start_local": { "type": "string" },
+        "end_local": { "type": "string" },
+        "area": { "type": "string" },
+        "table_label": { "type": "string" },
+        "status": { "type": "string" },
+        "special_requests": { "type": ["string", "null"] },
+        "created_at": { "type": "string" }
+      }
+    },
+    "idempotent_replay": { "type": "boolean" },
+    "alternatives": { "type": "array" },
+    "cancellation_policy": { "type": ["string", "null"] },
+    "note": { "type": "string" }
+  },
+  "required": ["status", "idempotent_replay", "alternatives", "note"]
+}
+```
+
+### 6.6 Status and Reason Codes
+| Status | Reason Code | Description |
+|---|---|---|
+| `confirmed` | `null` | Table booked successfully. Confirmation code assigned. |
+| `unavailable` | `fully_booked` | No matching table capacity at requested time. Alternatives provided. |
+| `unavailable` | `beyond_horizon` | Requested date is further in advance than the 30-day booking horizon. |
+| `unavailable` | `in_the_past` | Requested slot is earlier than the restaurant's current local time. |
+| `closed` | `closed_day` | Restaurant is closed on this day of week (e.g., Tuesdays). |
+| `closed` | `outside_hours` | Slot falls outside regular meal service hours or past last seating. |
+| `limit_exceeded` | `active_bookings_limit` | Guest has reached the maximum permitted active future bookings (default 3). |
+| `idempotency_conflict` | `idempotency_conflict` | Idempotency key reused with mismatched booking parameters. |
+
+---
+
+## 7. Tool: `cancel_booking`
+
+### 7.1 Purpose & Anti-Enumeration Design
+`cancel_booking` cancels an existing confirmed reservation.
+- **Verification Guarantee**: Cancellation requires both the `confirmation_code` and the `guest_name`. The name match is case-insensitive and trimmed.
+- **Anti-Enumeration Protection**: If the confirmation code does not exist or the guest name does not match, the tool returns the **identical generic error response** (`"No matching booking found for the provided confirmation code and guest name."`) to prevent attackers from probing valid confirmation codes.
+- **Rate Limiting**: An in-memory rate limiter tracks failed attempts per confirmation code. More than 5 failed attempts in 15 minutes triggers a temporary lock.
+- **State Transition**: Rows are **never deleted**. Status changes to `"cancelled"` and `cancelled_at` is stamped.
+
+### 7.2 Annotations
+```json
+{
+  "readOnlyHint": false,
+  "destructiveHint": true,
+  "idempotentHint": true,
+  "openWorldHint": false
+}
+```
+
+### 7.3 Input Schema
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "confirmation_code": {
+      "type": "string",
+      "description": "Confirmation code assigned during booking (e.g. 'TT-8K4MZ'). Case-insensitive; hyphens and spaces tolerated."
+    },
+    "guest_name": {
+      "type": "string",
+      "description": "Full name of the reservation holder for verification. Must match the booking record."
+    },
+    "reason": {
+      "type": ["string", "null"],
+      "description": "Optional reason for cancellation (max 200 characters)."
+    }
+  },
+  "required": ["confirmation_code", "guest_name"]
+}
+```
+
+### 7.4 Output Schema
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "status": {
+      "type": "string",
+      "enum": ["cancelled", "already_cancelled", "not_found", "not_cancellable"]
+    },
+    "already_cancelled": { "type": "boolean" },
+    "booking": { "type": ["object", "null"] },
+    "policy_note": { "type": ["string", "null"] },
+    "reason": { "type": ["string", "null"] },
+    "reason_detail": { "type": ["string", "null"] }
+  },
+  "required": ["status", "already_cancelled"]
+}
+```
+
+---
+
+## 8. Tool: `get_booking`
+
+### 8.1 Purpose & Verification
+`get_booking` is a **read-only** tool that retrieves the booking summary for a guest. Like `cancel_booking`, it requires verification via `guest_name` alongside `confirmation_code` and returns a generic not-found response on any mismatch. Internal row IDs and private contact information are stripped.
+
+### 8.2 Annotations
+```json
+{
+  "readOnlyHint": true,
+  "destructiveHint": false,
+  "idempotentHint": true,
+  "openWorldHint": false
+}
+```
+
+### 8.3 Input Schema
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "confirmation_code": {
+      "type": "string",
+      "description": "Confirmation code assigned during booking (e.g. 'TT-8K4MZ'). Case-insensitive; hyphens and spaces tolerated."
+    },
+    "guest_name": {
+      "type": "string",
+      "description": "Full name of the reservation holder for verification."
+    }
+  },
+  "required": ["confirmation_code", "guest_name"]
+}
+```
+
+### 8.4 Output Schema
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "status": {
+      "type": "string",
+      "enum": ["found", "not_found"]
+    },
+    "booking": { "type": ["object", "null"] },
+    "message": { "type": "string" }
+  },
+  "required": ["status", "message"]
+}
+```
+

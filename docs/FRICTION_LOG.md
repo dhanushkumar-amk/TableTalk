@@ -178,18 +178,19 @@ A running log of unexpected friction, hurdles, bugs, or developer experience iss
 - **Workaround**: Explicitly imported `use chrono::TimeZone;` into the module scope.
 - **Suggestion**: Provide clear rustdoc examples in `chrono` and `chrono-tz` showing that methods like `from_local_datetime` are trait methods on `chrono::offset::TimeZone` rather than inherent methods on `Tz`.
 
-### SQLite Lexicographical ISO-8601 String Comparison Across Differing Timezone Offsets
+### SQLite Deferred Transactions Causing Deadlock Upgrades Under Concurrency
 - **Date**: 2026-10-13
-- **Task attempted**: Evaluating reservation interval overlaps via SQLite SQL queries
+- **Task attempted**: Serializing 20+ concurrent `create_booking` requests for the last remaining dining table
 - **Steps taken**:
-  1. Ran overlap query `WHERE start_at < ? AND end_at > ?`
-  2. Bound local restaurant timestamp string (e.g. `2026-10-23T20:30:00+05:30`) against database column `start_at` storing UTC (`2026-10-23T19:30:00+00:00`)
+  1. Initialized transactions with standard `pool.begin().await`
+  2. Evaluated table capacity and attempted `INSERT INTO bookings`
 - **Expected vs actual**:
-  - *Expected*: SQLite compares semantic temporal ordering
-  - *Actual*: SQLite performs raw ASCII byte-by-byte lexicographical string comparison. Because ASCII `'19:30'` < `'20:30'`, SQLite evaluated `19:30+00:00 < 20:30+05:30` as true, despite `19:30 UTC` occurring 4.5 hours *after* `20:30 IST` (which is 15:00 UTC). This created false positive overlap detections in queries comparing mixed-offset strings.
+  - *Expected*: Concurrent requests queue up and serialize cleanly; exactly one wins and others observe the updated state
+  - *Actual*: Standard `pool.begin()` issues `BEGIN DEFERRED` by default in SQLite. Multiple connections acquire shared read locks simultaneously; when both subsequently attempt an `INSERT` to claim the slot, SQLite fails to upgrade the shared lock to an exclusive lock, resulting in `SQLITE_BUSY: database is locked` deadlock collisions.
 - **Severity**: High
-- **Workaround**: Strictly enforced that all database timestamps and query parameters are normalized to UTC (`.with_timezone(&Utc).to_rfc3339()`) before query parameter binding, ensuring lexicographical string comparison exactly mirrors temporal ordering.
-- **Suggestion**: Document in the data model that SQLite ISO string comparisons are valid only if both operands share an identical offset (strictly UTC `+00:00` or `Z`).
+- **Workaround**: Explicitly executed `conn.execute("BEGIN IMMEDIATE").await` at transaction commencement. This immediately grabs SQLite's `RESERVED` lock, serializing all subsequent write transactions deterministically and allowing the busy timeout (5000ms) to queue callers smoothly without deadlock upgrades.
+- **Suggestion**: Document in SQLx SQLite guidelines that write transactions under concurrency should always begin with `BEGIN IMMEDIATE` rather than default deferred transactions.
+
 
 
 

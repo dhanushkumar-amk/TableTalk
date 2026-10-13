@@ -371,3 +371,77 @@ When the requested slot is unavailable, the search algorithm proceeds with stric
 3. **Multi-Day Fallback**: If the requested date has zero available slots, the engine evaluates up to the next **3 open operating days** at the requested time (skipping closed days and special closures).
 4. **Result Capping**: Returns at most `alternatives` slots (default 3, max 6).
 
+---
+
+## 9. Booking Lifecycle & Concurrency (Phase 8)
+
+### 9.1 Booking State Machine
+Bookings progress through strict, validated lifecycle states:
+
+```mermaid
+stateDiagram-v2
+    [*] --> pending
+    [*] --> confirmed : direct booking (Phase 8)
+    pending --> confirmed : hold confirmed
+    pending --> cancelled : user / timeout
+    confirmed --> cancelled : cancel_booking (verified)
+    confirmed --> completed : post-dining
+    confirmed --> no_show : guest absent
+    cancelled --> [*]
+    completed --> [*]
+    no_show --> [*]
+```
+
+**Allowed Transitions**:
+- `pending` $\rightarrow$ `confirmed`, `cancelled`
+- `confirmed` $\rightarrow$ `cancelled`, `completed`, `no_show`
+
+**Illegal Transitions (Strictly Rejected)**:
+- `cancelled` $\rightarrow$ `confirmed`, `completed`, `no_show` (cannot resurrect cancelled bookings)
+- `completed` $\rightarrow$ `cancelled` (cannot cancel past dining)
+- `no_show` $\rightarrow$ `cancelled`
+- Any transition into `pending` from a terminal state
+
+### 9.2 Transaction Design & Concurrency Protection
+To prevent double bookings and race conditions when multiple callers contest the last free table:
+1. **`BEGIN IMMEDIATE` Write Locking**:
+   Every booking mutation begins with SQLite `BEGIN IMMEDIATE`, acquiring the `RESERVED` database lock before any reads or writes. This ensures subsequent transactions block or yield deterministically.
+2. **Never Trust Prior Availability**:
+   The full availability engine runs *inside* the write transaction under the lock. An earlier check by `check_availability` is treated merely as an advisory snapshot.
+3. **Deterministic Best-Fit Allocation**:
+   The engine iterates candidate tables sorted by smallest sufficient capacity ($C_{\text{max}}$ ascending), checks the mathematical half-open interval overlap predicate against active bookings (`pending` and `confirmed`), and picks the first available table.
+4. **Atomic Insertion & Audit Trail**:
+   The booking row, idempotency record, and audit event row are inserted within the same atomic transaction. If any step fails, the entire transaction rolls back.
+
+### 9.3 Idempotency Architecture (`idempotency_keys`)
+To support network retries, connection drops, and voice assistant retries without duplicate reservations:
+- Table `idempotency_keys`:
+  - `key TEXT PRIMARY KEY`: Caller-supplied token (8–64 characters matching `[a-zA-Z0-9_-]`).
+  - `request_hash TEXT NOT NULL`: SHA-256 canonical hash of the booking request payload.
+  - `response_json TEXT NOT NULL`: Cached successful MCP response body.
+  - `booking_id INTEGER`: Associated booking foreign key.
+  - `created_at TEXT NOT NULL`: ISO-8601 UTC creation timestamp.
+- **Identical Replay**: If the same key is submitted with the identical request hash, the transaction returns the cached booking with `idempotent_replay: true` without creating duplicate database rows.
+- **Conflict Rejection**: If the same key is submitted with modified parameters (hash mismatch), the tool returns status `idempotency_conflict` with an explanation and creates nothing.
+- **Retention & Expiry Rule**: Idempotency keys are indexed by `created_at` (`idx_idempotency_keys_created_at`) with a 24-hour retention window. Expired keys are periodically pruned during background maintenance jobs.
+
+### 9.4 Cancellation Verification & Anti-Enumeration Design
+- **Verification Guarantee**: Cancellation requires both `confirmation_code` and `guest_name` (case-insensitive, whitespace-trimmed).
+- **Anti-Enumeration Protection**: If the code does not exist or the guest name does not match, the response is **byte-for-byte identical** (`status: "not_found"`). An attacker cannot determine whether a given confirmation code is valid or invalid.
+- **Rate Limiting**: An in-memory sliding window limiter permits a maximum of 5 failed cancellation attempts per code within 15 minutes before enforcing a lock.
+- **State Change Only**: Cancellation rows are **never deleted**. Status is updated to `cancelled`, `cancelled_at` is stamped, and an audit event is logged. The slot immediately frees up for new bookings.
+
+### 9.5 Abuse Limits & Anti-Hoarding Rules
+- **Active Booking Cap**: A single guest name is restricted to a maximum of **3 active future bookings** (`pending` or `confirmed` with `start_time > current_time`). Subsequent attempts fail with status `limit_exceeded`.
+- **Party Size Boundaries**: Bookings are restricted between 1 and the restaurant's `max_party_size` (12).
+
+### 9.6 Demo Data & Privacy Notice
+All customer names, telephone numbers, and email addresses present in seed scripts or integration tests are **strictly fictional and synthetic** (e.g. `@example.com`).
+> [!IMPORTANT]
+> **Production Privacy Requirements**: In a live production deployment, processing personal identifying information (PII) requires:
+> 1. Explicit guest consent under applicable data protection regulations (GDPR, CCPA, DPDP Act).
+> 2. End-to-end encryption of contact data at rest and in transit.
+> 3. Zero plaintext PII logging at `INFO` or higher log levels (enforced in TableTalk code).
+> 4. Documented data retention, anonymization, and right-to-be-forgotten deletion workflows.
+
+

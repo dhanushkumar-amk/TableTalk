@@ -927,4 +927,369 @@ Executed against seeded `data/tabletalk.db` on Streamable HTTP transport:
 }
 ```
 
+---
+
+## 9. Phase 8 Booking Lifecycle Verification (`create_booking`, `get_booking`, `cancel_booking`)
+
+**Date**: 2026-10-13  
+**Server Target**: `http://127.0.0.1:8088/mcp`  
+**Tools Tested**: `create_booking`, `get_booking`, `cancel_booking`  
+
+### Scenario 1: Create a Booking (Confirmed)
+**Command**:
+```bash
+npx --yes @modelcontextprotocol/inspector --cli "http://127.0.0.1:8088/mcp" \
+  --method tools/call --tool-name create_booking \
+  --tool-arg date="2026-10-23" \
+  --tool-arg time="19:30" \
+  --tool-arg party_size="4" \
+  --tool-arg guest_name="Eleanor Vance" \
+  --tool-arg email="eleanor@example.com" \
+  --tool-arg idempotency_key="idem-eleanor-booking-001" \
+  --tool-arg special_requests="Quiet corner booth please"
+```
+**Verbatim Output**:
+```json
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "I have confirmed your table for 4 guests on Friday the twenty-third at seven thirty in the evening under the name Eleanor Vance. Your confirmation code is T T 7 P T U F. If you need to cancel or change your reservation, just mention this code."
+    }
+  ],
+  "structuredContent": {
+    "alternatives": [],
+    "booking": {
+      "area": "indoor",
+      "confirmation_code": "TT-7PTUF",
+      "created_at": "2026-10-13T09:29:58.143444300+00:00",
+      "end_local": "2026-10-23T21:00:00+05:30",
+      "guest_name": "Eleanor Vance",
+      "party_size": 4,
+      "special_requests": "Quiet corner booth please",
+      "start_local": "2026-10-23T19:30:00+05:30",
+      "status": "confirmed",
+      "table_label": "T03"
+    },
+    "cancellation_policy": "Free cancellation up to 6 hours prior to reservation.",
+    "idempotent_replay": false,
+    "note": "availability is a snapshot, not a reservation",
+    "reason": null,
+    "reason_detail": null,
+    "status": "confirmed"
+  },
+  "isError": false
+}
+```
+
+---
+
+### Scenario 2: Create Booking on Fully Booked Slot (Unavailable with Alternatives)
+**Command**:
+```bash
+npx --yes @modelcontextprotocol/inspector --cli "http://127.0.0.1:8088/mcp" \
+  --method tools/call --tool-name create_booking \
+  --tool-arg date="2026-10-23" \
+  --tool-arg time="19:30" \
+  --tool-arg party_size="8" \
+  --tool-arg guest_name="Percy Shelley" \
+  --tool-arg idempotency_key="idem-percy-001"
+```
+**Verbatim Output**:
+```json
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "I don't have a table available at seven thirty in the evening, but I have nine fifteen or nine thirty in the evening. Would either of those work for you?"
+    }
+  ],
+  "structuredContent": {
+    "alternatives": [
+      {
+        "area": "indoor",
+        "different_day": false,
+        "end_local": "2026-10-23T23:15:00+05:30",
+        "minutes_from_requested": 105,
+        "start_local": "2026-10-23T21:15:00+05:30",
+        "table_label": "T06"
+      },
+      {
+        "area": "indoor",
+        "different_day": false,
+        "end_local": "2026-10-23T23:30:00+05:30",
+        "minutes_from_requested": 120,
+        "start_local": "2026-10-23T21:30:00+05:30",
+        "table_label": "T06"
+      }
+    ],
+    "booking": null,
+    "cancellation_policy": null,
+    "idempotent_replay": false,
+    "note": "availability is a snapshot, not a reservation",
+    "reason": "fully_booked",
+    "reason_detail": "No tables available for party of 8 at 19:30 in any area. Found 2 alternative slot(s).",
+    "status": "unavailable"
+  },
+  "isError": false
+}
+```
+
+---
+
+### Scenario 3: Idempotent Retry with Same Key and Same Parameters
+**Command**:
+```bash
+npx --yes @modelcontextprotocol/inspector --cli "http://127.0.0.1:8088/mcp" \
+  --method tools/call --tool-name create_booking \
+  --tool-arg date="2026-10-23" \
+  --tool-arg time="19:30" \
+  --tool-arg party_size="4" \
+  --tool-arg guest_name="Eleanor Vance" \
+  --tool-arg email="eleanor@example.com" \
+  --tool-arg idempotency_key="idem-eleanor-booking-001" \
+  --tool-arg special_requests="Quiet corner booth please"
+```
+**Verbatim Output**:
+```json
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "I have confirmed your table for 4 guests on Friday the twenty-third at seven thirty in the evening under the name Eleanor Vance. Your confirmation code is T T 7 P T U F. If you need to cancel or change your reservation, just mention this code."
+    }
+  ],
+  "structuredContent": {
+    "alternatives": [],
+    "booking": {
+      "area": "indoor",
+      "confirmation_code": "TT-7PTUF",
+      "created_at": "2026-10-13T09:29:58.143444300+00:00",
+      "end_local": "2026-10-23T21:00:00+05:30",
+      "guest_name": "Eleanor Vance",
+      "party_size": 4,
+      "special_requests": "Quiet corner booth please",
+      "start_local": "2026-10-23T19:30:00+05:30",
+      "status": "confirmed",
+      "table_label": "T03"
+    },
+    "cancellation_policy": "Free cancellation up to 6 hours prior to reservation.",
+    "idempotent_replay": true,
+    "note": "availability is a snapshot, not a reservation",
+    "reason": null,
+    "reason_detail": null,
+    "status": "confirmed"
+  },
+  "isError": false
+}
+```
+
+---
+
+### Scenario 4: Read-Only `get_booking` with Name Verification
+**Command**:
+```bash
+npx --yes @modelcontextprotocol/inspector --cli "http://127.0.0.1:8088/mcp" \
+  --method tools/call --tool-name get_booking \
+  --tool-arg confirmation_code="TT-7PTUF" \
+  --tool-arg guest_name="Eleanor Vance"
+```
+**Verbatim Output**:
+```json
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "I found your reservation for 4 guests on Friday the twenty-third at seven thirty in the evening under the name Eleanor Vance. Confirmation code is T T 7 P T U F."
+    }
+  ],
+  "structuredContent": {
+    "booking": {
+      "area": "indoor",
+      "confirmation_code": "TT-7PTUF",
+      "created_at": "2026-10-13T09:29:58.143444300+00:00",
+      "end_local": "2026-10-23T21:00:00+05:30",
+      "guest_name": "Eleanor Vance",
+      "party_size": 4,
+      "special_requests": "Quiet corner booth please",
+      "start_local": "2026-10-23T19:30:00+05:30",
+      "status": "confirmed",
+      "table_label": "T03"
+    },
+    "message": "Booking retrieved successfully.",
+    "status": "found"
+  },
+  "isError": false
+}
+```
+
+---
+
+### Scenario 5: Cancel with Wrong Name (Anti-Enumeration Protection)
+**Command**:
+```bash
+npx --yes @modelcontextprotocol/inspector --cli "http://127.0.0.1:8088/mcp" \
+  --method tools/call --tool-name cancel_booking \
+  --tool-arg confirmation_code="TT-7PTUF" \
+  --tool-arg guest_name="John Doe"
+```
+**Verbatim Output**:
+```json
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "I couldn't find a booking with that confirmation code and name. Please check the code and the name on the booking."
+    }
+  ],
+  "structuredContent": {
+    "already_cancelled": false,
+    "booking": null,
+    "policy_note": null,
+    "reason": "not_found",
+    "reason_detail": "No matching booking found for the provided confirmation code and guest name. Please check your confirmation details.",
+    "status": "not_found"
+  },
+  "isError": false
+}
+```
+
+*(Note: Tested alongside unknown code `TT-99999` with `John Doe`—the output is byte-identical, preventing confirmation code enumeration).*
+
+---
+
+### Scenario 6: Cancel Correctly (Verified)
+**Command**:
+```bash
+npx --yes @modelcontextprotocol/inspector --cli "http://127.0.0.1:8088/mcp" \
+  --method tools/call --tool-name cancel_booking \
+  --tool-arg confirmation_code="TT-7PTUF" \
+  --tool-arg guest_name="Eleanor Vance" \
+  --tool-arg reason="Family emergency"
+```
+**Verbatim Output**:
+```json
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "Your reservation for Friday the twenty-third under code T T 7 P T U F has been cancelled. We hope to welcome you another time."
+    }
+  ],
+  "structuredContent": {
+    "already_cancelled": false,
+    "booking": {
+      "area": "indoor",
+      "confirmation_code": "TT-7PTUF",
+      "created_at": "2026-10-13T09:29:58.143444300+00:00",
+      "end_local": "2026-10-23T21:00:00+05:30",
+      "guest_name": "Eleanor Vance",
+      "party_size": 4,
+      "special_requests": "Quiet corner booth please",
+      "start_local": "2026-10-23T19:30:00+05:30",
+      "status": "cancelled",
+      "table_label": "T03"
+    },
+    "policy_note": "Cancelled within the free cancellation window.",
+    "reason": null,
+    "reason_detail": null,
+    "status": "cancelled"
+  },
+  "isError": false
+}
+```
+
+---
+
+### Scenario 7: Cancel Again (Idempotent Second Cancel)
+**Command**:
+```bash
+npx --yes @modelcontextprotocol/inspector --cli "http://127.0.0.1:8088/mcp" \
+  --method tools/call --tool-name cancel_booking \
+  --tool-arg confirmation_code="TT-7PTUF" \
+  --tool-arg guest_name="Eleanor Vance"
+```
+**Verbatim Output**:
+```json
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "This reservation under code T T 7 P T U F was already cancelled. No further action is needed."
+    }
+  ],
+  "structuredContent": {
+    "already_cancelled": true,
+    "booking": {
+      "area": "indoor",
+      "confirmation_code": "TT-7PTUF",
+      "created_at": "2026-10-13T09:29:58.143444300+00:00",
+      "end_local": "2026-10-23T21:00:00+05:30",
+      "guest_name": "Eleanor Vance",
+      "party_size": 4,
+      "special_requests": "Quiet corner booth please",
+      "start_local": "2026-10-23T19:30:00+05:30",
+      "status": "cancelled",
+      "table_label": "T03"
+    },
+    "policy_note": null,
+    "reason": null,
+    "reason_detail": "This reservation was already cancelled.",
+    "status": "already_cancelled"
+  },
+  "isError": false
+}
+```
+
+---
+
+### Scenario 8: Invalid Argument Rejected as Tool Error (`isError: true`)
+**Command**:
+```bash
+npx --yes @modelcontextprotocol/inspector --cli "http://127.0.0.1:8088/mcp" \
+  --method tools/call --tool-name create_booking \
+  --tool-arg date="2026-10-23" \
+  --tool-arg time="19:30" \
+  --tool-arg party_size="0" \
+  --tool-arg guest_name="Bad Request"
+```
+**Verbatim Output**:
+```json
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "Party size must be between 1 and 12 guests. Received 0."
+    }
+  ],
+  "isError": true
+}
+```
+
+---
+
+## 10. Manual Inspector UI Step-by-Step Guide
+
+If testing using the MCP Inspector Web UI:
+1. Start the server: `PORT=8080 cargo run --manifest-path backend/Cargo.toml --bin mcp_tabletalk_backend`
+2. Launch the MCP Inspector Web UI: `npx @modelcontextprotocol/inspector`
+3. In the Inspector UI top bar:
+   - Select transport: **Streamable HTTP** (or Server-Sent Events / HTTP)
+   - Enter Server URL: `http://127.0.0.1:8080/mcp`
+   - Click **Connect**
+4. Verify the **Tools** tab shows 6 registered tools: `ping_restaurant`, `search_menu`, `check_availability`, `create_booking`, `cancel_booking`, `get_booking`.
+5. Select `create_booking`:
+   - Enter `date`: `"2026-10-24"`, `time`: `"19:30"`, `party_size`: `2`, `guest_name`: `"Jane Doe"`
+   - Click **Run Tool**
+   - Verify status `confirmed`, a confirmation code `TT-XXXXX`, and natural speech text.
+6. Select `get_booking`:
+   - Enter the generated `confirmation_code` and `guest_name`: `"Jane Doe"`
+   - Click **Run Tool**
+   - Verify booking summary returned with status `found`.
+7. Select `cancel_booking`:
+   - Enter the `confirmation_code` and `guest_name`: `"Jane Doe"`
+   - Click **Run Tool**
+   - Verify status `cancelled` and confirmation speech.
+
+
 
