@@ -29,3 +29,17 @@ Object.defineProperty(navigator, "clipboard", {
     writeText: vi.fn().mockResolvedValue(undefined),
   },
 })
+
+// Mock ResizeObserver for cmdk
+globalThis.ResizeObserver = class ResizeObserver {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+}
+
+// Mock scrollIntoView for jsdom
+if (typeof Element !== "undefined" && !Element.prototype.scrollIntoView) {
+  Element.prototype.scrollIntoView = vi.fn()
+}
+
+
