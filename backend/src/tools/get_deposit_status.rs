@@ -44,7 +44,10 @@ fn tool_validation_error(message: impl Into<String>) -> CallToolResult {
     CallToolResult::error(vec![ContentBlock::text(message.into())])
 }
 
-pub async fn handle_get_deposit_status(pool: &SqlitePool, input: GetDepositStatusInput) -> CallToolResult {
+pub async fn handle_get_deposit_status(
+    pool: &SqlitePool,
+    input: GetDepositStatusInput,
+) -> CallToolResult {
     handle_get_deposit_status_with_clock(pool, input, &SystemClock).await
 }
 
@@ -144,7 +147,10 @@ pub async fn handle_get_deposit_status_with_clock(
     let required = booking.deposit_status != DepositStatus::NotRequired;
 
     let amount = if booking.deposit_amount_minor > 0 {
-        Some(payments::money(booking.deposit_amount_minor, &config.currency))
+        Some(payments::money(
+            booking.deposit_amount_minor,
+            &config.currency,
+        ))
     } else {
         None
     };

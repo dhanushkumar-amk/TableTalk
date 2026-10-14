@@ -137,9 +137,11 @@ async fn main() {
                 {
                     tracing::warn!("hold/negotiation sweep failed: {}", e);
                 }
-                if let Err(e) =
-                    tabletalk_backend::payments::expire_overdue_deposit_bookings(&sweeper_pool, &clock)
-                        .await
+                if let Err(e) = tabletalk_backend::payments::expire_overdue_deposit_bookings(
+                    &sweeper_pool,
+                    &clock,
+                )
+                .await
                 {
                     tracing::warn!("deposit sweep failed: {}", e);
                 }

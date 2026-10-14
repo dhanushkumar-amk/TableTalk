@@ -137,8 +137,6 @@ pub async fn handle_get_waitlist_status_with_clock(
         status = "expired".to_string();
     }
 
-
-
     let mut offer_detail = None;
 
     // Check if offered

@@ -15,9 +15,7 @@ use tabletalk_backend::{
         accept_offer::{handle_accept_offer_with_clock, AcceptOfferInput, AcceptOfferOutput},
         cancel_booking::{handle_cancel_booking_with_clock, CancelBookingInput},
         check_availability::{handle_check_availability_with_clock, CheckAvailabilityInput},
-        create_booking::{
-            handle_create_booking_with_clock, BookingAreaInput, CreateBookingInput,
-        },
+        create_booking::{handle_create_booking_with_clock, BookingAreaInput, CreateBookingInput},
         forget_me::{handle_forget_me_with_clock, ForgetMeInput},
         get_waitlist_status::{
             handle_get_waitlist_status_with_clock, GetWaitlistStatusInput, GetWaitlistStatusOutput,
@@ -153,17 +151,7 @@ fn test_deterministic_scoring_and_shuffled_invariance() {
 
     let mut baseline_scored: Vec<ScoredCandidate> = candidates
         .iter()
-        .map(|c| {
-            score_candidate(
-                c,
-                req_date,
-                req_time,
-                req_party,
-                area_filter,
-                None,
-                45,
-            )
-        })
+        .map(|c| score_candidate(c, req_date, req_time, req_party, area_filter, None, 45))
         .collect();
     sort_scored_candidates(&mut baseline_scored);
 
@@ -187,17 +175,7 @@ fn test_deterministic_scoring_and_shuffled_invariance() {
 
         let mut scored: Vec<ScoredCandidate> = shuffled
             .iter()
-            .map(|c| {
-                score_candidate(
-                    c,
-                    req_date,
-                    req_time,
-                    req_party,
-                    area_filter,
-                    None,
-                    45,
-                )
-            })
+            .map(|c| score_candidate(c, req_date, req_time, req_party, area_filter, None, 45))
             .collect();
         sort_scored_candidates(&mut scored);
 
@@ -263,7 +241,9 @@ fn test_spoken_voice_formatting_rules() {
         rank: 3,
     };
     let voice3 = format_spoken_options(&[opt1, opt2, opt3]);
-    assert!(voice3.contains("Eight in the evening indoors, seven thirty on the patio, or eight fifteen indoors"));
+    assert!(voice3.contains(
+        "Eight in the evening indoors, seven thirty on the patio, or eight fifteen indoors"
+    ));
     assert!(voice3.contains("Which would you like?"));
 
     // 4. Waitlist offer formatting
@@ -304,7 +284,8 @@ async fn test_negotiation_rounds_and_max_rounds_reached() {
     };
 
     let res1 = handle_negotiate_booking_with_clock(&pool, req1, &clock).await;
-    let out1: NegotiateBookingOutput = serde_json::from_value(res1.structured_content.unwrap()).unwrap();
+    let out1: NegotiateBookingOutput =
+        serde_json::from_value(res1.structured_content.unwrap()).unwrap();
     assert_eq!(out1.round, Some(1));
     let neg_id = out1.negotiation_id.expect("Must have negotiation_id");
 
@@ -324,7 +305,8 @@ async fn test_negotiation_rounds_and_max_rounds_reached() {
     };
 
     let res2 = handle_negotiate_booking_with_clock(&pool, req2.clone(), &clock).await;
-    let out2: NegotiateBookingOutput = serde_json::from_value(res2.structured_content.unwrap()).unwrap();
+    let out2: NegotiateBookingOutput =
+        serde_json::from_value(res2.structured_content.unwrap()).unwrap();
     assert_eq!(out2.round, Some(2));
 
     // Ensure round 2 options do not repeat round 1 options
@@ -344,7 +326,8 @@ async fn test_negotiation_rounds_and_max_rounds_reached() {
         ..req2.clone()
     };
     let res3 = handle_negotiate_booking_with_clock(&pool, req3, &clock).await;
-    let out3: NegotiateBookingOutput = serde_json::from_value(res3.structured_content.unwrap()).unwrap();
+    let out3: NegotiateBookingOutput =
+        serde_json::from_value(res3.structured_content.unwrap()).unwrap();
     assert_eq!(out3.round, Some(3));
 
     // Round 4 (exceeds MAX_NEGOTIATION_ROUNDS = 3) -> max_rounds_reached
@@ -353,7 +336,8 @@ async fn test_negotiation_rounds_and_max_rounds_reached() {
         ..req2.clone()
     };
     let res4 = handle_negotiate_booking_with_clock(&pool, req4, &clock).await;
-    let out4: NegotiateBookingOutput = serde_json::from_value(res4.structured_content.unwrap()).unwrap();
+    let out4: NegotiateBookingOutput =
+        serde_json::from_value(res4.structured_content.unwrap()).unwrap();
     assert_eq!(out4.status, "no_more_options");
     assert!(out4.message.contains("waitlist"));
 }
@@ -389,7 +373,8 @@ async fn test_holds_block_availability_and_booking_and_lazy_expiry() {
         &clock,
     )
     .await;
-    let neg_out: NegotiateBookingOutput = serde_json::from_value(neg_res.structured_content.unwrap()).unwrap();
+    let neg_out: NegotiateBookingOutput =
+        serde_json::from_value(neg_res.structured_content.unwrap()).unwrap();
     let neg_id = neg_out.negotiation_id.unwrap();
     let opt = &neg_out.options[0];
 
@@ -410,7 +395,8 @@ async fn test_holds_block_availability_and_booking_and_lazy_expiry() {
         &clock,
     )
     .await;
-    let hold_out: AcceptOfferOutput = serde_json::from_value(hold_res.structured_content.unwrap()).unwrap();
+    let hold_out: AcceptOfferOutput =
+        serde_json::from_value(hold_res.structured_content.unwrap()).unwrap();
     assert_eq!(hold_out.status, "held");
     let offer_token = hold_out.offer_token.expect("Must return offer token");
     assert!(offer_token.starts_with("tt_offer_"));
@@ -483,14 +469,22 @@ async fn test_holds_block_availability_and_booking_and_lazy_expiry() {
         &advanced_clock,
     )
     .await;
-    let late_out: AcceptOfferOutput = serde_json::from_value(late_accept.structured_content.unwrap()).unwrap();
+    let late_out: AcceptOfferOutput =
+        serde_json::from_value(late_accept.structured_content.unwrap()).unwrap();
     assert_eq!(late_out.status, "offer_expired");
 
     // Sweeper test: run sweeper and verify idempotency
-    let swept_count = sweep_expired_holds_and_negotiations(&pool, &advanced_clock).await.unwrap();
+    let swept_count = sweep_expired_holds_and_negotiations(&pool, &advanced_clock)
+        .await
+        .unwrap();
     assert!(swept_count >= 1);
-    let swept_again = sweep_expired_holds_and_negotiations(&pool, &advanced_clock).await.unwrap();
-    assert_eq!(swept_again, 0, "Second sweep must be idempotent (0 records)");
+    let swept_again = sweep_expired_holds_and_negotiations(&pool, &advanced_clock)
+        .await
+        .unwrap();
+    assert_eq!(
+        swept_again, 0,
+        "Second sweep must be idempotent (0 records)"
+    );
 }
 
 // =========================================================================
@@ -522,7 +516,8 @@ async fn test_waitlist_fifo_matching_fairness_and_requeue() {
         &clock,
     )
     .await;
-    let out_a: JoinWaitlistOutput = serde_json::from_value(res_a.structured_content.unwrap()).unwrap();
+    let out_a: JoinWaitlistOutput =
+        serde_json::from_value(res_a.structured_content.unwrap()).unwrap();
     let code_a = out_a.code;
 
     // Guest B (party 2, later) joins waitlist
@@ -542,7 +537,8 @@ async fn test_waitlist_fifo_matching_fairness_and_requeue() {
         &clock_b,
     )
     .await;
-    let out_b: JoinWaitlistOutput = serde_json::from_value(res_b.structured_content.unwrap()).unwrap();
+    let out_b: JoinWaitlistOutput =
+        serde_json::from_value(res_b.structured_content.unwrap()).unwrap();
     let code_b = out_b.code;
 
     // 2. Create and then cancel a 2-top booking at 19:30 indoor
@@ -595,8 +591,12 @@ async fn test_waitlist_fifo_matching_fairness_and_requeue() {
         &clock,
     )
     .await;
-    let out_stat_a: GetWaitlistStatusOutput = serde_json::from_value(stat_a.structured_content.unwrap()).unwrap();
-    assert_eq!(out_stat_a.status, "waiting", "Alice should still be waiting (table too small)");
+    let out_stat_a: GetWaitlistStatusOutput =
+        serde_json::from_value(stat_a.structured_content.unwrap()).unwrap();
+    assert_eq!(
+        out_stat_a.status, "waiting",
+        "Alice should still be waiting (table too small)"
+    );
 
     let stat_b = handle_get_waitlist_status_with_clock(
         &pool,
@@ -607,8 +607,12 @@ async fn test_waitlist_fifo_matching_fairness_and_requeue() {
         &clock,
     )
     .await;
-    let out_stat_b: GetWaitlistStatusOutput = serde_json::from_value(stat_b.structured_content.unwrap()).unwrap();
-    assert_eq!(out_stat_b.status, "offered", "Bob must be offered the freed 2-top table");
+    let out_stat_b: GetWaitlistStatusOutput =
+        serde_json::from_value(stat_b.structured_content.unwrap()).unwrap();
+    assert_eq!(
+        out_stat_b.status, "offered",
+        "Bob must be offered the freed 2-top table"
+    );
     let offer_detail = out_stat_b.waitlist.unwrap().offer.expect("Offer detail");
     let bob_offer_token = offer_detail.offer_token;
 
@@ -622,7 +626,8 @@ async fn test_waitlist_fifo_matching_fairness_and_requeue() {
         &clock,
     )
     .await;
-    let rel_out: ReleaseOfferOutput = serde_json::from_value(rel_res.structured_content.unwrap()).unwrap();
+    let rel_out: ReleaseOfferOutput =
+        serde_json::from_value(rel_res.structured_content.unwrap()).unwrap();
     assert_eq!(rel_out.status, "released");
 
     // Bob is back to 'waiting'
@@ -635,7 +640,8 @@ async fn test_waitlist_fifo_matching_fairness_and_requeue() {
         &clock,
     )
     .await;
-    let out_stat_b2: GetWaitlistStatusOutput = serde_json::from_value(stat_b2.structured_content.unwrap()).unwrap();
+    let out_stat_b2: GetWaitlistStatusOutput =
+        serde_json::from_value(stat_b2.structured_content.unwrap()).unwrap();
     assert_eq!(out_stat_b2.status, "waiting");
 }
 
@@ -671,7 +677,8 @@ async fn test_the_race_1_concurrent_accept_offer_20_tasks() {
             clock.as_ref(),
         )
         .await;
-        let neg_out: NegotiateBookingOutput = serde_json::from_value(neg_res.structured_content.unwrap()).unwrap();
+        let neg_out: NegotiateBookingOutput =
+            serde_json::from_value(neg_res.structured_content.unwrap()).unwrap();
         if neg_out.options.is_empty() {
             continue;
         }
@@ -736,8 +743,15 @@ async fn test_the_race_1_concurrent_accept_offer_20_tasks() {
         );
 
         // Reset iteration state
-        sqlx::query("DELETE FROM bookings WHERE guest_name = ?").bind(&guest).execute(&pool).await.unwrap();
-        sqlx::query("DELETE FROM negotiations").execute(&pool).await.unwrap();
+        sqlx::query("DELETE FROM bookings WHERE guest_name = ?")
+            .bind(&guest)
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query("DELETE FROM negotiations")
+            .execute(&pool)
+            .await
+            .unwrap();
     }
 }
 
@@ -770,7 +784,8 @@ async fn test_the_race_2_conversion_vs_release_vs_expiry() {
             clock.as_ref(),
         )
         .await;
-        let neg_out: NegotiateBookingOutput = serde_json::from_value(neg_res.structured_content.unwrap()).unwrap();
+        let neg_out: NegotiateBookingOutput =
+            serde_json::from_value(neg_res.structured_content.unwrap()).unwrap();
         if neg_out.options.is_empty() {
             continue;
         }
@@ -793,7 +808,8 @@ async fn test_the_race_2_conversion_vs_release_vs_expiry() {
             clock.as_ref(),
         )
         .await;
-        let hold_out: AcceptOfferOutput = serde_json::from_value(hold_res.structured_content.unwrap()).unwrap();
+        let hold_out: AcceptOfferOutput =
+            serde_json::from_value(hold_res.structured_content.unwrap()).unwrap();
         let token = hold_out.offer_token.expect("Must have hold token");
 
         // 2. Race: Task A (accept_offer), Task B (release_offer), Task C (expired clock check)
@@ -849,16 +865,18 @@ async fn test_the_race_2_conversion_vs_release_vs_expiry() {
 
         // 3. Verify DB invariant: hold must end in exactly one terminal state (converted, released, or expired)
         let token_hash = tabletalk_backend::negotiation::hash_token(&token);
-        let final_status: String = sqlx::query_scalar("SELECT status FROM slot_holds WHERE token_hash = ?")
-            .bind(&token_hash)
-            .fetch_one(&pool)
-            .await
-            .unwrap();
+        let final_status: String =
+            sqlx::query_scalar("SELECT status FROM slot_holds WHERE token_hash = ?")
+                .bind(&token_hash)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
 
         assert!(
             final_status == "converted" || final_status == "released" || final_status == "expired",
             "Iteration {}: Hold must be in valid terminal status, got {}",
-            iter, final_status
+            iter,
+            final_status
         );
     }
 }
@@ -917,7 +935,8 @@ async fn test_the_race_3_cancel_booking_vs_waitlist_vs_concurrent_create_booking
                 clock.as_ref(),
             )
             .await;
-            let wl_out: JoinWaitlistOutput = serde_json::from_value(wl_res.structured_content.unwrap()).unwrap();
+            let wl_out: JoinWaitlistOutput =
+                serde_json::from_value(wl_res.structured_content.unwrap()).unwrap();
             wl_codes.push((wl_out.code, format!("WL_{}_{}", iter, w_idx)));
         }
 
@@ -989,7 +1008,8 @@ async fn test_the_race_3_cancel_booking_vs_waitlist_vs_concurrent_create_booking
                 clock.as_ref(),
             )
             .await;
-            let stat_out: GetWaitlistStatusOutput = serde_json::from_value(stat_res.structured_content.unwrap()).unwrap();
+            let stat_out: GetWaitlistStatusOutput =
+                serde_json::from_value(stat_res.structured_content.unwrap()).unwrap();
             if stat_out.status == "offered" {
                 offered_count += 1;
             }
@@ -1002,8 +1022,14 @@ async fn test_the_race_3_cancel_booking_vs_waitlist_vs_concurrent_create_booking
         );
 
         // Reset state for next iteration
-        sqlx::query("DELETE FROM waitlist_entries").execute(&pool).await.unwrap();
-        sqlx::query("DELETE FROM slot_holds").execute(&pool).await.unwrap();
+        sqlx::query("DELETE FROM waitlist_entries")
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query("DELETE FROM slot_holds")
+            .execute(&pool)
+            .await
+            .unwrap();
         sqlx::query("DELETE FROM bookings WHERE guest_name LIKE 'CancelRacer_%' OR guest_name LIKE 'Outside_%'").execute(&pool).await.unwrap();
     }
 }
@@ -1075,7 +1101,8 @@ async fn test_token_privacy_never_in_db_and_forget_me_scrubs_all() {
         &clock,
     )
     .await;
-    let neg_out: NegotiateBookingOutput = serde_json::from_value(neg_res.structured_content.unwrap()).unwrap();
+    let neg_out: NegotiateBookingOutput =
+        serde_json::from_value(neg_res.structured_content.unwrap()).unwrap();
     let neg_id = neg_out.negotiation_id.unwrap();
     let opt_id = neg_out.options[0].option_id.clone();
 
@@ -1095,7 +1122,8 @@ async fn test_token_privacy_never_in_db_and_forget_me_scrubs_all() {
         &clock,
     )
     .await;
-    let hold_out: AcceptOfferOutput = serde_json::from_value(hold_res.structured_content.unwrap()).unwrap();
+    let hold_out: AcceptOfferOutput =
+        serde_json::from_value(hold_res.structured_content.unwrap()).unwrap();
     let offer_token = hold_out.offer_token.unwrap();
 
     // Verify plain offer token NEVER appears anywhere in any SQLite table!
@@ -1245,10 +1273,16 @@ async fn test_mcp_tools_list_twenty_two_tools_http() {
     }
 
     // Verify annotations
-    let get_wl = tools.iter().find(|t| t["name"] == "get_waitlist_status").unwrap();
+    let get_wl = tools
+        .iter()
+        .find(|t| t["name"] == "get_waitlist_status")
+        .unwrap();
     assert_eq!(get_wl["annotations"]["readOnlyHint"], true);
 
-    let leave_wl = tools.iter().find(|t| t["name"] == "leave_waitlist").unwrap();
+    let leave_wl = tools
+        .iter()
+        .find(|t| t["name"] == "leave_waitlist")
+        .unwrap();
     assert_eq!(leave_wl["annotations"]["destructiveHint"], true);
 }
 

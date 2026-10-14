@@ -224,8 +224,6 @@ pub async fn handle_negotiate_booking_with_clock(
         .duration_minutes
         .unwrap_or(config.dining_duration_minutes);
 
-
-
     // 2. Resolve or create negotiation record
     let mut conn = match pool.acquire().await {
         Ok(c) => c,

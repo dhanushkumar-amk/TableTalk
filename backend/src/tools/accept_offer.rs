@@ -258,11 +258,13 @@ pub async fn handle_accept_offer_with_clock(
         let is_expired =
             hold.expires_at <= now_iso || hold.status == crate::db::models::HoldStatus::Expired;
         if is_expired {
-            let _ = sqlx::query("UPDATE slot_holds SET status = 'expired', updated_at = ? WHERE id = ?")
-                .bind(&now_iso)
-                .bind(hold.id)
-                .execute(&mut *conn)
-                .await;
+            let _ = sqlx::query(
+                "UPDATE slot_holds SET status = 'expired', updated_at = ? WHERE id = ?",
+            )
+            .bind(&now_iso)
+            .bind(hold.id)
+            .execute(&mut *conn)
+            .await;
             let _ = sqlx::query("ROLLBACK").execute(&mut *conn).await;
             let output = AcceptOfferOutput {
                 status: "offer_expired".to_string(),
@@ -273,7 +275,9 @@ pub async fn handle_accept_offer_with_clock(
                 payment: None,
             };
             let mut res = CallToolResult::structured(serde_json::to_value(&output).unwrap());
-            res.content = vec![ContentBlock::text("Your hold has expired. Would you like to check other times?")];
+            res.content = vec![ContentBlock::text(
+                "Your hold has expired. Would you like to check other times?",
+            )];
             return res;
         }
 

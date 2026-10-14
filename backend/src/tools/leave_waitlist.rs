@@ -138,8 +138,6 @@ pub async fn handle_leave_waitlist_with_clock(
                 .execute(&mut *conn)
                 .await;
 
-
-
         if let Ok(dt_utc) = DateTime::parse_from_rfc3339(&start_at) {
             let local_dt = dt_utc.with_timezone(&tz);
             let date_str = local_dt.format("%Y-%m-%d").to_string();

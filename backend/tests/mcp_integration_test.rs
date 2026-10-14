@@ -346,3 +346,163 @@ async fn test_full_mcp_lifecycle_and_tools() {
 
     server_handle.abort();
 }
+
+#[tokio::test]
+async fn test_phase13_backward_compatibility_and_tool_count_is_24() {
+    let (base_url, server_handle) = spawn_test_server().await;
+    let client = reqwest::Client::new();
+
+    // 1. Initialize
+    let init_payload = serde_json::json!({
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "initialize",
+        "params": {
+            "protocolVersion": "2025-11-25",
+            "capabilities": {},
+            "clientInfo": {
+                "name": "Phase13CompatibilityClient",
+                "version": "1.0.0"
+            }
+        }
+    });
+
+    let init_resp = client
+        .post(format!("{}/mcp", base_url))
+        .header("Accept", "application/json, text/event-stream")
+        .header("mcp-protocol-version", "2025-11-25")
+        .json(&init_payload)
+        .send()
+        .await
+        .expect("initialize request failed");
+
+    let session_id = init_resp
+        .headers()
+        .get("mcp-session-id")
+        .expect("missing mcp-session-id")
+        .to_str()
+        .unwrap()
+        .to_string();
+
+    // 2. tools/list: Verify exact 24 tools
+    let list_payload = serde_json::json!({
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "tools/list",
+        "params": {}
+    });
+
+    let list_resp = client
+        .post(format!("{}/mcp", base_url))
+        .header("Accept", "application/json, text/event-stream")
+        .header("mcp-session-id", &session_id)
+        .header("mcp-protocol-version", "2025-11-25")
+        .json(&list_payload)
+        .send()
+        .await
+        .expect("tools/list request failed");
+
+    let list_raw = list_resp.text().await.expect("Failed to read tools/list");
+    let list_json = extract_json_from_response(&list_raw);
+    let tools = list_json["result"]["tools"]
+        .as_array()
+        .expect("tools array");
+
+    assert_eq!(
+        tools.len(),
+        24,
+        "Tool count must strictly remain 24 in Phase 13! Found: {}",
+        tools.len()
+    );
+
+    let expected_tools = [
+        "ping_restaurant",
+        "search_menu",
+        "check_availability",
+        "create_booking",
+        "cancel_booking",
+        "get_booking",
+        "place_order",
+        "get_order",
+        "cancel_order",
+        "enable_memory",
+        "get_profile",
+        "remember_preference",
+        "forget_preference",
+        "get_usual_order",
+        "rotate_profile_token",
+        "forget_me",
+        "negotiate_booking",
+        "accept_offer",
+        "release_offer",
+        "join_waitlist",
+        "get_waitlist_status",
+        "leave_waitlist",
+        "get_deposit_status",
+        "refresh_payment_session",
+    ];
+
+    let actual_names: std::collections::HashSet<String> = tools
+        .iter()
+        .map(|t| t["name"].as_str().unwrap().to_string())
+        .collect();
+
+    for name in expected_tools {
+        assert!(
+            actual_names.contains(name),
+            "Missing expected tool in tools/list: {}",
+            name
+        );
+    }
+
+    // 3. Backward compatibility: verify ping_restaurant output envelope is unchanged
+    let ping_payload = serde_json::json!({
+        "jsonrpc": "2.0",
+        "id": 3,
+        "method": "tools/call",
+        "params": {
+            "name": "ping_restaurant",
+            "arguments": {
+                "name": "Phase13Verifier"
+            }
+        }
+    });
+
+    let ping_resp = client
+        .post(format!("{}/mcp", base_url))
+        .header("Accept", "application/json, text/event-stream")
+        .header("mcp-session-id", &session_id)
+        .header("mcp-protocol-version", "2025-11-25")
+        .json(&ping_payload)
+        .send()
+        .await
+        .expect("ping_restaurant tools/call failed");
+
+    let ping_raw = ping_resp
+        .text()
+        .await
+        .expect("Failed to read ping_restaurant");
+    let ping_json = extract_json_from_response(&ping_raw);
+    let result = &ping_json["result"];
+
+    // Assert standard content array with text type
+    let content = result["content"].as_array().expect("content array");
+    assert!(!content.is_empty());
+    assert_eq!(content[0]["type"], "text");
+    assert!(content[0]["text"]
+        .as_str()
+        .unwrap()
+        .contains("Hello, Phase13Verifier!"));
+
+    // Assert structuredContent contains server metadata
+    let sc = &result["structuredContent"];
+    assert!(sc.is_object());
+    assert_eq!(sc["server"], "tabletalk");
+    assert_eq!(sc["version"], env!("CARGO_PKG_VERSION"));
+    assert!(sc["message"]
+        .as_str()
+        .unwrap()
+        .contains("Hello, Phase13Verifier!"));
+
+    server_handle.abort();
+}

@@ -59,7 +59,10 @@ pub enum PaymentError {
     #[error("money arithmetic overflow")]
     Overflow,
     #[error("illegal payment transition from {from:?} to {to:?}")]
-    Transition { from: PaymentState, to: PaymentState },
+    Transition {
+        from: PaymentState,
+        to: PaymentState,
+    },
     #[error("injected fault (test)")]
     FaultInjected,
     #[error("database error: {0}")]
@@ -112,8 +115,25 @@ const NUMBER_WORDS: [&str; 13] = [
 /// Spoken word for 0..=99 (hyphenated tens, e.g. forty-five).
 fn number_word(n: i64) -> String {
     const ONES: [&str; 20] = [
-        "zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten",
-        "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen", "eighteen",
+        "zero",
+        "one",
+        "two",
+        "three",
+        "four",
+        "five",
+        "six",
+        "seven",
+        "eight",
+        "nine",
+        "ten",
+        "eleven",
+        "twelve",
+        "thirteen",
+        "fourteen",
+        "fifteen",
+        "sixteen",
+        "seventeen",
+        "eighteen",
         "nineteen",
     ];
     const TENS: [&str; 8] = [
@@ -257,7 +277,10 @@ pub fn deposit_required(
 
 /// amount = per_person_minor * party_size, capped at the policy maximum.
 /// Uses checked arithmetic; never panics and never returns a float.
-pub fn compute_deposit_amount(policy: &DepositPolicy, party_size: i64) -> Result<i64, PaymentError> {
+pub fn compute_deposit_amount(
+    policy: &DepositPolicy,
+    party_size: i64,
+) -> Result<i64, PaymentError> {
     let total = policy
         .per_person_minor
         .checked_mul(party_size)
@@ -290,9 +313,9 @@ pub fn apply_basis_points_round_half_up(amount_minor: i64, bps: i64) -> i64 {
 
 /// Refund for cancelling with `minutes_until_start` remaining before the booking
 /// start. Boundaries are inclusive at the top of each window:
-///   >= refund_full_hours   -> full_bps
-///   >= refund_partial_hours-> partial_bps
-///   otherwise              -> 0
+/// - `>= refund_full_hours`   -> full_bps
+/// - `>= refund_partial_hours` -> partial_bps
+/// - otherwise                -> 0
 pub fn compute_refund(
     deposit_minor: i64,
     minutes_until_start: i64,
@@ -440,7 +463,7 @@ pub fn luhn_valid(digits: &[u8]) -> bool {
         sum += v;
         double = !double;
     }
-    sum % 10 == 0
+    sum.is_multiple_of(10)
 }
 
 /// Detects a card-like digit sequence (13-19 digits, Luhn-valid) in a string,
@@ -809,10 +832,12 @@ async fn expire_pending_booking_in_conn(
         return Ok(false);
     }
 
-    sqlx::query("UPDATE payment_sessions SET status = 'expired' WHERE booking_id = ? AND status = 'open'")
-        .bind(&booking.id)
-        .execute(&mut *conn)
-        .await?;
+    sqlx::query(
+        "UPDATE payment_sessions SET status = 'expired' WHERE booking_id = ? AND status = 'open'",
+    )
+    .bind(&booking.id)
+    .execute(&mut *conn)
+    .await?;
 
     let payload = serde_json::json!({
         "confirmation_code_prefix": booking.confirmation_code.get(..6).unwrap_or(&booking.confirmation_code),
@@ -861,11 +886,12 @@ async fn run_waitlist_matcher_for_slot(
         let local = dt_utc.with_timezone(tz);
         let date_str = local.format("%Y-%m-%d").to_string();
         let time_str = local.format("%H:%M").to_string();
-        let area_str = sqlx::query_scalar::<_, String>("SELECT area FROM dining_tables WHERE id = ?")
-            .bind(tid)
-            .fetch_optional(&mut *conn)
-            .await?
-            .unwrap_or_else(|| "indoor".to_string());
+        let area_str =
+            sqlx::query_scalar::<_, String>("SELECT area FROM dining_tables WHERE id = ?")
+                .bind(tid)
+                .fetch_optional(&mut *conn)
+                .await?
+                .unwrap_or_else(|| "indoor".to_string());
 
         let clock = crate::availability::FixedClock(now_utc);
         let _ = crate::negotiation::match_waitlist_for_slot(
@@ -970,11 +996,12 @@ pub async fn lazy_expire_booking_by_id(
             return Ok(false);
         };
 
-        let tz: Tz = sqlx::query_scalar::<_, String>("SELECT timezone FROM restaurant WHERE id = 1")
-            .fetch_optional(&mut *conn)
-            .await?
-            .and_then(|s| s.parse().ok())
-            .unwrap_or(chrono_tz::Asia::Kolkata);
+        let tz: Tz =
+            sqlx::query_scalar::<_, String>("SELECT timezone FROM restaurant WHERE id = 1")
+                .fetch_optional(&mut *conn)
+                .await?
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(chrono_tz::Asia::Kolkata);
 
         lazy_expire_booking_in_conn(&mut conn, &booking, now_utc, &tz).await
     }
@@ -1298,13 +1325,13 @@ pub async fn complete_checkout(
                 .await?;
 
                 let left = policy.decline_retry_limit - (session.decline_count + 1);
-                return Ok(CheckoutResult::new(
+                Ok(CheckoutResult::new(
                     "declined",
                     format!(
                         "The payment was declined. The session stays open; {} attempt(s) remaining.",
                         left.max(0)
                     ),
-                ));
+                ))
             }
             CheckoutOutcome::NeedsVerification => {
                 // Simulated step-up: move the payment to requires_action once.
@@ -1343,10 +1370,10 @@ pub async fn complete_checkout(
                     .await?;
                 }
 
-                return Ok(CheckoutResult::new(
+                Ok(CheckoutResult::new(
                     "needs_verification",
                     "Extra verification is required. Confirm again to complete the payment.".to_string(),
-                ));
+                ))
             }
             CheckoutOutcome::Success => {
                 // 5. Authorize + capture (authorize-then-capture, immediately).
@@ -1461,12 +1488,12 @@ pub async fn complete_checkout(
                 .execute(&mut *conn)
                 .await?;
 
-                return Ok(CheckoutResult {
+                Ok(CheckoutResult {
                     status: "success".to_string(),
                     simulated: true,
                     message: "Payment completed (simulated). Your table is confirmed.".to_string(),
                     booking_confirmed: true,
-                });
+                })
             }
         }
     }
@@ -1520,11 +1547,12 @@ pub async fn payment_balance(
     conn: &mut SqliteConnection,
     payment_id: &str,
 ) -> Result<i64, PaymentError> {
-    let sum: Option<i64> =
-        sqlx::query_scalar("SELECT COALESCE(SUM(amount_minor), 0) FROM ledger_entries WHERE payment_id = ?")
-            .bind(payment_id)
-            .fetch_one(&mut *conn)
-            .await?;
+    let sum: Option<i64> = sqlx::query_scalar(
+        "SELECT COALESCE(SUM(amount_minor), 0) FROM ledger_entries WHERE payment_id = ?",
+    )
+    .bind(payment_id)
+    .fetch_one(&mut *conn)
+    .await?;
     Ok(sum.unwrap_or(0))
 }
 
@@ -1542,7 +1570,9 @@ mod tests {
     }
 
     fn local(dt: &str) -> DateTime<Tz> {
-        let utc = DateTime::parse_from_rfc3339(dt).unwrap().with_timezone(&Utc);
+        let utc = DateTime::parse_from_rfc3339(dt)
+            .unwrap()
+            .with_timezone(&Utc);
         utc.with_timezone(&chrono_tz::Asia::Kolkata)
     }
 
@@ -1596,7 +1626,7 @@ mod tests {
     #[test]
     fn test_refund_schedule_boundaries() {
         let p = policy(); // full >= 24h, partial >= 2h, else none
-        // Exactly 24 hours -> full refund.
+                          // Exactly 24 hours -> full refund.
         assert_eq!(compute_refund(200_000, 24 * 60, &p).refund_minor, 200_000);
         // Just under 24 hours -> partial.
         assert_eq!(
@@ -1723,7 +1753,9 @@ mod tests {
         let mut seed: u64 = 42;
         let mut digits: Vec<u8> = Vec::with_capacity(15);
         for _ in 0..15 {
-            seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+            seed = seed
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407);
             digits.push(((seed >> 33) % 10) as u8);
         }
         // Find check digit so full 16-digit number is Luhn valid.

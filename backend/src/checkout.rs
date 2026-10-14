@@ -114,10 +114,7 @@ fn generic_bad_request() -> Response {
 }
 
 /// GET /mock-checkout/{token}
-async fn get_session(
-    State(state): State<CheckoutState>,
-    Path(token): Path<String>,
-) -> Response {
+async fn get_session(State(state): State<CheckoutState>, Path(token): Path<String>) -> Response {
     let request_id = uuid::Uuid::new_v4();
     let token_hash = payments::hash_payment_token(&token);
 
@@ -151,8 +148,12 @@ async fn get_session(
             .await
             .ok()
             .flatten();
-    let (restaurant_name, timezone) =
-        restaurant.unwrap_or_else(|| ("The Saffron Nebula Bistro".to_string(), "Asia/Kolkata".to_string()));
+    let (restaurant_name, timezone) = restaurant.unwrap_or_else(|| {
+        (
+            "The Saffron Nebula Bistro".to_string(),
+            "Asia/Kolkata".to_string(),
+        )
+    });
     let tz: chrono_tz::Tz = timezone.parse().unwrap_or(chrono_tz::Asia::Kolkata);
 
     let deadline = chrono::DateTime::parse_from_rfc3339(&session.expires_at)

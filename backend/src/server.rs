@@ -245,7 +245,9 @@ impl TableTalkServer {
     )]
     async fn refresh_payment_session(
         &self,
-        Parameters(input): Parameters<crate::tools::refresh_payment_session::RefreshPaymentSessionInput>,
+        Parameters(input): Parameters<
+            crate::tools::refresh_payment_session::RefreshPaymentSessionInput,
+        >,
     ) -> Result<rmcp::model::CallToolResult, rmcp::ErrorData> {
         let pool = match &self.db {
             Some(p) => p,

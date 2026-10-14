@@ -1438,7 +1438,10 @@ pub async fn get_booking_tx(
     // Deposit details surface only when a deposit is involved (backward compatible:
     // deposit-free bookings keep the Phase 8 output shape).
     let deposit = if booking.deposit_status != crate::db::models::DepositStatus::NotRequired {
-        let rest_tz: Tz = restaurant.timezone.parse().unwrap_or(chrono_tz::Asia::Kolkata);
+        let rest_tz: Tz = restaurant
+            .timezone
+            .parse()
+            .unwrap_or(chrono_tz::Asia::Kolkata);
         let deadline_local = booking
             .payment_deadline_at
             .as_deref()

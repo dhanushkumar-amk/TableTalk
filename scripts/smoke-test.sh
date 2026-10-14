@@ -254,6 +254,8 @@ else
   else
     log_fail "Inspector CLI place_order failed: ${ORDER_OUT}"
   fi
+fi
+
 # Check 12: Memory lifecycle: enable_memory -> remember_preference -> get_usual_order -> forget_me
 echo "Testing memory lifecycle: enable_memory -> remember_preference -> get_usual_order -> forget_me..."
 ENABLE_OUT=$(npx --yes @modelcontextprotocol/inspector --cli "${MCP_URL}" --method tools/call --tool-name enable_memory \
