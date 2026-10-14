@@ -160,6 +160,25 @@ async fn get_session(State(state): State<CheckoutState>, Path(token): Path<Strin
         .map(|d| d.with_timezone(&tz).to_rfc3339())
         .unwrap_or_else(|_| session.expires_at.clone());
 
+    let booking_info: Option<(i64, String)> = sqlx::query_as(
+        "SELECT party_size, start_at FROM bookings WHERE id = ?"
+    )
+    .bind(&session.booking_id)
+    .fetch_optional(&state.pool)
+    .await
+    .ok()
+    .flatten();
+
+    let (booking_party_size, booking_start_at) = match booking_info {
+        Some((ps, sa)) => {
+            let local_start = chrono::DateTime::parse_from_rfc3339(&sa)
+                .map(|d| d.with_timezone(&tz).to_rfc3339())
+                .unwrap_or(sa);
+            (Some(ps), Some(local_start))
+        }
+        None => (None, None),
+    };
+
     tracing::info!(
         request_id = %request_id,
         session_id = %session.id,
@@ -173,6 +192,8 @@ async fn get_session(State(state): State<CheckoutState>, Path(token): Path<Strin
         "restaurant_name": restaurant_name,
         "amount": payments::money(session.amount_minor, &session.currency),
         "deadline_local": deadline,
+        "party_size": booking_party_size,
+        "start_at_local": booking_start_at,
         "message": "SIMULATED PAYMENT - no real money will move."
     }))
     .into_response()
