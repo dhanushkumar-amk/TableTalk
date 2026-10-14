@@ -1,0 +1,2971 @@
+{
+  "accept_offer": {
+    "$defs": {
+      "BookingSummary": {
+        "properties": {
+          "area": {
+            "type": "string"
+          },
+          "confirmation_code": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "end_local": {
+            "type": "string"
+          },
+          "guest_name": {
+            "type": "string"
+          },
+          "party_size": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "source": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "special_requests": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "start_local": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "table_label": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "confirmation_code",
+          "guest_name",
+          "party_size",
+          "start_local",
+          "end_local",
+          "area",
+          "table_label",
+          "status",
+          "created_at"
+        ],
+        "type": "object"
+      },
+      "HoldSummary": {
+        "properties": {
+          "area": {
+            "type": "string"
+          },
+          "end_local": {
+            "type": "string"
+          },
+          "expires_at_local": {
+            "type": "string"
+          },
+          "hold_id": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "party_size": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "seconds_remaining": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "start_local": {
+            "type": "string"
+          },
+          "table_label": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "hold_id",
+          "expires_at_local",
+          "seconds_remaining",
+          "area",
+          "start_local",
+          "end_local",
+          "table_label",
+          "party_size"
+        ],
+        "type": "object"
+      },
+      "Money": {
+        "description": "Structured money value: integer minor units plus a display string.",
+        "properties": {
+          "amount_minor": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "display": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "amount_minor",
+          "currency",
+          "display"
+        ],
+        "type": "object"
+      },
+      "PaymentObject": {
+        "description": "Payment object embedded in create_booking / accept_offer / refresh responses.",
+        "properties": {
+          "amount": {
+            "$ref": "#/$defs/Money"
+          },
+          "checkout_url": {
+            "type": "string"
+          },
+          "deadline_local": {
+            "type": "string"
+          },
+          "minutes_remaining": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "required": {
+            "type": "boolean"
+          },
+          "simulated": {
+            "type": "boolean"
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "required",
+          "simulated",
+          "status",
+          "amount",
+          "deadline_local",
+          "minutes_remaining",
+          "checkout_url"
+        ],
+        "type": "object"
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "booking": {
+        "anyOf": [
+          {
+            "$ref": "#/$defs/BookingSummary"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "hold": {
+        "anyOf": [
+          {
+            "$ref": "#/$defs/HoldSummary"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "message": {
+        "type": "string"
+      },
+      "offer_token": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "payment": {
+        "anyOf": [
+          {
+            "$ref": "#/$defs/PaymentObject"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "description": "Present only when a simulated deposit is required to confirm the booking."
+      },
+      "status": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "status",
+      "message"
+    ],
+    "type": "object"
+  },
+  "cancel_booking": {
+    "$defs": {
+      "BookingSummary": {
+        "properties": {
+          "area": {
+            "type": "string"
+          },
+          "confirmation_code": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "end_local": {
+            "type": "string"
+          },
+          "guest_name": {
+            "type": "string"
+          },
+          "party_size": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "source": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "special_requests": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "start_local": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "table_label": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "confirmation_code",
+          "guest_name",
+          "party_size",
+          "start_local",
+          "end_local",
+          "area",
+          "table_label",
+          "status",
+          "created_at"
+        ],
+        "type": "object"
+      },
+      "Money": {
+        "description": "Structured money value: integer minor units plus a display string.",
+        "properties": {
+          "amount_minor": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "display": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "amount_minor",
+          "currency",
+          "display"
+        ],
+        "type": "object"
+      },
+      "RefundSummary": {
+        "description": "Refund outcome embedded in cancel_booking responses.",
+        "properties": {
+          "amount": {
+            "$ref": "#/$defs/Money"
+          },
+          "explanation": {
+            "type": "string"
+          },
+          "percent_bps": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "percent_display": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "amount",
+          "percent_bps",
+          "percent_display",
+          "explanation"
+        ],
+        "type": "object"
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "already_cancelled": {
+        "type": "boolean"
+      },
+      "booking": {
+        "anyOf": [
+          {
+            "$ref": "#/$defs/BookingSummary"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "policy_note": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "reason": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "reason_detail": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "refund": {
+        "anyOf": [
+          {
+            "$ref": "#/$defs/RefundSummary"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "description": "Present only when a deposit was captured and a refund was evaluated."
+      },
+      "status": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "status",
+      "already_cancelled"
+    ],
+    "type": "object"
+  },
+  "cancel_order": {
+    "$defs": {
+      "OrderLineSummary": {
+        "properties": {
+          "allergens": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "dietary_tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "item_id": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "line_total": {
+            "$ref": "#/$defs/PriceDisplay"
+          },
+          "name": {
+            "type": "string"
+          },
+          "notes": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "quantity": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "unit_price": {
+            "$ref": "#/$defs/PriceDisplay"
+          }
+        },
+        "required": [
+          "item_id",
+          "name",
+          "quantity",
+          "unit_price",
+          "line_total",
+          "allergens",
+          "dietary_tags"
+        ],
+        "type": "object"
+      },
+      "OrderSummary": {
+        "properties": {
+          "created_at": {
+            "type": "string"
+          },
+          "guest_name": {
+            "type": "string"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/$defs/OrderLineSummary"
+            },
+            "type": "array"
+          },
+          "order_code": {
+            "type": "string"
+          },
+          "payment_status": {
+            "type": "string"
+          },
+          "pickup_time_local": {
+            "type": "string"
+          },
+          "stated_allergens": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "type": "string"
+          },
+          "subtotal": {
+            "$ref": "#/$defs/PriceDisplay"
+          },
+          "tax": {
+            "$ref": "#/$defs/PriceDisplay"
+          },
+          "total": {
+            "$ref": "#/$defs/PriceDisplay"
+          }
+        },
+        "required": [
+          "order_code",
+          "guest_name",
+          "status",
+          "pickup_time_local",
+          "lines",
+          "subtotal",
+          "tax",
+          "total",
+          "payment_status",
+          "created_at"
+        ],
+        "type": "object"
+      },
+      "PriceDisplay": {
+        "properties": {
+          "amount_minor": {
+            "description": "Price in minor currency units (paise)",
+            "format": "int64",
+            "type": "integer"
+          },
+          "currency": {
+            "description": "ISO currency code (e.g. INR)",
+            "type": "string"
+          },
+          "display": {
+            "description": "Human-readable formatted price string (e.g. ₹380)",
+            "type": "string"
+          }
+        },
+        "required": [
+          "amount_minor",
+          "currency",
+          "display"
+        ],
+        "type": "object"
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "already_cancelled": {
+        "type": "boolean"
+      },
+      "order": {
+        "anyOf": [
+          {
+            "$ref": "#/$defs/OrderSummary"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "policy_note": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "reason": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "reason_detail": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "status": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "status",
+      "already_cancelled"
+    ],
+    "type": "object"
+  },
+  "check_availability": {
+    "$defs": {
+      "AlternativeSlot": {
+        "description": "Alternative dining slot suggestion.",
+        "properties": {
+          "area": {
+            "type": "string"
+          },
+          "different_day": {
+            "type": "boolean"
+          },
+          "end_local": {
+            "type": "string"
+          },
+          "minutes_from_requested": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "start_local": {
+            "type": "string"
+          },
+          "table_label": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "start_local",
+          "end_local",
+          "area",
+          "table_label",
+          "minutes_from_requested",
+          "different_day"
+        ],
+        "type": "object"
+      },
+      "AvailableSlot": {
+        "description": "Allocated dining slot when available.",
+        "properties": {
+          "area": {
+            "type": "string"
+          },
+          "capacity": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "end_local": {
+            "type": "string"
+          },
+          "start_local": {
+            "type": "string"
+          },
+          "table_label": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "start_local",
+          "end_local",
+          "table_label",
+          "area",
+          "capacity"
+        ],
+        "type": "object"
+      },
+      "OpeningHoursRange": {
+        "description": "Operating hours range for a service period.",
+        "properties": {
+          "close": {
+            "type": "string"
+          },
+          "open": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "open",
+          "close"
+        ],
+        "type": "object"
+      },
+      "RequestedDetails": {
+        "description": "Details of the parsed reservation request.",
+        "properties": {
+          "area": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string"
+          },
+          "duration_minutes": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "party_size": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "time": {
+            "type": "string"
+          },
+          "timezone": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "date",
+          "time",
+          "party_size",
+          "area",
+          "duration_minutes",
+          "timezone"
+        ],
+        "type": "object"
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "alternatives": {
+        "items": {
+          "$ref": "#/$defs/AlternativeSlot"
+        },
+        "type": "array"
+      },
+      "note": {
+        "type": "string"
+      },
+      "opening_hours_that_day": {
+        "items": {
+          "$ref": "#/$defs/OpeningHoursRange"
+        },
+        "type": "array"
+      },
+      "reason": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "reason_detail": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "requested": {
+        "$ref": "#/$defs/RequestedDetails"
+      },
+      "restaurant_now": {
+        "type": "string"
+      },
+      "slot": {
+        "anyOf": [
+          {
+            "$ref": "#/$defs/AvailableSlot"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "snapped_from": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "status": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "requested",
+      "restaurant_now",
+      "status",
+      "alternatives",
+      "opening_hours_that_day",
+      "note"
+    ],
+    "type": "object"
+  },
+  "create_booking": {
+    "$defs": {
+      "AlternativeSlot": {
+        "description": "Alternative dining slot suggestion.",
+        "properties": {
+          "area": {
+            "type": "string"
+          },
+          "different_day": {
+            "type": "boolean"
+          },
+          "end_local": {
+            "type": "string"
+          },
+          "minutes_from_requested": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "start_local": {
+            "type": "string"
+          },
+          "table_label": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "start_local",
+          "end_local",
+          "area",
+          "table_label",
+          "minutes_from_requested",
+          "different_day"
+        ],
+        "type": "object"
+      },
+      "BookingSummary": {
+        "properties": {
+          "area": {
+            "type": "string"
+          },
+          "confirmation_code": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "end_local": {
+            "type": "string"
+          },
+          "guest_name": {
+            "type": "string"
+          },
+          "party_size": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "source": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "special_requests": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "start_local": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "table_label": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "confirmation_code",
+          "guest_name",
+          "party_size",
+          "start_local",
+          "end_local",
+          "area",
+          "table_label",
+          "status",
+          "created_at"
+        ],
+        "type": "object"
+      },
+      "Money": {
+        "description": "Structured money value: integer minor units plus a display string.",
+        "properties": {
+          "amount_minor": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "display": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "amount_minor",
+          "currency",
+          "display"
+        ],
+        "type": "object"
+      },
+      "NegotiationOption": {
+        "properties": {
+          "area": {
+            "type": "string"
+          },
+          "end_local": {
+            "type": "string"
+          },
+          "minutes_from_requested": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "option_id": {
+            "type": "string"
+          },
+          "rank": {
+            "format": "uint",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "score_reasons": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "start_local": {
+            "type": "string"
+          },
+          "table_label": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "option_id",
+          "start_local",
+          "end_local",
+          "area",
+          "minutes_from_requested",
+          "score_reasons",
+          "rank"
+        ],
+        "type": "object"
+      },
+      "PaymentObject": {
+        "description": "Payment object embedded in create_booking / accept_offer / refresh responses.",
+        "properties": {
+          "amount": {
+            "$ref": "#/$defs/Money"
+          },
+          "checkout_url": {
+            "type": "string"
+          },
+          "deadline_local": {
+            "type": "string"
+          },
+          "minutes_remaining": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "required": {
+            "type": "boolean"
+          },
+          "simulated": {
+            "type": "boolean"
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "required",
+          "simulated",
+          "status",
+          "amount",
+          "deadline_local",
+          "minutes_remaining",
+          "checkout_url"
+        ],
+        "type": "object"
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "alternatives": {
+        "items": {
+          "$ref": "#/$defs/AlternativeSlot"
+        },
+        "type": "array"
+      },
+      "booking": {
+        "anyOf": [
+          {
+            "$ref": "#/$defs/BookingSummary"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "cancellation_policy": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "idempotent_replay": {
+        "type": "boolean"
+      },
+      "negotiation_id": {
+        "format": "int64",
+        "type": [
+          "integer",
+          "null"
+        ]
+      },
+      "negotiation_options": {
+        "items": {
+          "$ref": "#/$defs/NegotiationOption"
+        },
+        "type": [
+          "array",
+          "null"
+        ]
+      },
+      "note": {
+        "type": "string"
+      },
+      "payment": {
+        "anyOf": [
+          {
+            "$ref": "#/$defs/PaymentObject"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "description": "Present only when a simulated deposit is required for this booking."
+      },
+      "profile_applied": {
+        "type": [
+          "boolean",
+          "null"
+        ]
+      },
+      "reason": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "reason_detail": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "seat_preference_honored": {
+        "type": [
+          "boolean",
+          "null"
+        ]
+      },
+      "status": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "status",
+      "idempotent_replay",
+      "alternatives",
+      "note"
+    ],
+    "type": "object"
+  },
+  "enable_memory": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "consent_version": {
+        "type": "string"
+      },
+      "guest_name": {
+        "type": "string"
+      },
+      "message": {
+        "type": "string"
+      },
+      "preferences_saved": {
+        "format": "uint",
+        "minimum": 0,
+        "type": "integer"
+      },
+      "profile_token": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "status": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "status",
+      "guest_name",
+      "consent_version",
+      "preferences_saved",
+      "message"
+    ],
+    "type": "object"
+  },
+  "forget_me": {
+    "$defs": {
+      "ScrubbedBusinessRecordsSummary": {
+        "properties": {
+          "scrubbed_bookings": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "scrubbed_orders": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "scrubbed_orders",
+          "scrubbed_bookings"
+        ],
+        "type": "object"
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "message": {
+        "type": "string"
+      },
+      "removed_components": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "scrubbed_business_records": {
+        "$ref": "#/$defs/ScrubbedBusinessRecordsSummary"
+      },
+      "status": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "status",
+      "removed_components",
+      "scrubbed_business_records",
+      "message"
+    ],
+    "type": "object"
+  },
+  "forget_preference": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "kind": {
+        "type": "string"
+      },
+      "message": {
+        "type": "string"
+      },
+      "policy_note": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "removed": {
+        "type": "boolean"
+      },
+      "status": {
+        "type": "string"
+      },
+      "value": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "status",
+      "kind",
+      "value",
+      "removed",
+      "message"
+    ],
+    "type": "object"
+  },
+  "get_booking": {
+    "$defs": {
+      "BookingSummary": {
+        "properties": {
+          "area": {
+            "type": "string"
+          },
+          "confirmation_code": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "end_local": {
+            "type": "string"
+          },
+          "guest_name": {
+            "type": "string"
+          },
+          "party_size": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "source": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "special_requests": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "start_local": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "table_label": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "confirmation_code",
+          "guest_name",
+          "party_size",
+          "start_local",
+          "end_local",
+          "area",
+          "table_label",
+          "status",
+          "created_at"
+        ],
+        "type": "object"
+      },
+      "DepositInfo": {
+        "description": "Deposit details surfaced by get_booking.",
+        "properties": {
+          "amount": {
+            "$ref": "#/$defs/Money"
+          },
+          "deadline_local": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "minutes_remaining": {
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "amount"
+        ],
+        "type": "object"
+      },
+      "Money": {
+        "description": "Structured money value: integer minor units plus a display string.",
+        "properties": {
+          "amount_minor": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "display": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "amount_minor",
+          "currency",
+          "display"
+        ],
+        "type": "object"
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "booking": {
+        "anyOf": [
+          {
+            "$ref": "#/$defs/BookingSummary"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "deposit": {
+        "anyOf": [
+          {
+            "$ref": "#/$defs/DepositInfo"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "description": "Present only when the booking carries a deposit (paid or pending)."
+      },
+      "message": {
+        "type": "string"
+      },
+      "status": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "status",
+      "message"
+    ],
+    "type": "object"
+  },
+  "get_deposit_status": {
+    "$defs": {
+      "DepositStatusMoney": {
+        "properties": {
+          "amount": {
+            "$ref": "#/$defs/Money"
+          },
+          "explanation": {
+            "type": "string"
+          },
+          "percent_bps": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "percent_display": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "amount",
+          "percent_bps",
+          "percent_display",
+          "explanation"
+        ],
+        "type": "object"
+      },
+      "Money": {
+        "description": "Structured money value: integer minor units plus a display string.",
+        "properties": {
+          "amount_minor": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "display": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "amount_minor",
+          "currency",
+          "display"
+        ],
+        "type": "object"
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "amount": {
+        "anyOf": [
+          {
+            "$ref": "#/$defs/Money"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "deadline_local": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "deposit_status": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "message": {
+        "type": "string"
+      },
+      "minutes_remaining": {
+        "format": "int64",
+        "type": [
+          "integer",
+          "null"
+        ]
+      },
+      "refund_if_cancelled_now": {
+        "anyOf": [
+          {
+            "$ref": "#/$defs/DepositStatusMoney"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "description": "What the caller would receive if they cancelled right now."
+      },
+      "required": {
+        "type": "boolean"
+      },
+      "status": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "status",
+      "required",
+      "message"
+    ],
+    "type": "object"
+  },
+  "get_order": {
+    "$defs": {
+      "OrderLineSummary": {
+        "properties": {
+          "allergens": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "dietary_tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "item_id": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "line_total": {
+            "$ref": "#/$defs/PriceDisplay"
+          },
+          "name": {
+            "type": "string"
+          },
+          "notes": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "quantity": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "unit_price": {
+            "$ref": "#/$defs/PriceDisplay"
+          }
+        },
+        "required": [
+          "item_id",
+          "name",
+          "quantity",
+          "unit_price",
+          "line_total",
+          "allergens",
+          "dietary_tags"
+        ],
+        "type": "object"
+      },
+      "OrderSummary": {
+        "properties": {
+          "created_at": {
+            "type": "string"
+          },
+          "guest_name": {
+            "type": "string"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/$defs/OrderLineSummary"
+            },
+            "type": "array"
+          },
+          "order_code": {
+            "type": "string"
+          },
+          "payment_status": {
+            "type": "string"
+          },
+          "pickup_time_local": {
+            "type": "string"
+          },
+          "stated_allergens": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "type": "string"
+          },
+          "subtotal": {
+            "$ref": "#/$defs/PriceDisplay"
+          },
+          "tax": {
+            "$ref": "#/$defs/PriceDisplay"
+          },
+          "total": {
+            "$ref": "#/$defs/PriceDisplay"
+          }
+        },
+        "required": [
+          "order_code",
+          "guest_name",
+          "status",
+          "pickup_time_local",
+          "lines",
+          "subtotal",
+          "tax",
+          "total",
+          "payment_status",
+          "created_at"
+        ],
+        "type": "object"
+      },
+      "PriceDisplay": {
+        "properties": {
+          "amount_minor": {
+            "description": "Price in minor currency units (paise)",
+            "format": "int64",
+            "type": "integer"
+          },
+          "currency": {
+            "description": "ISO currency code (e.g. INR)",
+            "type": "string"
+          },
+          "display": {
+            "description": "Human-readable formatted price string (e.g. ₹380)",
+            "type": "string"
+          }
+        },
+        "required": [
+          "amount_minor",
+          "currency",
+          "display"
+        ],
+        "type": "object"
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "message": {
+        "type": "string"
+      },
+      "order": {
+        "anyOf": [
+          {
+            "$ref": "#/$defs/OrderSummary"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "status": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "status",
+      "message"
+    ],
+    "type": "object"
+  },
+  "get_profile": {
+    "$defs": {
+      "DataExportRecord": {
+        "properties": {
+          "booking_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "consent_granted_at": {
+            "type": "string"
+          },
+          "consent_version": {
+            "type": "string"
+          },
+          "display_name": {
+            "type": "string"
+          },
+          "email": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "order_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "phone": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "preferences": {
+            "items": {
+              "$ref": "#/$defs/StoredPreferenceView"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "display_name",
+          "consent_version",
+          "consent_granted_at",
+          "preferences",
+          "order_ids",
+          "booking_ids"
+        ],
+        "type": "object"
+      },
+      "ProfileCounts": {
+        "properties": {
+          "preference_count": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "total_bookings": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "total_orders": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "total_orders",
+          "total_bookings",
+          "preference_count"
+        ],
+        "type": "object"
+      },
+      "StoredPreferenceView": {
+        "properties": {
+          "confirmed_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "id": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "severity": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "value": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "value",
+          "created_at"
+        ],
+        "type": "object"
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "consent_granted_at": {
+        "type": "string"
+      },
+      "consent_version": {
+        "type": "string"
+      },
+      "counts": {
+        "$ref": "#/$defs/ProfileCounts"
+      },
+      "data_export": {
+        "anyOf": [
+          {
+            "$ref": "#/$defs/DataExportRecord"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "email_masked": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "guest_name": {
+        "type": "string"
+      },
+      "needs_reconfirmation": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "phone_masked": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "preferences": {
+        "items": {
+          "$ref": "#/$defs/StoredPreferenceView"
+        },
+        "type": "array"
+      },
+      "status": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "status",
+      "guest_name",
+      "consent_version",
+      "consent_granted_at",
+      "preferences",
+      "counts",
+      "needs_reconfirmation"
+    ],
+    "type": "object"
+  },
+  "get_usual_order": {
+    "$defs": {
+      "ConflictingAllergyItem": {
+        "properties": {
+          "conflicting_allergens": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "item_id": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "item_name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "item_id",
+          "item_name",
+          "conflicting_allergens"
+        ],
+        "type": "object"
+      },
+      "PriceDifference": {
+        "properties": {
+          "current_price": {
+            "$ref": "#/$defs/PriceDisplay"
+          },
+          "item_id": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "item_name": {
+            "type": "string"
+          },
+          "previous_price": {
+            "$ref": "#/$defs/PriceDisplay"
+          }
+        },
+        "required": [
+          "item_id",
+          "item_name",
+          "previous_price",
+          "current_price"
+        ],
+        "type": "object"
+      },
+      "PriceDisplay": {
+        "properties": {
+          "amount_minor": {
+            "description": "Price in minor currency units (paise)",
+            "format": "int64",
+            "type": "integer"
+          },
+          "currency": {
+            "description": "ISO currency code (e.g. INR)",
+            "type": "string"
+          },
+          "display": {
+            "description": "Human-readable formatted price string (e.g. ₹380)",
+            "type": "string"
+          }
+        },
+        "required": [
+          "amount_minor",
+          "currency",
+          "display"
+        ],
+        "type": "object"
+      },
+      "SuggestedOrderLine": {
+        "properties": {
+          "item_id": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "item_name": {
+            "type": "string"
+          },
+          "line_total": {
+            "$ref": "#/$defs/PriceDisplay"
+          },
+          "quantity": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "unit_price": {
+            "$ref": "#/$defs/PriceDisplay"
+          },
+          "user_provided_note": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "item_id",
+          "item_name",
+          "quantity",
+          "unit_price",
+          "line_total"
+        ],
+        "type": "object"
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "allergen_notice": {
+        "type": "string"
+      },
+      "conflicting_items": {
+        "items": {
+          "$ref": "#/$defs/ConflictingAllergyItem"
+        },
+        "type": "array"
+      },
+      "guest_name": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "needs_allergy_reconfirmation": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "price_changes": {
+        "items": {
+          "$ref": "#/$defs/PriceDifference"
+        },
+        "type": "array"
+      },
+      "status": {
+        "type": "string"
+      },
+      "subtotal": {
+        "anyOf": [
+          {
+            "$ref": "#/$defs/PriceDisplay"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "suggested_lines": {
+        "items": {
+          "$ref": "#/$defs/SuggestedOrderLine"
+        },
+        "type": "array"
+      },
+      "tax": {
+        "anyOf": [
+          {
+            "$ref": "#/$defs/PriceDisplay"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "total": {
+        "anyOf": [
+          {
+            "$ref": "#/$defs/PriceDisplay"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "unavailable_items": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      }
+    },
+    "required": [
+      "status",
+      "suggested_lines",
+      "price_changes",
+      "unavailable_items",
+      "conflicting_items",
+      "needs_allergy_reconfirmation",
+      "allergen_notice"
+    ],
+    "type": "object"
+  },
+  "get_waitlist_status": {
+    "$defs": {
+      "WaitlistOfferDetail": {
+        "properties": {
+          "area": {
+            "type": "string"
+          },
+          "end_local": {
+            "type": "string"
+          },
+          "expires_at_local": {
+            "type": "string"
+          },
+          "offer_token": {
+            "type": "string"
+          },
+          "seconds_remaining": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "start_local": {
+            "type": "string"
+          },
+          "table_label": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "offer_token",
+          "start_local",
+          "end_local",
+          "area",
+          "table_label",
+          "expires_at_local",
+          "seconds_remaining"
+        ],
+        "type": "object"
+      },
+      "WaitlistSummary": {
+        "properties": {
+          "area": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string"
+          },
+          "expires_at_local": {
+            "type": "string"
+          },
+          "guest_name": {
+            "type": "string"
+          },
+          "offer": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/WaitlistOfferDetail"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "party_size": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "queue_position": {
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "status": {
+            "type": "string"
+          },
+          "window_end": {
+            "type": "string"
+          },
+          "window_start": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "guest_name",
+          "party_size",
+          "date",
+          "window_start",
+          "window_end",
+          "area",
+          "status",
+          "expires_at_local"
+        ],
+        "type": "object"
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "message": {
+        "type": "string"
+      },
+      "status": {
+        "type": "string"
+      },
+      "waitlist": {
+        "anyOf": [
+          {
+            "$ref": "#/$defs/WaitlistSummary"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      }
+    },
+    "required": [
+      "status",
+      "message"
+    ],
+    "type": "object"
+  },
+  "join_waitlist": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "area": {
+        "type": "string"
+      },
+      "code": {
+        "type": "string"
+      },
+      "date": {
+        "type": "string"
+      },
+      "expires_at_local": {
+        "type": "string"
+      },
+      "guest_name": {
+        "type": "string"
+      },
+      "message": {
+        "type": "string"
+      },
+      "party_size": {
+        "format": "int64",
+        "type": "integer"
+      },
+      "queue_position": {
+        "format": "int64",
+        "type": "integer"
+      },
+      "status": {
+        "type": "string"
+      },
+      "window_end": {
+        "type": "string"
+      },
+      "window_start": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "status",
+      "code",
+      "guest_name",
+      "party_size",
+      "date",
+      "window_start",
+      "window_end",
+      "area",
+      "queue_position",
+      "expires_at_local",
+      "message"
+    ],
+    "type": "object"
+  },
+  "leave_waitlist": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "already_cancelled": {
+        "type": "boolean"
+      },
+      "code": {
+        "type": "string"
+      },
+      "message": {
+        "type": "string"
+      },
+      "status": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "status",
+      "code",
+      "already_cancelled",
+      "message"
+    ],
+    "type": "object"
+  },
+  "negotiate_booking": {
+    "$defs": {
+      "AvailableSlot": {
+        "description": "Allocated dining slot when available.",
+        "properties": {
+          "area": {
+            "type": "string"
+          },
+          "capacity": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "end_local": {
+            "type": "string"
+          },
+          "start_local": {
+            "type": "string"
+          },
+          "table_label": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "start_local",
+          "end_local",
+          "table_label",
+          "area",
+          "capacity"
+        ],
+        "type": "object"
+      },
+      "NegotiationOption": {
+        "properties": {
+          "area": {
+            "type": "string"
+          },
+          "end_local": {
+            "type": "string"
+          },
+          "minutes_from_requested": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "option_id": {
+            "type": "string"
+          },
+          "rank": {
+            "format": "uint",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "score_reasons": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "start_local": {
+            "type": "string"
+          },
+          "table_label": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "option_id",
+          "start_local",
+          "end_local",
+          "area",
+          "minutes_from_requested",
+          "score_reasons",
+          "rank"
+        ],
+        "type": "object"
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "message": {
+        "type": "string"
+      },
+      "negotiation_id": {
+        "format": "int64",
+        "type": [
+          "integer",
+          "null"
+        ]
+      },
+      "options": {
+        "items": {
+          "$ref": "#/$defs/NegotiationOption"
+        },
+        "type": "array"
+      },
+      "profile_applied": {
+        "type": [
+          "boolean",
+          "null"
+        ]
+      },
+      "round": {
+        "format": "int64",
+        "type": [
+          "integer",
+          "null"
+        ]
+      },
+      "slot": {
+        "anyOf": [
+          {
+            "$ref": "#/$defs/AvailableSlot"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "status": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "status",
+      "options",
+      "message"
+    ],
+    "type": "object"
+  },
+  "ping_restaurant": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "message": {
+        "description": "Friendly greeting message confirming assistant status",
+        "type": "string"
+      },
+      "server": {
+        "description": "Identifier of the serving MCP implementation",
+        "type": "string"
+      },
+      "version": {
+        "description": "Crate package version of the TableTalk server",
+        "type": "string"
+      }
+    },
+    "required": [
+      "message",
+      "server",
+      "version"
+    ],
+    "type": "object"
+  },
+  "place_order": {
+    "$defs": {
+      "ItemCandidate": {
+        "properties": {
+          "item_id": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "price": {
+            "$ref": "#/$defs/PriceDisplay"
+          }
+        },
+        "required": [
+          "item_id",
+          "name",
+          "price"
+        ],
+        "type": "object"
+      },
+      "OrderLineSummary": {
+        "properties": {
+          "allergens": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "dietary_tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "item_id": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "line_total": {
+            "$ref": "#/$defs/PriceDisplay"
+          },
+          "name": {
+            "type": "string"
+          },
+          "notes": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "quantity": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "unit_price": {
+            "$ref": "#/$defs/PriceDisplay"
+          }
+        },
+        "required": [
+          "item_id",
+          "name",
+          "quantity",
+          "unit_price",
+          "line_total",
+          "allergens",
+          "dietary_tags"
+        ],
+        "type": "object"
+      },
+      "OrderSummary": {
+        "properties": {
+          "created_at": {
+            "type": "string"
+          },
+          "guest_name": {
+            "type": "string"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/$defs/OrderLineSummary"
+            },
+            "type": "array"
+          },
+          "order_code": {
+            "type": "string"
+          },
+          "payment_status": {
+            "type": "string"
+          },
+          "pickup_time_local": {
+            "type": "string"
+          },
+          "stated_allergens": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "type": "string"
+          },
+          "subtotal": {
+            "$ref": "#/$defs/PriceDisplay"
+          },
+          "tax": {
+            "$ref": "#/$defs/PriceDisplay"
+          },
+          "total": {
+            "$ref": "#/$defs/PriceDisplay"
+          }
+        },
+        "required": [
+          "order_code",
+          "guest_name",
+          "status",
+          "pickup_time_local",
+          "lines",
+          "subtotal",
+          "tax",
+          "total",
+          "payment_status",
+          "created_at"
+        ],
+        "type": "object"
+      },
+      "PriceChange": {
+        "properties": {
+          "current_price": {
+            "$ref": "#/$defs/PriceDisplay"
+          },
+          "item_id": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "item_name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "item_id",
+          "item_name",
+          "current_price"
+        ],
+        "type": "object"
+      },
+      "PriceDisplay": {
+        "properties": {
+          "amount_minor": {
+            "description": "Price in minor currency units (paise)",
+            "format": "int64",
+            "type": "integer"
+          },
+          "currency": {
+            "description": "ISO currency code (e.g. INR)",
+            "type": "string"
+          },
+          "display": {
+            "description": "Human-readable formatted price string (e.g. ₹380)",
+            "type": "string"
+          }
+        },
+        "required": [
+          "amount_minor",
+          "currency",
+          "display"
+        ],
+        "type": "object"
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "allergen_notice": {
+        "type": "string"
+      },
+      "alternatives": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "candidates": {
+        "items": {
+          "$ref": "#/$defs/ItemCandidate"
+        },
+        "type": "array"
+      },
+      "earliest_pickup_local": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "idempotent_replay": {
+        "type": "boolean"
+      },
+      "needs_reconfirmation": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "order": {
+        "anyOf": [
+          {
+            "$ref": "#/$defs/OrderSummary"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "price_changes": {
+        "items": {
+          "$ref": "#/$defs/PriceChange"
+        },
+        "type": "array"
+      },
+      "profile_applied": {
+        "type": [
+          "boolean",
+          "null"
+        ]
+      },
+      "reason": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "reason_detail": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "status": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "status",
+      "price_changes",
+      "candidates",
+      "alternatives",
+      "allergen_notice",
+      "idempotent_replay"
+    ],
+    "type": "object"
+  },
+  "refresh_payment_session": {
+    "$defs": {
+      "Money": {
+        "description": "Structured money value: integer minor units plus a display string.",
+        "properties": {
+          "amount_minor": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "display": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "amount_minor",
+          "currency",
+          "display"
+        ],
+        "type": "object"
+      },
+      "PaymentObject": {
+        "description": "Payment object embedded in create_booking / accept_offer / refresh responses.",
+        "properties": {
+          "amount": {
+            "$ref": "#/$defs/Money"
+          },
+          "checkout_url": {
+            "type": "string"
+          },
+          "deadline_local": {
+            "type": "string"
+          },
+          "minutes_remaining": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "required": {
+            "type": "boolean"
+          },
+          "simulated": {
+            "type": "boolean"
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "required",
+          "simulated",
+          "status",
+          "amount",
+          "deadline_local",
+          "minutes_remaining",
+          "checkout_url"
+        ],
+        "type": "object"
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "message": {
+        "type": "string"
+      },
+      "payment": {
+        "anyOf": [
+          {
+            "$ref": "#/$defs/PaymentObject"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "status": {
+        "description": "One of: refreshed | not_required | not_pending | deadline_passed | not_found.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "status",
+      "message"
+    ],
+    "type": "object"
+  },
+  "release_offer": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "already_released": {
+        "type": "boolean"
+      },
+      "message": {
+        "type": "string"
+      },
+      "status": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "status",
+      "already_released",
+      "message"
+    ],
+    "type": "object"
+  },
+  "remember_preference": {
+    "$defs": {
+      "StoredPreferenceView": {
+        "properties": {
+          "confirmed_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "id": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "severity": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "value": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "value",
+          "created_at"
+        ],
+        "type": "object"
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "deduplicated": {
+        "type": "boolean"
+      },
+      "message": {
+        "type": "string"
+      },
+      "preference": {
+        "anyOf": [
+          {
+            "$ref": "#/$defs/StoredPreferenceView"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "status": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "status",
+      "deduplicated",
+      "message"
+    ],
+    "type": "object"
+  },
+  "rotate_profile_token": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "message": {
+        "type": "string"
+      },
+      "new_profile_token": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "status": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "status",
+      "message"
+    ],
+    "type": "object"
+  },
+  "search_menu": {
+    "$defs": {
+      "AllergenFilter": {
+        "enum": [
+          "peanuts",
+          "tree_nuts",
+          "dairy",
+          "gluten",
+          "soy",
+          "sesame",
+          "mustard",
+          "shellfish",
+          "egg",
+          "fish"
+        ],
+        "type": "string"
+      },
+      "AppliedFilters": {
+        "properties": {
+          "category": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "dietary": {
+            "items": {
+              "$ref": "#/$defs/DietaryTagFilter"
+            },
+            "type": "array"
+          },
+          "exclude_allergens": {
+            "items": {
+              "$ref": "#/$defs/AllergenFilter"
+            },
+            "type": "array"
+          },
+          "include_unavailable": {
+            "type": "boolean"
+          },
+          "limit": {
+            "format": "uint",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "max_price_inr": {
+            "format": "double",
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "query": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "sort": {
+            "$ref": "#/$defs/SortOption"
+          }
+        },
+        "required": [
+          "dietary",
+          "exclude_allergens",
+          "include_unavailable",
+          "sort",
+          "limit"
+        ],
+        "type": "object"
+      },
+      "DietaryTagFilter": {
+        "enum": [
+          "vegan",
+          "vegetarian",
+          "gluten_free",
+          "dairy_free",
+          "halal",
+          "nut_free"
+        ],
+        "type": "string"
+      },
+      "MenuItemCard": {
+        "properties": {
+          "allergens": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "available": {
+            "type": "boolean"
+          },
+          "calories": {
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "category": {
+            "type": "string"
+          },
+          "chefs_special": {
+            "type": "boolean"
+          },
+          "description": {
+            "type": "string"
+          },
+          "dietary_tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "id": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "image_url": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "match_reason": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "prep_time_minutes": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "price": {
+            "$ref": "#/$defs/PriceDisplay"
+          },
+          "spice_level": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "description",
+          "category",
+          "price",
+          "dietary_tags",
+          "allergens",
+          "spice_level",
+          "prep_time_minutes",
+          "available",
+          "chefs_special",
+          "match_reason"
+        ],
+        "type": "object"
+      },
+      "PriceDisplay": {
+        "properties": {
+          "amount_minor": {
+            "description": "Price in minor currency units (paise)",
+            "format": "int64",
+            "type": "integer"
+          },
+          "currency": {
+            "description": "ISO currency code (e.g. INR)",
+            "type": "string"
+          },
+          "display": {
+            "description": "Human-readable formatted price string (e.g. ₹380)",
+            "type": "string"
+          }
+        },
+        "required": [
+          "amount_minor",
+          "currency",
+          "display"
+        ],
+        "type": "object"
+      },
+      "SortOption": {
+        "enum": [
+          "relevance",
+          "price_asc",
+          "price_desc",
+          "popular"
+        ],
+        "type": "string"
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "allergen_notice": {
+        "description": "Standard allergen handling notice for kitchen operations",
+        "type": "string"
+      },
+      "applied_filters": {
+        "$ref": "#/$defs/AppliedFilters",
+        "description": "Normalized filter values applied in database query"
+      },
+      "items": {
+        "description": "Menu items matching criteria",
+        "items": {
+          "$ref": "#/$defs/MenuItemCard"
+        },
+        "type": "array"
+      },
+      "needs_reconfirmation": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "profile_applied": {
+        "type": [
+          "boolean",
+          "null"
+        ]
+      },
+      "query_summary": {
+        "description": "Human-readable echo of interpreted filters",
+        "type": "string"
+      },
+      "returned": {
+        "description": "Number of items returned in this response",
+        "format": "uint",
+        "minimum": 0,
+        "type": "integer"
+      },
+      "suggestions": {
+        "description": "Concrete suggestions if zero or few matches found",
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "total_matches": {
+        "description": "Total number of items matching filters before pagination",
+        "format": "uint",
+        "minimum": 0,
+        "type": "integer"
+      }
+    },
+    "required": [
+      "query_summary",
+      "applied_filters",
+      "total_matches",
+      "returned",
+      "items",
+      "suggestions",
+      "allergen_notice"
+    ],
+    "type": "object"
+  }
+}

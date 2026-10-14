@@ -1,0 +1,4298 @@
+[
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": false
+    },
+    "description": "Accept an option from an active negotiation or convert a previously held offer into a confirmed booking. When hold_only is true, places a short-lived hold (default 5 minutes) returning an offer_token. When hold_only is false or when offer_token is provided, completes the reservation.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "email": {
+          "description": "Optional contact email address for booking receipt.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "guest_name": {
+          "description": "Full name of the primary dining guest for verification.",
+          "type": "string"
+        },
+        "hold_only": {
+          "description": "When true, places a short-lived hold on the table instead of immediately creating a booking (default false).",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "idempotency_key": {
+          "description": "Optional client idempotency key to prevent double bookings on retries.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "negotiation_id": {
+          "description": "Negotiation ID if accepting an option from an active negotiation.",
+          "format": "int64",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "offer_token": {
+          "description": "Offer bearer token (prefix 'tt_offer_') if confirming an active hold.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "option_id": {
+          "description": "Option identifier (e.g. 'opt_1') selected from the negotiation round.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "phone": {
+          "description": "Optional contact phone number for confirmation SMS.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "special_requests": {
+          "description": "Optional special requests, dietary preferences, or celebration notes.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "guest_name"
+      ],
+      "type": "object"
+    },
+    "name": "accept_offer",
+    "outputSchema": {
+      "$defs": {
+        "BookingSummary": {
+          "properties": {
+            "area": {
+              "type": "string"
+            },
+            "confirmation_code": {
+              "type": "string"
+            },
+            "created_at": {
+              "type": "string"
+            },
+            "end_local": {
+              "type": "string"
+            },
+            "guest_name": {
+              "type": "string"
+            },
+            "party_size": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "source": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "special_requests": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "start_local": {
+              "type": "string"
+            },
+            "status": {
+              "type": "string"
+            },
+            "table_label": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "confirmation_code",
+            "guest_name",
+            "party_size",
+            "start_local",
+            "end_local",
+            "area",
+            "table_label",
+            "status",
+            "created_at"
+          ],
+          "type": "object"
+        },
+        "HoldSummary": {
+          "properties": {
+            "area": {
+              "type": "string"
+            },
+            "end_local": {
+              "type": "string"
+            },
+            "expires_at_local": {
+              "type": "string"
+            },
+            "hold_id": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "party_size": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "seconds_remaining": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "start_local": {
+              "type": "string"
+            },
+            "table_label": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "hold_id",
+            "expires_at_local",
+            "seconds_remaining",
+            "area",
+            "start_local",
+            "end_local",
+            "table_label",
+            "party_size"
+          ],
+          "type": "object"
+        },
+        "Money": {
+          "description": "Structured money value: integer minor units plus a display string.",
+          "properties": {
+            "amount_minor": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "currency": {
+              "type": "string"
+            },
+            "display": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "amount_minor",
+            "currency",
+            "display"
+          ],
+          "type": "object"
+        },
+        "PaymentObject": {
+          "description": "Payment object embedded in create_booking / accept_offer / refresh responses.",
+          "properties": {
+            "amount": {
+              "$ref": "#/$defs/Money"
+            },
+            "checkout_url": {
+              "type": "string"
+            },
+            "deadline_local": {
+              "type": "string"
+            },
+            "minutes_remaining": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "required": {
+              "type": "boolean"
+            },
+            "simulated": {
+              "type": "boolean"
+            },
+            "status": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "required",
+            "simulated",
+            "status",
+            "amount",
+            "deadline_local",
+            "minutes_remaining",
+            "checkout_url"
+          ],
+          "type": "object"
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "booking": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BookingSummary"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "hold": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/HoldSummary"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "message": {
+          "type": "string"
+        },
+        "offer_token": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "payment": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PaymentObject"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Present only when a simulated deposit is required to confirm the booking."
+        },
+        "status": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "status",
+        "message"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": true,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": false
+    },
+    "description": "Cancel an existing dining reservation using its confirmation code and primary guest name. Requires guest identity verification to prevent unauthorized cancellations. Cancelling an already cancelled reservation is idempotent.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "confirmation_code": {
+          "description": "The unique confirmation code received when booking was created (e.g. 'TT-8K4MZ'). \\\nCase-insensitive; hyphens and spaces may be omitted.",
+          "type": "string"
+        },
+        "guest_name": {
+          "description": "Guest name associated with the reservation. Required for identity verification \\\nto ensure reservations cannot be cancelled by unauthorized callers.",
+          "type": "string"
+        },
+        "reason": {
+          "description": "Optional reason for cancellation (e.g. 'change of travel plans', max 200 characters).",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "confirmation_code",
+        "guest_name"
+      ],
+      "type": "object"
+    },
+    "name": "cancel_booking",
+    "outputSchema": {
+      "$defs": {
+        "BookingSummary": {
+          "properties": {
+            "area": {
+              "type": "string"
+            },
+            "confirmation_code": {
+              "type": "string"
+            },
+            "created_at": {
+              "type": "string"
+            },
+            "end_local": {
+              "type": "string"
+            },
+            "guest_name": {
+              "type": "string"
+            },
+            "party_size": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "source": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "special_requests": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "start_local": {
+              "type": "string"
+            },
+            "status": {
+              "type": "string"
+            },
+            "table_label": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "confirmation_code",
+            "guest_name",
+            "party_size",
+            "start_local",
+            "end_local",
+            "area",
+            "table_label",
+            "status",
+            "created_at"
+          ],
+          "type": "object"
+        },
+        "Money": {
+          "description": "Structured money value: integer minor units plus a display string.",
+          "properties": {
+            "amount_minor": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "currency": {
+              "type": "string"
+            },
+            "display": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "amount_minor",
+            "currency",
+            "display"
+          ],
+          "type": "object"
+        },
+        "RefundSummary": {
+          "description": "Refund outcome embedded in cancel_booking responses.",
+          "properties": {
+            "amount": {
+              "$ref": "#/$defs/Money"
+            },
+            "explanation": {
+              "type": "string"
+            },
+            "percent_bps": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "percent_display": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "amount",
+            "percent_bps",
+            "percent_display",
+            "explanation"
+          ],
+          "type": "object"
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "already_cancelled": {
+          "type": "boolean"
+        },
+        "booking": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BookingSummary"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "policy_note": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "reason_detail": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "refund": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RefundSummary"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Present only when a deposit was captured and a refund was evaluated."
+        },
+        "status": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "status",
+        "already_cancelled"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": true,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": false
+    },
+    "description": "Cancel an existing placed pickup order using its order code (e.g. 'TO-8K4MZ') and primary guest name. Requires guest identity verification. Allowed only prior to kitchen preparation.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "guest_name": {
+          "description": "Full name of the order holder for verification.\nCase-insensitive match required to prevent code guessing attacks.",
+          "type": "string"
+        },
+        "order_code": {
+          "description": "Human-friendly order code assigned during order placement (e.g. 'TO-8K4MZ').\nCase-insensitive; hyphens and spaces tolerated.",
+          "type": "string"
+        },
+        "reason": {
+          "description": "Optional reason for cancellation (max 200 characters).",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "order_code",
+        "guest_name"
+      ],
+      "type": "object"
+    },
+    "name": "cancel_order",
+    "outputSchema": {
+      "$defs": {
+        "OrderLineSummary": {
+          "properties": {
+            "allergens": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "dietary_tags": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "item_id": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "line_total": {
+              "$ref": "#/$defs/PriceDisplay"
+            },
+            "name": {
+              "type": "string"
+            },
+            "notes": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "quantity": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "unit_price": {
+              "$ref": "#/$defs/PriceDisplay"
+            }
+          },
+          "required": [
+            "item_id",
+            "name",
+            "quantity",
+            "unit_price",
+            "line_total",
+            "allergens",
+            "dietary_tags"
+          ],
+          "type": "object"
+        },
+        "OrderSummary": {
+          "properties": {
+            "created_at": {
+              "type": "string"
+            },
+            "guest_name": {
+              "type": "string"
+            },
+            "lines": {
+              "items": {
+                "$ref": "#/$defs/OrderLineSummary"
+              },
+              "type": "array"
+            },
+            "order_code": {
+              "type": "string"
+            },
+            "payment_status": {
+              "type": "string"
+            },
+            "pickup_time_local": {
+              "type": "string"
+            },
+            "stated_allergens": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "status": {
+              "type": "string"
+            },
+            "subtotal": {
+              "$ref": "#/$defs/PriceDisplay"
+            },
+            "tax": {
+              "$ref": "#/$defs/PriceDisplay"
+            },
+            "total": {
+              "$ref": "#/$defs/PriceDisplay"
+            }
+          },
+          "required": [
+            "order_code",
+            "guest_name",
+            "status",
+            "pickup_time_local",
+            "lines",
+            "subtotal",
+            "tax",
+            "total",
+            "payment_status",
+            "created_at"
+          ],
+          "type": "object"
+        },
+        "PriceDisplay": {
+          "properties": {
+            "amount_minor": {
+              "description": "Price in minor currency units (paise)",
+              "format": "int64",
+              "type": "integer"
+            },
+            "currency": {
+              "description": "ISO currency code (e.g. INR)",
+              "type": "string"
+            },
+            "display": {
+              "description": "Human-readable formatted price string (e.g. ₹380)",
+              "type": "string"
+            }
+          },
+          "required": [
+            "amount_minor",
+            "currency",
+            "display"
+          ],
+          "type": "object"
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "already_cancelled": {
+          "type": "boolean"
+        },
+        "order": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/OrderSummary"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "policy_note": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "reason_detail": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "status": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "status",
+        "already_cancelled"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": true
+    },
+    "description": "Check dining table availability at the restaurant for a specific date, time, party size, and seating area. Returns whether the requested slot is available with an allocated table, or suggests alternative nearby slots or dates if unavailable. Does NOT create a booking or hold a table. The caller must resolve relative date phrases like 'tomorrow' or 'next Friday' to a concrete ISO date (YYYY-MM-DD) in the restaurant timezone prior to calling.",
+    "inputSchema": {
+      "$defs": {
+        "AreaFilter": {
+          "description": "Seating area filter for availability queries.",
+          "enum": [
+            "any",
+            "indoor",
+            "patio",
+            "bar"
+          ],
+          "type": "string"
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "alternatives": {
+          "description": "Number of alternative slots to return if the requested time is unavailable (0-6, default 3).",
+          "format": "uint",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "area": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AreaFilter"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Seating area preference: 'indoor', 'patio', 'bar', or 'any'. Defaults to 'any'."
+        },
+        "date": {
+          "description": "Local restaurant date in ISO format YYYY-MM-DD (e.g. '2026-10-17'). \\\nThe caller must resolve relative phrases like 'tomorrow' or 'Friday' to a concrete date itself, \\\nusing the restaurant timezone. The tool result includes the restaurant's current local date/time \\\nso the caller can verify.",
+          "type": "string"
+        },
+        "duration_minutes": {
+          "description": "Estimated dining duration in minutes. Optional; if omitted, defaults based on party size \\\n(75m for 1-2 guests, 90m for 3-4 guests, 105m for 5-6 guests, 120m for 7+ guests). \\\nMust be between 30 and 240 minutes if specified.",
+          "format": "int64",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "party_size": {
+          "description": "Party size (number of guests). Must be at least 1 and cannot exceed restaurant maximum capacity.",
+          "format": "int64",
+          "type": "integer"
+        },
+        "time": {
+          "description": "Local 24-hour time in HH:MM format (e.g. '19:30' or '13:00'). \\\nOff-grid times will be reported and snapped to the nearest slot granularity (15 minutes).",
+          "type": "string"
+        }
+      },
+      "required": [
+        "date",
+        "time",
+        "party_size"
+      ],
+      "type": "object"
+    },
+    "name": "check_availability",
+    "outputSchema": {
+      "$defs": {
+        "AlternativeSlot": {
+          "description": "Alternative dining slot suggestion.",
+          "properties": {
+            "area": {
+              "type": "string"
+            },
+            "different_day": {
+              "type": "boolean"
+            },
+            "end_local": {
+              "type": "string"
+            },
+            "minutes_from_requested": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "start_local": {
+              "type": "string"
+            },
+            "table_label": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "start_local",
+            "end_local",
+            "area",
+            "table_label",
+            "minutes_from_requested",
+            "different_day"
+          ],
+          "type": "object"
+        },
+        "AvailableSlot": {
+          "description": "Allocated dining slot when available.",
+          "properties": {
+            "area": {
+              "type": "string"
+            },
+            "capacity": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "end_local": {
+              "type": "string"
+            },
+            "start_local": {
+              "type": "string"
+            },
+            "table_label": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "start_local",
+            "end_local",
+            "table_label",
+            "area",
+            "capacity"
+          ],
+          "type": "object"
+        },
+        "OpeningHoursRange": {
+          "description": "Operating hours range for a service period.",
+          "properties": {
+            "close": {
+              "type": "string"
+            },
+            "open": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "open",
+            "close"
+          ],
+          "type": "object"
+        },
+        "RequestedDetails": {
+          "description": "Details of the parsed reservation request.",
+          "properties": {
+            "area": {
+              "type": "string"
+            },
+            "date": {
+              "type": "string"
+            },
+            "duration_minutes": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "party_size": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "time": {
+              "type": "string"
+            },
+            "timezone": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "date",
+            "time",
+            "party_size",
+            "area",
+            "duration_minutes",
+            "timezone"
+          ],
+          "type": "object"
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "alternatives": {
+          "items": {
+            "$ref": "#/$defs/AlternativeSlot"
+          },
+          "type": "array"
+        },
+        "note": {
+          "type": "string"
+        },
+        "opening_hours_that_day": {
+          "items": {
+            "$ref": "#/$defs/OpeningHoursRange"
+          },
+          "type": "array"
+        },
+        "reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "reason_detail": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "requested": {
+          "$ref": "#/$defs/RequestedDetails"
+        },
+        "restaurant_now": {
+          "type": "string"
+        },
+        "slot": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AvailableSlot"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "snapped_from": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "status": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "requested",
+        "restaurant_now",
+        "status",
+        "alternatives",
+        "opening_hours_that_day",
+        "note"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": false
+    },
+    "description": "Create a dining reservation at the restaurant. Re-evaluates real-time table availability inside an immediate write transaction and assigns a best-fit dining table. Returns a confirmed reservation with a human-friendly confirmation code, or suggests alternatives if the slot became unavailable. Supports idempotency keys for safe retries.",
+    "inputSchema": {
+      "$defs": {
+        "BookingAreaInput": {
+          "description": "Seating area preference for reservation requests.",
+          "enum": [
+            "any",
+            "indoor",
+            "patio",
+            "bar"
+          ],
+          "type": "string"
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "area": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BookingAreaInput"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Seating area preference: 'indoor', 'patio', 'bar', or 'any'. Defaults to 'any'."
+        },
+        "customer_id": {
+          "description": "Optional returning customer identifier if known from session history.",
+          "format": "int64",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "date": {
+          "description": "Local restaurant date in ISO format YYYY-MM-DD (e.g. '2026-10-17'). \\\nThe caller must resolve relative phrases like 'tomorrow' or 'Friday' to a concrete date itself, \\\nusing the restaurant timezone (Asia/Kolkata).",
+          "type": "string"
+        },
+        "duration_minutes": {
+          "description": "Optional dining duration in minutes (30-240). If omitted, defaults by party size \\\n(75m for 1-2 guests, 90m for 3-4 guests, 105m for 5-6 guests, 120m for 7+ guests).",
+          "format": "int64",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "email": {
+          "description": "Optional contact email address for booking confirmation receipts.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "guest_name": {
+          "description": "Name of the primary dining guest (1 to 80 characters, trimmed).",
+          "type": "string"
+        },
+        "idempotency_key": {
+          "description": "Optional idempotency key (8-64 characters matching [a-zA-Z0-9_.-]). \\\nStrongly recommended on client retries to guarantee at-most-once booking creation.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "negotiate": {
+          "description": "Optional negotiate flag. When true and requested reservation is unavailable, returns negotiation_id and ranked alternative options.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "party_size": {
+          "description": "Party size (number of guests). Must be at least 1 and cannot exceed restaurant maximum capacity.",
+          "format": "int64",
+          "type": "integer"
+        },
+        "phone": {
+          "description": "Optional contact phone number for reservation notifications and SMS reminders.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "profile_token": {
+          "description": "Optional profile bearer token to link booking, default guest name, and honor seating preferences.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "special_requests": {
+          "description": "Optional dietary notes, seating requests, or celebration comments (max 300 characters).",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "time": {
+          "description": "Local 24-hour reservation time in HH:MM format (e.g. '19:30').",
+          "type": "string"
+        }
+      },
+      "required": [
+        "date",
+        "time",
+        "party_size",
+        "guest_name"
+      ],
+      "type": "object"
+    },
+    "name": "create_booking",
+    "outputSchema": {
+      "$defs": {
+        "AlternativeSlot": {
+          "description": "Alternative dining slot suggestion.",
+          "properties": {
+            "area": {
+              "type": "string"
+            },
+            "different_day": {
+              "type": "boolean"
+            },
+            "end_local": {
+              "type": "string"
+            },
+            "minutes_from_requested": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "start_local": {
+              "type": "string"
+            },
+            "table_label": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "start_local",
+            "end_local",
+            "area",
+            "table_label",
+            "minutes_from_requested",
+            "different_day"
+          ],
+          "type": "object"
+        },
+        "BookingSummary": {
+          "properties": {
+            "area": {
+              "type": "string"
+            },
+            "confirmation_code": {
+              "type": "string"
+            },
+            "created_at": {
+              "type": "string"
+            },
+            "end_local": {
+              "type": "string"
+            },
+            "guest_name": {
+              "type": "string"
+            },
+            "party_size": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "source": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "special_requests": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "start_local": {
+              "type": "string"
+            },
+            "status": {
+              "type": "string"
+            },
+            "table_label": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "confirmation_code",
+            "guest_name",
+            "party_size",
+            "start_local",
+            "end_local",
+            "area",
+            "table_label",
+            "status",
+            "created_at"
+          ],
+          "type": "object"
+        },
+        "Money": {
+          "description": "Structured money value: integer minor units plus a display string.",
+          "properties": {
+            "amount_minor": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "currency": {
+              "type": "string"
+            },
+            "display": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "amount_minor",
+            "currency",
+            "display"
+          ],
+          "type": "object"
+        },
+        "NegotiationOption": {
+          "properties": {
+            "area": {
+              "type": "string"
+            },
+            "end_local": {
+              "type": "string"
+            },
+            "minutes_from_requested": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "option_id": {
+              "type": "string"
+            },
+            "rank": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "score_reasons": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "start_local": {
+              "type": "string"
+            },
+            "table_label": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "option_id",
+            "start_local",
+            "end_local",
+            "area",
+            "minutes_from_requested",
+            "score_reasons",
+            "rank"
+          ],
+          "type": "object"
+        },
+        "PaymentObject": {
+          "description": "Payment object embedded in create_booking / accept_offer / refresh responses.",
+          "properties": {
+            "amount": {
+              "$ref": "#/$defs/Money"
+            },
+            "checkout_url": {
+              "type": "string"
+            },
+            "deadline_local": {
+              "type": "string"
+            },
+            "minutes_remaining": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "required": {
+              "type": "boolean"
+            },
+            "simulated": {
+              "type": "boolean"
+            },
+            "status": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "required",
+            "simulated",
+            "status",
+            "amount",
+            "deadline_local",
+            "minutes_remaining",
+            "checkout_url"
+          ],
+          "type": "object"
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "alternatives": {
+          "items": {
+            "$ref": "#/$defs/AlternativeSlot"
+          },
+          "type": "array"
+        },
+        "booking": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BookingSummary"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "cancellation_policy": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "idempotent_replay": {
+          "type": "boolean"
+        },
+        "negotiation_id": {
+          "format": "int64",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "negotiation_options": {
+          "items": {
+            "$ref": "#/$defs/NegotiationOption"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "note": {
+          "type": "string"
+        },
+        "payment": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PaymentObject"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Present only when a simulated deposit is required for this booking."
+        },
+        "profile_applied": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "reason_detail": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "seat_preference_honored": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "status": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "status",
+        "idempotent_replay",
+        "alternatives",
+        "note"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": false,
+      "readOnlyHint": false
+    },
+    "description": "Opt into personalized dining memory and profile storage. Requires explicit guest consent ('consent_acknowledged: true'). Returns a secure bearer profile token ONCE which the caller must store securely. Never call without asking the guest first.",
+    "inputSchema": {
+      "$defs": {
+        "InitialPreferenceInput": {
+          "properties": {
+            "kind": {
+              "type": "string"
+            },
+            "severity": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "value": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "value"
+          ],
+          "type": "object"
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "consent_acknowledged": {
+          "description": "Required explicit consent acknowledgement. Must be true to enable profile memory.",
+          "type": "boolean"
+        },
+        "email": {
+          "description": "Optional email address for confirmation notifications.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "guest_name": {
+          "description": "Full name of the dining guest (1-80 characters).",
+          "type": "string"
+        },
+        "initial_preferences": {
+          "description": "Optional initial dining preferences (allergens, dietary tags, seating, favorites).",
+          "items": {
+            "$ref": "#/$defs/InitialPreferenceInput"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "phone": {
+          "description": "Optional mobile telephone number for SMS booking updates.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "guest_name",
+        "consent_acknowledged"
+      ],
+      "type": "object"
+    },
+    "name": "enable_memory",
+    "outputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "consent_version": {
+          "type": "string"
+        },
+        "guest_name": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        },
+        "preferences_saved": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "profile_token": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "status": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "status",
+        "guest_name",
+        "consent_version",
+        "preferences_saved",
+        "message"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": true,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": false
+    },
+    "description": "Permanently hard-delete the guest profile, consent records, tokens, and dining preferences ('Right to Be Forgotten'). Unlinks and anonymizes historical order and booking business records in one atomic transaction.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "confirm": {
+          "description": "Explicit confirmation to delete profile and all associated preferences.",
+          "type": "boolean"
+        },
+        "profile_token": {
+          "description": "Opaque profile bearer token (e.g. 'tt_prof_...') to delete.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "profile_token",
+        "confirm"
+      ],
+      "type": "object"
+    },
+    "name": "forget_me",
+    "outputSchema": {
+      "$defs": {
+        "ScrubbedBusinessRecordsSummary": {
+          "properties": {
+            "scrubbed_bookings": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "scrubbed_orders": {
+              "format": "int64",
+              "type": "integer"
+            }
+          },
+          "required": [
+            "scrubbed_orders",
+            "scrubbed_bookings"
+          ],
+          "type": "object"
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "message": {
+          "type": "string"
+        },
+        "removed_components": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "scrubbed_business_records": {
+          "$ref": "#/$defs/ScrubbedBusinessRecordsSummary"
+        },
+        "status": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "status",
+        "removed_components",
+        "scrubbed_business_records",
+        "message"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": true,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": false
+    },
+    "description": "Remove a saved preference from the guest profile. Removing an allergy requires explicit confirmation ('confirm_remove_allergy: true') and alerts the guest that removal affects profile storage only.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "confirm_remove_allergy": {
+          "description": "Required confirmation when removing an allergy (must be true).",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "kind": {
+          "description": "Preference category: 'allergy', 'dietary', 'seat_pref', 'favorite_item', or 'note'.",
+          "type": "string"
+        },
+        "profile_token": {
+          "description": "Opaque profile bearer token (e.g. 'tt_prof_...').",
+          "type": "string"
+        },
+        "value": {
+          "description": "Exact preference value to remove.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "profile_token",
+        "kind",
+        "value"
+      ],
+      "type": "object"
+    },
+    "name": "forget_preference",
+    "outputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "kind": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        },
+        "policy_note": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "removed": {
+          "type": "boolean"
+        },
+        "status": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "status",
+        "kind",
+        "value",
+        "removed",
+        "message"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": true
+    },
+    "description": "Retrieve reservation details and summary by confirmation code and primary guest name. Requires guest name matching for privacy.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "confirmation_code": {
+          "description": "The unique confirmation code of the reservation (e.g. 'TT-8K4MZ').",
+          "type": "string"
+        },
+        "guest_name": {
+          "description": "Guest name associated with the reservation. Required for identity verification.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "confirmation_code",
+        "guest_name"
+      ],
+      "type": "object"
+    },
+    "name": "get_booking",
+    "outputSchema": {
+      "$defs": {
+        "BookingSummary": {
+          "properties": {
+            "area": {
+              "type": "string"
+            },
+            "confirmation_code": {
+              "type": "string"
+            },
+            "created_at": {
+              "type": "string"
+            },
+            "end_local": {
+              "type": "string"
+            },
+            "guest_name": {
+              "type": "string"
+            },
+            "party_size": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "source": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "special_requests": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "start_local": {
+              "type": "string"
+            },
+            "status": {
+              "type": "string"
+            },
+            "table_label": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "confirmation_code",
+            "guest_name",
+            "party_size",
+            "start_local",
+            "end_local",
+            "area",
+            "table_label",
+            "status",
+            "created_at"
+          ],
+          "type": "object"
+        },
+        "DepositInfo": {
+          "description": "Deposit details surfaced by get_booking.",
+          "properties": {
+            "amount": {
+              "$ref": "#/$defs/Money"
+            },
+            "deadline_local": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "minutes_remaining": {
+              "format": "int64",
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "status": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "status",
+            "amount"
+          ],
+          "type": "object"
+        },
+        "Money": {
+          "description": "Structured money value: integer minor units plus a display string.",
+          "properties": {
+            "amount_minor": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "currency": {
+              "type": "string"
+            },
+            "display": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "amount_minor",
+            "currency",
+            "display"
+          ],
+          "type": "object"
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "booking": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BookingSummary"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "deposit": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DepositInfo"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Present only when the booking carries a deposit (paid or pending)."
+        },
+        "message": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "status",
+        "message"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": true
+    },
+    "description": "Check the deposit status of a dining reservation using its confirmation code and guest name. Returns whether a simulated deposit is required, its status, amount, payment deadline and minutes remaining, and what refund would apply if cancelled now. This is a READ-ONLY tool: it never completes, approves or refunds a payment. Payments are only ever completed by the guest through the separate mock checkout page; refunds happen only via cancel_booking.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "confirmation_code": {
+          "description": "The unique confirmation code of the reservation (e.g. 'TT-8K4MZ').",
+          "type": "string"
+        },
+        "guest_name": {
+          "description": "Guest name associated with the reservation. Required for identity verification.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "confirmation_code",
+        "guest_name"
+      ],
+      "type": "object"
+    },
+    "name": "get_deposit_status",
+    "outputSchema": {
+      "$defs": {
+        "DepositStatusMoney": {
+          "properties": {
+            "amount": {
+              "$ref": "#/$defs/Money"
+            },
+            "explanation": {
+              "type": "string"
+            },
+            "percent_bps": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "percent_display": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "amount",
+            "percent_bps",
+            "percent_display",
+            "explanation"
+          ],
+          "type": "object"
+        },
+        "Money": {
+          "description": "Structured money value: integer minor units plus a display string.",
+          "properties": {
+            "amount_minor": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "currency": {
+              "type": "string"
+            },
+            "display": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "amount_minor",
+            "currency",
+            "display"
+          ],
+          "type": "object"
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "amount": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Money"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "deadline_local": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "deposit_status": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "message": {
+          "type": "string"
+        },
+        "minutes_remaining": {
+          "format": "int64",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "refund_if_cancelled_now": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DepositStatusMoney"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "What the caller would receive if they cancelled right now."
+        },
+        "required": {
+          "type": "boolean"
+        },
+        "status": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "status",
+        "required",
+        "message"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": true
+    },
+    "description": "Retrieve pickup order details, line items, pricing breakdown, and preparation status using the order code and primary guest name. Requires guest name matching for privacy.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "guest_name": {
+          "description": "Full name of the order holder for verification.\nCase-insensitive match required for privacy.",
+          "type": "string"
+        },
+        "order_code": {
+          "description": "Human-friendly order code assigned during order placement (e.g. 'TO-8K4MZ').\nCase-insensitive; hyphens and spaces tolerated.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "order_code",
+        "guest_name"
+      ],
+      "type": "object"
+    },
+    "name": "get_order",
+    "outputSchema": {
+      "$defs": {
+        "OrderLineSummary": {
+          "properties": {
+            "allergens": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "dietary_tags": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "item_id": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "line_total": {
+              "$ref": "#/$defs/PriceDisplay"
+            },
+            "name": {
+              "type": "string"
+            },
+            "notes": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "quantity": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "unit_price": {
+              "$ref": "#/$defs/PriceDisplay"
+            }
+          },
+          "required": [
+            "item_id",
+            "name",
+            "quantity",
+            "unit_price",
+            "line_total",
+            "allergens",
+            "dietary_tags"
+          ],
+          "type": "object"
+        },
+        "OrderSummary": {
+          "properties": {
+            "created_at": {
+              "type": "string"
+            },
+            "guest_name": {
+              "type": "string"
+            },
+            "lines": {
+              "items": {
+                "$ref": "#/$defs/OrderLineSummary"
+              },
+              "type": "array"
+            },
+            "order_code": {
+              "type": "string"
+            },
+            "payment_status": {
+              "type": "string"
+            },
+            "pickup_time_local": {
+              "type": "string"
+            },
+            "stated_allergens": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "status": {
+              "type": "string"
+            },
+            "subtotal": {
+              "$ref": "#/$defs/PriceDisplay"
+            },
+            "tax": {
+              "$ref": "#/$defs/PriceDisplay"
+            },
+            "total": {
+              "$ref": "#/$defs/PriceDisplay"
+            }
+          },
+          "required": [
+            "order_code",
+            "guest_name",
+            "status",
+            "pickup_time_local",
+            "lines",
+            "subtotal",
+            "tax",
+            "total",
+            "payment_status",
+            "created_at"
+          ],
+          "type": "object"
+        },
+        "PriceDisplay": {
+          "properties": {
+            "amount_minor": {
+              "description": "Price in minor currency units (paise)",
+              "format": "int64",
+              "type": "integer"
+            },
+            "currency": {
+              "description": "ISO currency code (e.g. INR)",
+              "type": "string"
+            },
+            "display": {
+              "description": "Human-readable formatted price string (e.g. ₹380)",
+              "type": "string"
+            }
+          },
+          "required": [
+            "amount_minor",
+            "currency",
+            "display"
+          ],
+          "type": "object"
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "message": {
+          "type": "string"
+        },
+        "order": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/OrderSummary"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "status": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "status",
+        "message"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": true
+    },
+    "description": "Retrieve the guest's saved dining profile, masked contact information, preferences, counts, allergy reconfirmation status, and complete data export using their profile token.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "profile_token": {
+          "description": "Opaque profile bearer token (e.g. 'tt_prof_...') issued during enable_memory.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "profile_token"
+      ],
+      "type": "object"
+    },
+    "name": "get_profile",
+    "outputSchema": {
+      "$defs": {
+        "DataExportRecord": {
+          "properties": {
+            "booking_ids": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "consent_granted_at": {
+              "type": "string"
+            },
+            "consent_version": {
+              "type": "string"
+            },
+            "display_name": {
+              "type": "string"
+            },
+            "email": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "order_ids": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "phone": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "preferences": {
+              "items": {
+                "$ref": "#/$defs/StoredPreferenceView"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "display_name",
+            "consent_version",
+            "consent_granted_at",
+            "preferences",
+            "order_ids",
+            "booking_ids"
+          ],
+          "type": "object"
+        },
+        "ProfileCounts": {
+          "properties": {
+            "preference_count": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "total_bookings": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "total_orders": {
+              "format": "int64",
+              "type": "integer"
+            }
+          },
+          "required": [
+            "total_orders",
+            "total_bookings",
+            "preference_count"
+          ],
+          "type": "object"
+        },
+        "StoredPreferenceView": {
+          "properties": {
+            "confirmed_at": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "created_at": {
+              "type": "string"
+            },
+            "id": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "kind": {
+              "type": "string"
+            },
+            "severity": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "value": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "kind",
+            "value",
+            "created_at"
+          ],
+          "type": "object"
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "consent_granted_at": {
+          "type": "string"
+        },
+        "consent_version": {
+          "type": "string"
+        },
+        "counts": {
+          "$ref": "#/$defs/ProfileCounts"
+        },
+        "data_export": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DataExportRecord"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "email_masked": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "guest_name": {
+          "type": "string"
+        },
+        "needs_reconfirmation": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "phone_masked": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "preferences": {
+          "items": {
+            "$ref": "#/$defs/StoredPreferenceView"
+          },
+          "type": "array"
+        },
+        "status": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "status",
+        "guest_name",
+        "consent_version",
+        "consent_granted_at",
+        "preferences",
+        "counts",
+        "needs_reconfirmation"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": true
+    },
+    "description": "Retrieve the guest's 'usual order' suggestion computed deterministically from past order history. Re-validates items against live menu prices, stock availability, and profile allergies without placing an order.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "profile_token": {
+          "description": "Opaque profile bearer token (e.g. 'tt_prof_...') issued during enable_memory.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "profile_token"
+      ],
+      "type": "object"
+    },
+    "name": "get_usual_order",
+    "outputSchema": {
+      "$defs": {
+        "ConflictingAllergyItem": {
+          "properties": {
+            "conflicting_allergens": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "item_id": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "item_name": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "item_id",
+            "item_name",
+            "conflicting_allergens"
+          ],
+          "type": "object"
+        },
+        "PriceDifference": {
+          "properties": {
+            "current_price": {
+              "$ref": "#/$defs/PriceDisplay"
+            },
+            "item_id": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "item_name": {
+              "type": "string"
+            },
+            "previous_price": {
+              "$ref": "#/$defs/PriceDisplay"
+            }
+          },
+          "required": [
+            "item_id",
+            "item_name",
+            "previous_price",
+            "current_price"
+          ],
+          "type": "object"
+        },
+        "PriceDisplay": {
+          "properties": {
+            "amount_minor": {
+              "description": "Price in minor currency units (paise)",
+              "format": "int64",
+              "type": "integer"
+            },
+            "currency": {
+              "description": "ISO currency code (e.g. INR)",
+              "type": "string"
+            },
+            "display": {
+              "description": "Human-readable formatted price string (e.g. ₹380)",
+              "type": "string"
+            }
+          },
+          "required": [
+            "amount_minor",
+            "currency",
+            "display"
+          ],
+          "type": "object"
+        },
+        "SuggestedOrderLine": {
+          "properties": {
+            "item_id": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "item_name": {
+              "type": "string"
+            },
+            "line_total": {
+              "$ref": "#/$defs/PriceDisplay"
+            },
+            "quantity": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "unit_price": {
+              "$ref": "#/$defs/PriceDisplay"
+            },
+            "user_provided_note": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "item_id",
+            "item_name",
+            "quantity",
+            "unit_price",
+            "line_total"
+          ],
+          "type": "object"
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "allergen_notice": {
+          "type": "string"
+        },
+        "conflicting_items": {
+          "items": {
+            "$ref": "#/$defs/ConflictingAllergyItem"
+          },
+          "type": "array"
+        },
+        "guest_name": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "needs_allergy_reconfirmation": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "price_changes": {
+          "items": {
+            "$ref": "#/$defs/PriceDifference"
+          },
+          "type": "array"
+        },
+        "status": {
+          "type": "string"
+        },
+        "subtotal": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PriceDisplay"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "suggested_lines": {
+          "items": {
+            "$ref": "#/$defs/SuggestedOrderLine"
+          },
+          "type": "array"
+        },
+        "tax": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PriceDisplay"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "total": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PriceDisplay"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "unavailable_items": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "status",
+        "suggested_lines",
+        "price_changes",
+        "unavailable_items",
+        "conflicting_items",
+        "needs_allergy_reconfirmation",
+        "allergen_notice"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": true
+    },
+    "description": "Check the status of a dining waitlist entry. Read-only. If a table opens up and is offered, returns an offer_token and hold expiry so the caller can call accept_offer.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "code": {
+          "description": "Waitlist entry code (e.g. 'WL-8K4MZ').",
+          "type": "string"
+        },
+        "guest_name": {
+          "description": "Full name of the dining guest for verification.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "guest_name"
+      ],
+      "type": "object"
+    },
+    "name": "get_waitlist_status",
+    "outputSchema": {
+      "$defs": {
+        "WaitlistOfferDetail": {
+          "properties": {
+            "area": {
+              "type": "string"
+            },
+            "end_local": {
+              "type": "string"
+            },
+            "expires_at_local": {
+              "type": "string"
+            },
+            "offer_token": {
+              "type": "string"
+            },
+            "seconds_remaining": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "start_local": {
+              "type": "string"
+            },
+            "table_label": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "offer_token",
+            "start_local",
+            "end_local",
+            "area",
+            "table_label",
+            "expires_at_local",
+            "seconds_remaining"
+          ],
+          "type": "object"
+        },
+        "WaitlistSummary": {
+          "properties": {
+            "area": {
+              "type": "string"
+            },
+            "code": {
+              "type": "string"
+            },
+            "date": {
+              "type": "string"
+            },
+            "expires_at_local": {
+              "type": "string"
+            },
+            "guest_name": {
+              "type": "string"
+            },
+            "offer": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/WaitlistOfferDetail"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "party_size": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "queue_position": {
+              "format": "int64",
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "status": {
+              "type": "string"
+            },
+            "window_end": {
+              "type": "string"
+            },
+            "window_start": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "code",
+            "guest_name",
+            "party_size",
+            "date",
+            "window_start",
+            "window_end",
+            "area",
+            "status",
+            "expires_at_local"
+          ],
+          "type": "object"
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "message": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "waitlist": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/WaitlistSummary"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "status",
+        "message"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": false
+    },
+    "description": "Join the dining waitlist for a specific date and time window when no tables are available. Returns a waitlist code and queue position. There are no push notifications; callers must poll get_waitlist_status.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "area": {
+          "description": "Seating area preference: 'indoor', 'patio', 'bar', or 'any'. Defaults to 'any'.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "contact": {
+          "description": "Optional contact phone number or email for notifications.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "date": {
+          "description": "Local restaurant date in YYYY-MM-DD format (e.g. '2026-10-16').",
+          "type": "string"
+        },
+        "guest_name": {
+          "description": "Full name of the dining guest.",
+          "type": "string"
+        },
+        "party_size": {
+          "description": "Party size (number of guests).",
+          "format": "int64",
+          "type": "integer"
+        },
+        "profile_token": {
+          "description": "Optional profile bearer token to link waitlist entry to saved profile.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "window_end": {
+          "description": "Latest acceptable arrival time in HH:MM format (e.g. '20:30').",
+          "type": "string"
+        },
+        "window_start": {
+          "description": "Earliest acceptable arrival time in HH:MM format (e.g. '18:30').",
+          "type": "string"
+        }
+      },
+      "required": [
+        "guest_name",
+        "party_size",
+        "date",
+        "window_start",
+        "window_end"
+      ],
+      "type": "object"
+    },
+    "name": "join_waitlist",
+    "outputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "area": {
+          "type": "string"
+        },
+        "code": {
+          "type": "string"
+        },
+        "date": {
+          "type": "string"
+        },
+        "expires_at_local": {
+          "type": "string"
+        },
+        "guest_name": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        },
+        "party_size": {
+          "format": "int64",
+          "type": "integer"
+        },
+        "queue_position": {
+          "format": "int64",
+          "type": "integer"
+        },
+        "status": {
+          "type": "string"
+        },
+        "window_end": {
+          "type": "string"
+        },
+        "window_start": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "status",
+        "code",
+        "guest_name",
+        "party_size",
+        "date",
+        "window_start",
+        "window_end",
+        "area",
+        "queue_position",
+        "expires_at_local",
+        "message"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": true,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": false
+    },
+    "description": "Leave the dining waitlist and cancel any active offer hold. Idempotent.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "code": {
+          "description": "Waitlist entry code (e.g. 'WL-8K4MZ').",
+          "type": "string"
+        },
+        "guest_name": {
+          "description": "Full name of the dining guest for verification.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "guest_name"
+      ],
+      "type": "object"
+    },
+    "name": "leave_waitlist",
+    "outputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "already_cancelled": {
+          "type": "boolean"
+        },
+        "code": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "status",
+        "code",
+        "already_cancelled",
+        "message"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": false,
+      "readOnlyHint": false
+    },
+    "description": "Negotiate dining options when preferred time or table is unavailable. Generates up to max_options ranked alternatives with explainable reason codes using deterministic integer scoring. Does NOT place a hold or create a booking. To hold or confirm an option, use accept_offer.",
+    "inputSchema": {
+      "$defs": {
+        "BookingAreaInput": {
+          "description": "Seating area preference for reservation requests.",
+          "enum": [
+            "any",
+            "indoor",
+            "patio",
+            "bar"
+          ],
+          "type": "string"
+        },
+        "NegotiationFlexibility": {
+          "properties": {
+            "allow_other_areas": {
+              "description": "Whether to allow tables in other seating areas if requested area is unavailable (default true).",
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "allow_other_days": {
+              "description": "Whether to search on subsequent days within the booking horizon (default false).",
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "earliest_time": {
+              "description": "Earliest acceptable local time in HH:MM format.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "latest_time": {
+              "description": "Latest acceptable local time in HH:MM format.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "time_window_minutes": {
+              "description": "Search window around requested time in minutes (default 90, max 240).",
+              "format": "int64",
+              "type": [
+                "integer",
+                "null"
+              ]
+            }
+          },
+          "type": "object"
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "area": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BookingAreaInput"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional seating area preference: 'indoor', 'patio', 'bar', or 'any'."
+        },
+        "date": {
+          "description": "Local restaurant date in YYYY-MM-DD format (e.g. '2026-10-16').",
+          "type": "string"
+        },
+        "duration_minutes": {
+          "description": "Optional dining duration in minutes.",
+          "format": "int64",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "exclude_offered": {
+          "description": "Whether to exclude slots already offered in prior rounds of this negotiation (default true).",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "flexibility": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/NegotiationFlexibility"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional search flexibility settings."
+        },
+        "guest_name": {
+          "description": "Name of the dining guest.",
+          "type": "string"
+        },
+        "max_options": {
+          "description": "Maximum number of ranked alternative options to return (1 to 4, default 3).",
+          "format": "uint",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "negotiation_id": {
+          "description": "Optional existing negotiation ID to request additional alternative options.",
+          "format": "int64",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "party_size": {
+          "description": "Party size (number of guests).",
+          "format": "int64",
+          "type": "integer"
+        },
+        "profile_token": {
+          "description": "Optional profile bearer token to apply soft seating preference.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "time": {
+          "description": "Local 24-hour time in HH:MM format (e.g. '19:30').",
+          "type": "string"
+        }
+      },
+      "required": [
+        "date",
+        "time",
+        "party_size",
+        "guest_name"
+      ],
+      "type": "object"
+    },
+    "name": "negotiate_booking",
+    "outputSchema": {
+      "$defs": {
+        "AvailableSlot": {
+          "description": "Allocated dining slot when available.",
+          "properties": {
+            "area": {
+              "type": "string"
+            },
+            "capacity": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "end_local": {
+              "type": "string"
+            },
+            "start_local": {
+              "type": "string"
+            },
+            "table_label": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "start_local",
+            "end_local",
+            "table_label",
+            "area",
+            "capacity"
+          ],
+          "type": "object"
+        },
+        "NegotiationOption": {
+          "properties": {
+            "area": {
+              "type": "string"
+            },
+            "end_local": {
+              "type": "string"
+            },
+            "minutes_from_requested": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "option_id": {
+              "type": "string"
+            },
+            "rank": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "score_reasons": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "start_local": {
+              "type": "string"
+            },
+            "table_label": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "option_id",
+            "start_local",
+            "end_local",
+            "area",
+            "minutes_from_requested",
+            "score_reasons",
+            "rank"
+          ],
+          "type": "object"
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "message": {
+          "type": "string"
+        },
+        "negotiation_id": {
+          "format": "int64",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "options": {
+          "items": {
+            "$ref": "#/$defs/NegotiationOption"
+          },
+          "type": "array"
+        },
+        "profile_applied": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "round": {
+          "format": "int64",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "slot": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AvailableSlot"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "status": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "status",
+        "options",
+        "message"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "readOnlyHint": true
+    },
+    "description": "Ping the TableTalk restaurant assistant to verify connectivity and retrieve server status",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "name": {
+          "description": "Optional guest or client name to include in greeting",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "sleep_ms": {
+          "description": "Optional simulation delay in milliseconds to test client/server timeout behavior",
+          "format": "uint64",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      },
+      "type": "object"
+    },
+    "name": "ping_restaurant",
+    "outputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "message": {
+          "description": "Friendly greeting message confirming assistant status",
+          "type": "string"
+        },
+        "server": {
+          "description": "Identifier of the serving MCP implementation",
+          "type": "string"
+        },
+        "version": {
+          "description": "Crate package version of the TableTalk server",
+          "type": "string"
+        }
+      },
+      "required": [
+        "message",
+        "server",
+        "version"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": false
+    },
+    "description": "Place a pickup order for food and beverages from the restaurant. Computes exact server-side pricing and tax, validates item availability, enforces kitchen preparation timing, and verifies safety-critical allergen restrictions. Returns a confirmed order with an order code (e.g. 'TO-8K4MZ') or reports conflicts and alternative dishes.",
+    "inputSchema": {
+      "$defs": {
+        "AllergenAcknowledgement": {
+          "properties": {
+            "acknowledged": {
+              "type": "boolean"
+            },
+            "allergens_to_avoid": {
+              "items": {
+                "$ref": "#/$defs/AllergenFilter"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "allergens_to_avoid",
+            "acknowledged"
+          ],
+          "type": "object"
+        },
+        "AllergenFilter": {
+          "enum": [
+            "peanuts",
+            "tree_nuts",
+            "dairy",
+            "gluten",
+            "soy",
+            "sesame",
+            "mustard",
+            "shellfish",
+            "egg",
+            "fish"
+          ],
+          "type": "string"
+        },
+        "OrderLineInput": {
+          "properties": {
+            "item_id": {
+              "format": "int64",
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "item_name": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "notes": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "quantity": {
+              "format": "int64",
+              "type": "integer"
+            }
+          },
+          "required": [
+            "quantity"
+          ],
+          "type": "object"
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "allergen_acknowledgement": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AllergenAcknowledgement"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional allergen restrictions to avoid and guest acknowledgement of verified warnings.\nIf any ordered dish contains a listed allergen, or if allergen data is unverified, the order is blocked."
+        },
+        "email": {
+          "description": "Optional contact email address for electronic receipt. Never logged in full.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "guest_name": {
+          "description": "Full name of the primary pickup guest (1-80 characters, trimmed).",
+          "type": "string"
+        },
+        "idempotency_key": {
+          "description": "Optional idempotency key (8-64 characters matching [a-zA-Z0-9_.-]).\nStrongly recommended on retries to ensure at-most-once order placement.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "items": {
+          "description": "Array of ordered items (1 to 20 lines). Each line must provide either `item_id` (preferred from search_menu)\nor `item_name` (exact case-insensitive match), a quantity between 1 and 20, and optional special notes.",
+          "items": {
+            "$ref": "#/$defs/OrderLineInput"
+          },
+          "type": "array"
+        },
+        "order_notes": {
+          "description": "Optional kitchen or packaging notes (max 300 characters, stored as plain text).",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "phone": {
+          "description": "Optional contact phone number for order status notifications. Never logged in full.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "pickup_time": {
+          "description": "Optional local pickup time: either 'HH:MM' on the restaurant's current local day, or full ISO local date-time.\nIf omitted, defaults automatically to the earliest feasible kitchen preparation time.\nThe caller must not invent times.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "profile_token": {
+          "description": "Optional profile bearer token (e.g. 'tt_prof_...') to link order, default guest name, and enforce stored allergies.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "items",
+        "guest_name"
+      ],
+      "type": "object"
+    },
+    "name": "place_order",
+    "outputSchema": {
+      "$defs": {
+        "ItemCandidate": {
+          "properties": {
+            "item_id": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "name": {
+              "type": "string"
+            },
+            "price": {
+              "$ref": "#/$defs/PriceDisplay"
+            }
+          },
+          "required": [
+            "item_id",
+            "name",
+            "price"
+          ],
+          "type": "object"
+        },
+        "OrderLineSummary": {
+          "properties": {
+            "allergens": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "dietary_tags": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "item_id": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "line_total": {
+              "$ref": "#/$defs/PriceDisplay"
+            },
+            "name": {
+              "type": "string"
+            },
+            "notes": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "quantity": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "unit_price": {
+              "$ref": "#/$defs/PriceDisplay"
+            }
+          },
+          "required": [
+            "item_id",
+            "name",
+            "quantity",
+            "unit_price",
+            "line_total",
+            "allergens",
+            "dietary_tags"
+          ],
+          "type": "object"
+        },
+        "OrderSummary": {
+          "properties": {
+            "created_at": {
+              "type": "string"
+            },
+            "guest_name": {
+              "type": "string"
+            },
+            "lines": {
+              "items": {
+                "$ref": "#/$defs/OrderLineSummary"
+              },
+              "type": "array"
+            },
+            "order_code": {
+              "type": "string"
+            },
+            "payment_status": {
+              "type": "string"
+            },
+            "pickup_time_local": {
+              "type": "string"
+            },
+            "stated_allergens": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "status": {
+              "type": "string"
+            },
+            "subtotal": {
+              "$ref": "#/$defs/PriceDisplay"
+            },
+            "tax": {
+              "$ref": "#/$defs/PriceDisplay"
+            },
+            "total": {
+              "$ref": "#/$defs/PriceDisplay"
+            }
+          },
+          "required": [
+            "order_code",
+            "guest_name",
+            "status",
+            "pickup_time_local",
+            "lines",
+            "subtotal",
+            "tax",
+            "total",
+            "payment_status",
+            "created_at"
+          ],
+          "type": "object"
+        },
+        "PriceChange": {
+          "properties": {
+            "current_price": {
+              "$ref": "#/$defs/PriceDisplay"
+            },
+            "item_id": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "item_name": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "item_id",
+            "item_name",
+            "current_price"
+          ],
+          "type": "object"
+        },
+        "PriceDisplay": {
+          "properties": {
+            "amount_minor": {
+              "description": "Price in minor currency units (paise)",
+              "format": "int64",
+              "type": "integer"
+            },
+            "currency": {
+              "description": "ISO currency code (e.g. INR)",
+              "type": "string"
+            },
+            "display": {
+              "description": "Human-readable formatted price string (e.g. ₹380)",
+              "type": "string"
+            }
+          },
+          "required": [
+            "amount_minor",
+            "currency",
+            "display"
+          ],
+          "type": "object"
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "allergen_notice": {
+          "type": "string"
+        },
+        "alternatives": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "candidates": {
+          "items": {
+            "$ref": "#/$defs/ItemCandidate"
+          },
+          "type": "array"
+        },
+        "earliest_pickup_local": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "idempotent_replay": {
+          "type": "boolean"
+        },
+        "needs_reconfirmation": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "order": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/OrderSummary"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "price_changes": {
+          "items": {
+            "$ref": "#/$defs/PriceChange"
+          },
+          "type": "array"
+        },
+        "profile_applied": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "reason_detail": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "status": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "status",
+        "price_changes",
+        "candidates",
+        "alternatives",
+        "allergen_notice",
+        "idempotent_replay"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": false,
+      "readOnlyHint": false
+    },
+    "description": "Issue a fresh simulated payment checkout link for a reservation that is still pending and within its payment deadline. Invalidates any previous open payment session. It never extends the booking's payment deadline and never marks a payment as paid: the guest must still complete the payment on the checkout page. Use this when the guest lost or expired their payment link.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "confirmation_code": {
+          "description": "The unique confirmation code of the reservation (e.g. 'TT-8K4MZ').",
+          "type": "string"
+        },
+        "guest_name": {
+          "description": "Guest name associated with the reservation. Required for identity verification.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "confirmation_code",
+        "guest_name"
+      ],
+      "type": "object"
+    },
+    "name": "refresh_payment_session",
+    "outputSchema": {
+      "$defs": {
+        "Money": {
+          "description": "Structured money value: integer minor units plus a display string.",
+          "properties": {
+            "amount_minor": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "currency": {
+              "type": "string"
+            },
+            "display": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "amount_minor",
+            "currency",
+            "display"
+          ],
+          "type": "object"
+        },
+        "PaymentObject": {
+          "description": "Payment object embedded in create_booking / accept_offer / refresh responses.",
+          "properties": {
+            "amount": {
+              "$ref": "#/$defs/Money"
+            },
+            "checkout_url": {
+              "type": "string"
+            },
+            "deadline_local": {
+              "type": "string"
+            },
+            "minutes_remaining": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "required": {
+              "type": "boolean"
+            },
+            "simulated": {
+              "type": "boolean"
+            },
+            "status": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "required",
+            "simulated",
+            "status",
+            "amount",
+            "deadline_local",
+            "minutes_remaining",
+            "checkout_url"
+          ],
+          "type": "object"
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "message": {
+          "type": "string"
+        },
+        "payment": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PaymentObject"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "status": {
+          "description": "One of: refreshed | not_required | not_pending | deadline_passed | not_found.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "status",
+        "message"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": false
+    },
+    "description": "Release an active table hold, freeing the table for other guests or waitlist matching. Idempotent.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "guest_name": {
+          "description": "Full name of the primary dining guest for verification.",
+          "type": "string"
+        },
+        "offer_token": {
+          "description": "Offer bearer token (prefix 'tt_offer_') associated with the active hold.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "offer_token",
+        "guest_name"
+      ],
+      "type": "object"
+    },
+    "name": "release_offer",
+    "outputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "already_released": {
+          "type": "boolean"
+        },
+        "message": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "status",
+        "already_released",
+        "message"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": false
+    },
+    "description": "Save or update a guest dining preference (allergy, dietary tag, seating preference, favorite menu item, or note). Values are validated against official registers and menu items. Deduplicates existing entries.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "kind": {
+          "description": "Preference category: 'allergy', 'dietary', 'seat_pref', 'favorite_item', or 'note'.",
+          "type": "string"
+        },
+        "profile_token": {
+          "description": "Opaque profile bearer token (e.g. 'tt_prof_...').",
+          "type": "string"
+        },
+        "severity": {
+          "description": "Optional allergy severity: 'mild', 'severe', or 'unknown'. Only applicable when kind is 'allergy'.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "value": {
+          "description": "Preference value (e.g. 'peanuts', 'vegetarian', 'patio', 'Paneer Tikka Angaare', or note text).",
+          "type": "string"
+        }
+      },
+      "required": [
+        "profile_token",
+        "kind",
+        "value"
+      ],
+      "type": "object"
+    },
+    "name": "remember_preference",
+    "outputSchema": {
+      "$defs": {
+        "StoredPreferenceView": {
+          "properties": {
+            "confirmed_at": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "created_at": {
+              "type": "string"
+            },
+            "id": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "kind": {
+              "type": "string"
+            },
+            "severity": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "value": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "kind",
+            "value",
+            "created_at"
+          ],
+          "type": "object"
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "deduplicated": {
+          "type": "boolean"
+        },
+        "message": {
+          "type": "string"
+        },
+        "preference": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/StoredPreferenceView"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "status": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "status",
+        "deduplicated",
+        "message"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": false,
+      "readOnlyHint": false
+    },
+    "description": "Rotate the guest's profile bearer token atomically. Issues a new cryptographically random token and permanently revokes the previous token.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "profile_token": {
+          "description": "Opaque profile bearer token (e.g. 'tt_prof_...') to rotate and revoke.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "profile_token"
+      ],
+      "type": "object"
+    },
+    "name": "rotate_profile_token",
+    "outputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "message": {
+          "type": "string"
+        },
+        "new_profile_token": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "status": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "status",
+        "message"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": true
+    },
+    "description": "Search the restaurant menu by dish name, ingredient, cuisine style, dietary needs, allergen exclusions, or budget. Call this tool when the guest asks about food options, dishes, ingredients, or wants recommendations fitting dietary or allergen constraints. Do NOT call this tool for table reservations, checking table availability, placing orders, or checking opening hours.",
+    "inputSchema": {
+      "$defs": {
+        "AllergenFilter": {
+          "enum": [
+            "peanuts",
+            "tree_nuts",
+            "dairy",
+            "gluten",
+            "soy",
+            "sesame",
+            "mustard",
+            "shellfish",
+            "egg",
+            "fish"
+          ],
+          "type": "string"
+        },
+        "DietaryTagFilter": {
+          "enum": [
+            "vegan",
+            "vegetarian",
+            "gluten_free",
+            "dairy_free",
+            "halal",
+            "nut_free"
+          ],
+          "type": "string"
+        },
+        "SortOption": {
+          "enum": [
+            "relevance",
+            "price_asc",
+            "price_desc",
+            "popular"
+          ],
+          "type": "string"
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "category": {
+          "description": "Category name to filter by (e.g. 'Small Plates & Starters', 'Tandoor & Charcoal Grills', 'Signature Curries & Mains').",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "dietary": {
+          "description": "Dietary tags the item MUST have (e.g. ['vegan', 'gluten_free']). Only valid tags recognized by the restaurant are allowed.",
+          "items": {
+            "$ref": "#/$defs/DietaryTagFilter"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "exclude_allergens": {
+          "description": "Allergens the item MUST NOT contain (e.g. ['peanuts', 'dairy', 'gluten']). Hard filter in database.",
+          "items": {
+            "$ref": "#/$defs/AllergenFilter"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "include_unavailable": {
+          "description": "Whether to include dishes that are temporarily out of stock. Defaults to false.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "limit": {
+          "description": "Maximum number of items to return (1-10, default 5). Kept short for voice assistant readability.",
+          "format": "uint",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "max_price": {
+          "description": "Maximum price threshold in Indian Rupees (INR) (e.g. 500.0 for dishes up to ₹500).",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "profile_token": {
+          "description": "Optional profile bearer token to automatically apply saved dietary and allergy preferences.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "query": {
+          "description": "Free text query for dish name, ingredient, cuisine style, or mood (e.g. 'biryani', 'spinach', 'spicy'). Maximum 200 characters.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "sort": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SortOption"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Sort ordering: 'relevance' (default), 'price_asc', 'price_desc', or 'popular'."
+        },
+        "use_profile": {
+          "description": "Whether to apply preferences from the profile associated with `profile_token`. Defaults to false.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
+      },
+      "type": "object"
+    },
+    "name": "search_menu",
+    "outputSchema": {
+      "$defs": {
+        "AllergenFilter": {
+          "enum": [
+            "peanuts",
+            "tree_nuts",
+            "dairy",
+            "gluten",
+            "soy",
+            "sesame",
+            "mustard",
+            "shellfish",
+            "egg",
+            "fish"
+          ],
+          "type": "string"
+        },
+        "AppliedFilters": {
+          "properties": {
+            "category": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "dietary": {
+              "items": {
+                "$ref": "#/$defs/DietaryTagFilter"
+              },
+              "type": "array"
+            },
+            "exclude_allergens": {
+              "items": {
+                "$ref": "#/$defs/AllergenFilter"
+              },
+              "type": "array"
+            },
+            "include_unavailable": {
+              "type": "boolean"
+            },
+            "limit": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "max_price_inr": {
+              "format": "double",
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "query": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "sort": {
+              "$ref": "#/$defs/SortOption"
+            }
+          },
+          "required": [
+            "dietary",
+            "exclude_allergens",
+            "include_unavailable",
+            "sort",
+            "limit"
+          ],
+          "type": "object"
+        },
+        "DietaryTagFilter": {
+          "enum": [
+            "vegan",
+            "vegetarian",
+            "gluten_free",
+            "dairy_free",
+            "halal",
+            "nut_free"
+          ],
+          "type": "string"
+        },
+        "MenuItemCard": {
+          "properties": {
+            "allergens": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "available": {
+              "type": "boolean"
+            },
+            "calories": {
+              "format": "int64",
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "category": {
+              "type": "string"
+            },
+            "chefs_special": {
+              "type": "boolean"
+            },
+            "description": {
+              "type": "string"
+            },
+            "dietary_tags": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "id": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "image_url": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "match_reason": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "prep_time_minutes": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "price": {
+              "$ref": "#/$defs/PriceDisplay"
+            },
+            "spice_level": {
+              "format": "int64",
+              "type": "integer"
+            }
+          },
+          "required": [
+            "id",
+            "name",
+            "description",
+            "category",
+            "price",
+            "dietary_tags",
+            "allergens",
+            "spice_level",
+            "prep_time_minutes",
+            "available",
+            "chefs_special",
+            "match_reason"
+          ],
+          "type": "object"
+        },
+        "PriceDisplay": {
+          "properties": {
+            "amount_minor": {
+              "description": "Price in minor currency units (paise)",
+              "format": "int64",
+              "type": "integer"
+            },
+            "currency": {
+              "description": "ISO currency code (e.g. INR)",
+              "type": "string"
+            },
+            "display": {
+              "description": "Human-readable formatted price string (e.g. ₹380)",
+              "type": "string"
+            }
+          },
+          "required": [
+            "amount_minor",
+            "currency",
+            "display"
+          ],
+          "type": "object"
+        },
+        "SortOption": {
+          "enum": [
+            "relevance",
+            "price_asc",
+            "price_desc",
+            "popular"
+          ],
+          "type": "string"
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "allergen_notice": {
+          "description": "Standard allergen handling notice for kitchen operations",
+          "type": "string"
+        },
+        "applied_filters": {
+          "$ref": "#/$defs/AppliedFilters",
+          "description": "Normalized filter values applied in database query"
+        },
+        "items": {
+          "description": "Menu items matching criteria",
+          "items": {
+            "$ref": "#/$defs/MenuItemCard"
+          },
+          "type": "array"
+        },
+        "needs_reconfirmation": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "profile_applied": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "query_summary": {
+          "description": "Human-readable echo of interpreted filters",
+          "type": "string"
+        },
+        "returned": {
+          "description": "Number of items returned in this response",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "suggestions": {
+          "description": "Concrete suggestions if zero or few matches found",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "total_matches": {
+          "description": "Total number of items matching filters before pagination",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "query_summary",
+        "applied_filters",
+        "total_matches",
+        "returned",
+        "items",
+        "suggestions",
+        "allergen_notice"
+      ],
+      "type": "object"
+    }
+  }
+]
