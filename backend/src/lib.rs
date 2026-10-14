@@ -9,8 +9,10 @@ pub mod menu_search;
 pub mod negotiation;
 pub mod ordering;
 pub mod payments;
+pub mod rate_limit;
 pub mod server;
 pub mod tools;
+pub mod validation;
 
 pub use config::Config;
 pub use http::{build_router, build_router_with_db, HealthResponse};

@@ -294,10 +294,11 @@ pub fn format_spoken_options(options: &[NegotiationOption]) -> String {
         parts.push(format!("{} {}", time_part, area_part));
     }
 
-    let joined = match parts.len() {
-        1 => parts[0].clone(),
-        2 => format!("{}, or {}", parts[0], parts[1]),
-        _ => format!("{}, {}, or {}", parts[0], parts[1], parts[2]),
+    let joined = match parts.as_slice() {
+        [] => String::new(),
+        [first] => first.clone(),
+        [first, second] => format!("{first}, or {second}"),
+        [first, second, third, ..] => format!("{first}, {second}, or {third}"),
     };
 
     // Capitalize first letter

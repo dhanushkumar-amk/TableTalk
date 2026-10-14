@@ -32,21 +32,36 @@ pub async fn handle_remember_preference_with_clock(
     input: RememberPreferenceInput,
     clock: &dyn Clock,
 ) -> rmcp::model::CallToolResult {
-    let token_clean = input.profile_token.trim();
-    if token_clean.is_empty() {
-        return rmcp::model::CallToolResult::error(vec![rmcp::model::ContentBlock::text(
-            "Invalid input: 'profile_token' must be provided.",
-        )]);
-    }
+    let token_clean =
+        match crate::validation::sanitize_string(&input.profile_token, "profile_token", 1, 128) {
+            Ok(t) => t,
+            Err(err) => return err,
+        };
+
+    let kind_clean = match crate::validation::sanitize_string(&input.kind, "kind", 1, 32) {
+        Ok(k) => k,
+        Err(err) => return err,
+    };
+
+    let value_clean = match crate::validation::sanitize_string(&input.value, "value", 1, 200) {
+        Ok(v) => v,
+        Err(err) => return err,
+    };
+
+    let severity_clean =
+        match crate::validation::sanitize_optional_string(input.severity, "severity", 32) {
+            Ok(s) => s,
+            Err(err) => return err,
+        };
 
     let rate_limiter = get_token_rate_limiter();
 
     match remember_preference_tx(
         pool,
-        token_clean,
-        &input.kind,
-        &input.value,
-        input.severity.as_deref(),
+        &token_clean,
+        &kind_clean,
+        &value_clean,
+        severity_clean.as_deref(),
         rate_limiter,
         clock,
     )
@@ -56,23 +71,17 @@ pub async fn handle_remember_preference_with_clock(
             let voice_text = if output.status == "not_found" {
                 "I couldn't find a saved profile matching that token.".to_string()
             } else {
-                match input.kind.to_lowercase().as_str() {
-                    "allergy" => format!(
-                        "I've noted that you would like to avoid {}.",
-                        input.value.trim()
-                    ),
-                    "dietary" => format!(
-                        "I've saved {} as your dietary preference.",
-                        input.value.trim()
-                    ),
-                    "seat_pref" => format!(
-                        "I've noted your seating preference for {}.",
-                        input.value.trim()
-                    ),
-                    "favorite_item" => format!(
-                        "I've saved {} as one of your favorite dishes.",
-                        input.value.trim()
-                    ),
+                match kind_clean.to_lowercase().as_str() {
+                    "allergy" => {
+                        format!("I've noted that you would like to avoid {}.", value_clean)
+                    }
+                    "dietary" => format!("I've saved {} as your dietary preference.", value_clean),
+                    "seat_pref" => {
+                        format!("I've noted your seating preference for {}.", value_clean)
+                    }
+                    "favorite_item" => {
+                        format!("I've saved {} as one of your favorite dishes.", value_clean)
+                    }
                     "note" => "I've saved that note to your profile.".to_string(),
                     _ => "I've saved that preference to your profile.".to_string(),
                 }
@@ -81,12 +90,10 @@ pub async fn handle_remember_preference_with_clock(
             let structured = match serde_json::to_value(&output) {
                 Ok(v) => v,
                 Err(e) => {
-                    return rmcp::model::CallToolResult::error(vec![
-                        rmcp::model::ContentBlock::text(format!(
-                            "Failed to serialize remember_preference output: {}",
-                            e
-                        )),
-                    ]);
+                    return crate::validation::internal_tool_error(
+                        "serializing remember_preference output",
+                        e,
+                    );
                 }
             };
 
@@ -94,13 +101,7 @@ pub async fn handle_remember_preference_with_clock(
             tool_result.content = vec![rmcp::model::ContentBlock::text(voice_text)];
             tool_result
         }
-        Ok(Err(validation_err)) => {
-            rmcp::model::CallToolResult::error(vec![rmcp::model::ContentBlock::text(
-                validation_err,
-            )])
-        }
-        Err(e) => rmcp::model::CallToolResult::error(vec![rmcp::model::ContentBlock::text(
-            format!("Database error saving preference: {}", e),
-        )]),
+        Ok(Err(validation_err)) => crate::validation::tool_error(validation_err),
+        Err(e) => crate::validation::internal_tool_error("saving preference", e),
     }
 }

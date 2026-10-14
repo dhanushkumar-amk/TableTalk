@@ -60,6 +60,8 @@ ALTER TABLE restaurant ADD COLUMN deposit_decline_retry_limit INTEGER NOT NULL D
 --    implicit DELETE fired by DROP TABLE, so their referencing columns/rows are
 --    snapshotted first and restored afterwards.
 -- ---------------------------------------------------------------------------
+DROP TABLE IF EXISTS payments;
+
 CREATE TABLE IF NOT EXISTS _orders_booking_snapshot AS
     SELECT id, booking_id FROM orders WHERE booking_id IS NOT NULL;
 
@@ -155,7 +157,7 @@ CREATE INDEX IF NOT EXISTS idx_payment_sessions_expiry ON payment_sessions(statu
 --    statuses, payer fields (scrubbed by forget_me) and a partial unique index
 --    preventing two captured deposits for the same booking.
 -- ---------------------------------------------------------------------------
-DROP TABLE payments;
+DROP TABLE IF EXISTS payments;
 
 CREATE TABLE payments (
     id TEXT PRIMARY KEY,

@@ -23,7 +23,19 @@ pub struct PingOutput {
 
 /// Business logic for executing the hello-world ping tool.
 pub fn handle_ping(input: PingInput) -> PingOutput {
-    let guest = input.name.as_deref().unwrap_or("Guest");
+    let guest = input
+        .name
+        .as_deref()
+        .map(|n| {
+            let cleaned: String = n.chars().filter(|c| !c.is_control()).collect();
+            let trimmed = cleaned.trim();
+            if trimmed.is_empty() {
+                "Guest".to_string()
+            } else {
+                trimmed.chars().take(100).collect::<String>()
+            }
+        })
+        .unwrap_or_else(|| "Guest".to_string());
     PingOutput {
         message: format!(
             "Hello, {}! TableTalk restaurant MCP server is online.",

@@ -1,3 +1,4 @@
+use crate::validation::tool_error as tool_validation_error;
 use crate::{
     availability::{Clock, SystemClock},
     booking::{format_spoken_code, BookingSummary},
@@ -46,10 +47,6 @@ pub struct AcceptOfferOutput {
     /// Present only when a simulated deposit is required to confirm the booking.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub payment: Option<crate::payments::PaymentObject>,
-}
-
-fn tool_validation_error(msg: impl Into<String>) -> CallToolResult {
-    CallToolResult::error(vec![ContentBlock::text(msg.into())])
 }
 
 /// Compute deposit requirement for a slot and, if due, create the booking as
@@ -118,10 +115,11 @@ pub async fn handle_accept_offer_with_clock(
     input: AcceptOfferInput,
     clock: &dyn Clock,
 ) -> CallToolResult {
-    let guest_name = input.guest_name.trim();
-    if guest_name.is_empty() {
-        return tool_validation_error("Guest name is required.");
-    }
+    let guest_name =
+        match crate::validation::sanitize_string(&input.guest_name, "guest_name", 1, 100) {
+            Ok(n) => n,
+            Err(err) => return err,
+        };
 
     let now_utc = clock.now();
     let now_iso = now_utc.to_rfc3339();
@@ -130,13 +128,15 @@ pub async fn handle_accept_offer_with_clock(
     // Load restaurant config before acquiring exclusive connection
     let config = match crate::db::repo::restaurant::get_config(pool).await {
         Ok(c) => c,
-        Err(e) => return tool_validation_error(format!("Failed to load config: {}", e)),
+        Err(e) => return crate::validation::internal_tool_error("loading restaurant config", e),
     };
     let tz: Tz = config.timezone.parse().unwrap_or(chrono_tz::Asia::Kolkata);
 
     let mut conn = match pool.acquire().await {
         Ok(c) => c,
-        Err(e) => return tool_validation_error(format!("DB connection error: {}", e)),
+        Err(e) => {
+            return crate::validation::internal_tool_error("acquiring database connection", e)
+        }
     };
 
     // --- CASE A: Converting an existing hold using offer_token ---
@@ -177,7 +177,7 @@ pub async fn handle_accept_offer_with_clock(
 
         // Verification check: constant-time hash and guest name match
         if !verify_token_hash(&computed_hash, &hold.token_hash)
-            || !hold.guest_name.trim().eq_ignore_ascii_case(guest_name)
+            || !hold.guest_name.trim().eq_ignore_ascii_case(&guest_name)
         {
             let _ = sqlx::query("ROLLBACK").execute(&mut *conn).await;
             let output = AcceptOfferOutput {
@@ -332,7 +332,7 @@ pub async fn handle_accept_offer_with_clock(
         )
         .bind(&booking_id)
         .bind(&confirmation_code)
-        .bind(guest_name)
+        .bind(&guest_name)
         .bind(party_size)
         .bind(&start_at)
         .bind(&end_at)
@@ -389,11 +389,11 @@ pub async fn handle_accept_offer_with_clock(
                 .unwrap_or_else(|_| "T1".to_string());
 
         let dt_start = DateTime::parse_from_rfc3339(&start_at)
-            .unwrap()
-            .with_timezone(&tz);
+            .map(|d| d.with_timezone(&tz))
+            .unwrap_or_else(|_| now_utc.with_timezone(&tz));
         let dt_end = DateTime::parse_from_rfc3339(&end_at)
-            .unwrap()
-            .with_timezone(&tz);
+            .map(|d| d.with_timezone(&tz))
+            .unwrap_or_else(|_| now_utc.with_timezone(&tz));
 
         let summary = BookingSummary {
             confirmation_code: confirmation_code.clone(),
@@ -485,7 +485,7 @@ pub async fn handle_accept_offer_with_clock(
         }
     };
 
-    if !neg.guest_name.trim().eq_ignore_ascii_case(guest_name) {
+    if !neg.guest_name.trim().eq_ignore_ascii_case(&guest_name) {
         let _ = sqlx::query("ROLLBACK").execute(&mut *conn).await;
         return tool_validation_error("Guest name does not match the negotiation record.");
     }
@@ -564,7 +564,7 @@ pub async fn handle_accept_offer_with_clock(
         let active_holds: i64 = sqlx::query_scalar(
             "SELECT COUNT(*) FROM slot_holds WHERE guest_name = ? AND status = 'active' AND expires_at > ?"
         )
-        .bind(guest_name)
+        .bind(&guest_name)
         .bind(&now_iso)
         .fetch_one(&mut *conn)
         .await
@@ -593,7 +593,7 @@ pub async fn handle_accept_offer_with_clock(
         .bind(&slot.start_at)
         .bind(&slot.end_at)
         .bind(&hold_expires_iso)
-        .bind(guest_name)
+        .bind(&guest_name)
         .bind(slot.party_size)
         .bind(&slot.area)
         .bind(&token_hash)
@@ -685,7 +685,7 @@ pub async fn handle_accept_offer_with_clock(
     )
     .bind(&booking_id)
     .bind(&confirmation_code)
-    .bind(guest_name)
+    .bind(&guest_name)
     .bind(slot.party_size)
     .bind(&slot.start_at)
     .bind(&slot.end_at)

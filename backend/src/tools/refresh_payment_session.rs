@@ -27,10 +27,6 @@ pub struct RefreshPaymentSessionOutput {
     pub message: String,
 }
 
-fn tool_validation_error(message: impl Into<String>) -> CallToolResult {
-    CallToolResult::error(vec![ContentBlock::text(message.into())])
-}
-
 pub async fn handle_refresh_payment_session(
     pool: &SqlitePool,
     input: RefreshPaymentSessionInput,
@@ -43,23 +39,28 @@ pub async fn handle_refresh_payment_session_with_clock(
     input: RefreshPaymentSessionInput,
     clock: &dyn Clock,
 ) -> CallToolResult {
-    let code = input.confirmation_code.trim();
-    if code.is_empty() {
-        return tool_validation_error("Confirmation code is required (e.g. 'TT-8K4MZ').");
-    }
-    let name = input.guest_name.trim();
-    if name.is_empty() {
-        return tool_validation_error("Guest name is required for booking verification.");
-    }
-    let normalized = normalize_confirmation_code(code);
+    let code = match crate::validation::sanitize_string(
+        &input.confirmation_code,
+        "confirmation_code",
+        1,
+        64,
+    ) {
+        Ok(c) => c,
+        Err(err) => return err,
+    };
+    let name = match crate::validation::sanitize_string(&input.guest_name, "guest_name", 1, 100) {
+        Ok(n) => n,
+        Err(err) => return err,
+    };
+    let normalized = normalize_confirmation_code(&code);
     let now_utc = clock.now();
 
     let mut conn = match pool.acquire().await {
         Ok(c) => c,
-        Err(e) => return tool_validation_error(format!("DB connection error: {}", e)),
+        Err(e) => return crate::validation::internal_tool_error("acquiring connection", e),
     };
     if let Err(e) = sqlx::query("BEGIN IMMEDIATE").execute(&mut *conn).await {
-        return tool_validation_error(format!("Failed to begin transaction: {}", e));
+        return crate::validation::internal_tool_error("beginning transaction", e);
     }
 
     let result: Result<CallToolResult, sqlx::Error> = async {
@@ -73,7 +74,7 @@ pub async fn handle_refresh_payment_session_with_clock(
 
         let verified = booking
             .as_ref()
-            .map(|b| b.guest_name.trim().eq_ignore_ascii_case(name))
+            .map(|b| b.guest_name.trim().eq_ignore_ascii_case(&name))
             .unwrap_or(false);
         if !verified {
             let output = RefreshPaymentSessionOutput {
@@ -124,7 +125,22 @@ pub async fn handle_refresh_payment_session_with_clock(
                 .await?;
             }
         }
-        let booking = booking.unwrap();
+        let booking = match booking {
+            Some(b) => b,
+            None => {
+                let output = RefreshPaymentSessionOutput {
+                    status: "not_found".to_string(),
+                    payment: None,
+                    message: format!("No booking found for confirmation code {}.", normalized),
+                };
+                let mut res = CallToolResult::structured(serde_json::to_value(&output).unwrap());
+                res.content = vec![ContentBlock::text(format!(
+                    "I couldn't find a booking matching {}.",
+                    normalized
+                ))];
+                return Ok(res);
+            }
+        };
 
         if booking.deposit_status == DepositStatus::NotRequired {
             let output = RefreshPaymentSessionOutput {
@@ -214,13 +230,13 @@ pub async fn handle_refresh_payment_session_with_clock(
     match result {
         Ok(res) => {
             if let Err(e) = sqlx::query("COMMIT").execute(&mut *conn).await {
-                return tool_validation_error(format!("Failed to commit: {}", e));
+                return crate::validation::internal_tool_error("committing transaction", e);
             }
             res
         }
         Err(e) => {
             let _ = sqlx::query("ROLLBACK").execute(&mut *conn).await;
-            tool_validation_error(format!("Failed to refresh payment session: {}", e))
+            crate::validation::internal_tool_error("refreshing payment session", e)
         }
     }
 }

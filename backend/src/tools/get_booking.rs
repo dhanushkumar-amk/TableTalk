@@ -15,10 +15,6 @@ pub struct GetBookingInput {
     pub guest_name: String,
 }
 
-fn tool_validation_error(message: impl Into<String>) -> CallToolResult {
-    CallToolResult::error(vec![ContentBlock::text(message.into())])
-}
-
 /// Handler for `get_booking` tool.
 pub async fn handle_get_booking(pool: &SqlitePool, input: GetBookingInput) -> CallToolResult {
     handle_get_booking_with_clock(pool, input, &SystemClock).await
@@ -30,27 +26,26 @@ pub async fn handle_get_booking_with_clock(
     input: GetBookingInput,
     clock: &dyn Clock,
 ) -> CallToolResult {
-    let req_id = uuid::Uuid::new_v4();
+    let trimmed_code = match crate::validation::sanitize_string(
+        &input.confirmation_code,
+        "confirmation_code",
+        1,
+        64,
+    ) {
+        Ok(c) => c,
+        Err(err) => return err,
+    };
 
-    let trimmed_code = input.confirmation_code.trim();
-    if trimmed_code.is_empty() {
-        return tool_validation_error(
-            "Confirmation code is required and cannot be empty (e.g. 'TT-8K4MZ').",
-        );
-    }
+    let trimmed_name =
+        match crate::validation::sanitize_string(&input.guest_name, "guest_name", 1, 100) {
+            Ok(n) => n,
+            Err(err) => return err,
+        };
 
-    let trimmed_name = input.guest_name.trim();
-    if trimmed_name.is_empty() {
-        return tool_validation_error("Guest name is required for booking verification.");
-    }
-
-    let outcome = match get_booking_tx(pool, trimmed_code, trimmed_name, clock).await {
+    let outcome = match get_booking_tx(pool, &trimmed_code, &trimmed_name, clock).await {
         Ok(out) => out,
         Err(err) => {
-            tracing::error!(request_id = %req_id, "Failed to retrieve booking from database: {}", err);
-            return CallToolResult::error(vec![ContentBlock::text(
-                "An internal database error occurred while looking up your reservation. Please try again.",
-            )]);
+            return crate::validation::internal_tool_error("retrieving booking", err);
         }
     };
 

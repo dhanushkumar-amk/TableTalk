@@ -3,7 +3,7 @@ use crate::availability::{
     AvailabilityQuery, Clock, SystemClock,
 };
 use crate::db::repo::{bookings, restaurant, tables};
-use chrono::{Duration, NaiveDate, NaiveTime, TimeZone, Utc};
+use chrono::{Duration, TimeZone, Utc};
 use chrono_tz::Tz;
 use rmcp::model::{CallToolResult, ContentBlock};
 use schemars::JsonSchema;
@@ -43,11 +43,6 @@ pub struct CheckAvailabilityInput {
     pub alternatives: Option<usize>,
 }
 
-/// Helper to produce a tool execution error (isError: true) allowing the LLM to self-correct.
-fn tool_validation_error(message: impl Into<String>) -> CallToolResult {
-    CallToolResult::error(vec![ContentBlock::text(message.into())])
-}
-
 /// Handler for `check_availability` MCP tool execution.
 pub async fn handle_check_availability(
     pool: &SqlitePool,
@@ -63,50 +58,35 @@ pub async fn handle_check_availability_with_clock(
     clock: &dyn Clock,
 ) -> CallToolResult {
     // 1. Argument validation (schema format & boundaries)
-    let parsed_date = match NaiveDate::parse_from_str(&input.date, "%Y-%m-%d") {
+    let parsed_date = match crate::validation::parse_iso_date(&input.date, "date") {
         Ok(d) => d,
-        Err(_) => {
-            return tool_validation_error(format!(
-                "Invalid input: 'date' must be in ISO format YYYY-MM-DD (e.g. '2026-10-17'). Received '{}'.",
-                input.date
-            ));
-        }
+        Err(err) => return err,
     };
 
-    let parsed_time = match NaiveTime::parse_from_str(&input.time, "%H:%M") {
+    let parsed_time = match crate::validation::parse_time_24h(&input.time, "time") {
         Ok(t) => t,
-        Err(_) => {
-            return tool_validation_error(format!(
-                "Invalid input: 'time' must be in 24-hour HH:MM format (e.g. '19:30' or '13:00'). Received '{}'.",
-                input.time
-            ));
-        }
+        Err(err) => return err,
     };
 
-    if input.party_size < 1 {
-        return tool_validation_error(format!(
-            "Invalid input: 'party_size' must be at least 1 (received {}).",
-            input.party_size
-        ));
+    if let Err(err) = crate::validation::validate_range_i64(input.party_size, 1, 100, "party_size")
+    {
+        return err;
     }
 
     if let Some(dur) = input.duration_minutes {
-        if !(30..=240).contains(&dur) {
-            return tool_validation_error(format!(
-                "Invalid input: 'duration_minutes' must be between 30 and 240 minutes (received {}).",
-                dur
-            ));
+        if let Err(err) = crate::validation::validate_range_i64(dur, 30, 240, "duration_minutes") {
+            return err;
         }
     }
 
     let alternatives_limit = match input.alternatives {
-        Some(a) if a > 6 => {
-            return tool_validation_error(format!(
-                "Invalid input: 'alternatives' must be between 0 and 6 (received {}).",
-                a
-            ));
+        Some(a) => {
+            if let Err(err) = crate::validation::validate_range_i64(a as i64, 0, 6, "alternatives")
+            {
+                return err;
+            }
+            a
         }
-        Some(a) => a,
         None => 3,
     };
 

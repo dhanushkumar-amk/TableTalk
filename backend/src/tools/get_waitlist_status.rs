@@ -27,10 +27,6 @@ pub struct GetWaitlistStatusOutput {
     pub message: String,
 }
 
-fn tool_validation_error(msg: impl Into<String>) -> CallToolResult {
-    CallToolResult::error(vec![ContentBlock::text(msg.into())])
-}
-
 pub async fn handle_get_waitlist_status(
     pool: &SqlitePool,
     input: GetWaitlistStatusInput,
@@ -44,15 +40,15 @@ pub async fn handle_get_waitlist_status_with_clock(
     input: GetWaitlistStatusInput,
     clock: &dyn Clock,
 ) -> CallToolResult {
-    let code_clean = input.code.trim().to_uppercase();
-    let guest_name = input.guest_name.trim();
-
-    if code_clean.is_empty() {
-        return tool_validation_error("Waitlist code is required.");
-    }
-    if guest_name.is_empty() {
-        return tool_validation_error("Guest name is required.");
-    }
+    let code_clean = match crate::validation::sanitize_string(&input.code, "code", 1, 64) {
+        Ok(c) => c.to_uppercase(),
+        Err(err) => return err,
+    };
+    let guest_name =
+        match crate::validation::sanitize_string(&input.guest_name, "guest_name", 1, 100) {
+            Ok(n) => n,
+            Err(err) => return err,
+        };
 
     let now_utc = clock.now();
     let now_iso = now_utc.to_rfc3339();
@@ -65,7 +61,7 @@ pub async fn handle_get_waitlist_status_with_clock(
 
     let mut conn = match pool.acquire().await {
         Ok(c) => c,
-        Err(e) => return tool_validation_error(format!("DB connection error: {}", e)),
+        Err(e) => return crate::validation::internal_tool_error("acquiring connection", e),
     };
 
     let entry: Option<crate::db::models::WaitlistEntry> = sqlx::query_as(
@@ -98,7 +94,7 @@ pub async fn handle_get_waitlist_status_with_clock(
         }
     };
 
-    if !entry.guest_name.trim().eq_ignore_ascii_case(guest_name) {
+    if !entry.guest_name.trim().eq_ignore_ascii_case(&guest_name) {
         let output = GetWaitlistStatusOutput {
             status: "not_found".to_string(),
             waitlist: None,
@@ -160,18 +156,18 @@ pub async fn handle_get_waitlist_status_with_clock(
                 // Active hold! Generate deterministic offer token
                 let (offer_token, _) = generate_waitlist_offer_token(h_id, &code, &created_at);
                 let dt_start = DateTime::parse_from_rfc3339(&h_start)
-                    .unwrap()
-                    .with_timezone(&tz);
+                    .map(|d| d.with_timezone(&tz))
+                    .unwrap_or_else(|_| now_utc.with_timezone(&tz));
                 let dt_end = DateTime::parse_from_rfc3339(&h_end)
-                    .unwrap()
-                    .with_timezone(&tz);
+                    .map(|d| d.with_timezone(&tz))
+                    .unwrap_or_else(|_| now_utc.with_timezone(&tz));
                 let dt_exp = DateTime::parse_from_rfc3339(&h_expires)
-                    .unwrap()
-                    .with_timezone(&tz);
+                    .map(|d| d.with_timezone(&tz))
+                    .unwrap_or_else(|_| now_utc.with_timezone(&tz));
 
                 let exp_utc = DateTime::parse_from_rfc3339(&h_expires)
-                    .unwrap()
-                    .with_timezone(&chrono::Utc);
+                    .map(|d| d.with_timezone(&chrono::Utc))
+                    .unwrap_or_else(|_| now_utc);
                 let secs_remaining = (exp_utc - now_utc).num_seconds().max(0);
 
                 let table_label: String =

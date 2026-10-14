@@ -47,10 +47,6 @@ pub struct PlaceOrderInput {
     pub profile_token: Option<String>,
 }
 
-fn tool_validation_error(message: impl Into<String>) -> CallToolResult {
-    CallToolResult::error(vec![ContentBlock::text(message.into())])
-}
-
 /// Handler for `place_order` tool.
 pub async fn handle_place_order(pool: &SqlitePool, input: PlaceOrderInput) -> CallToolResult {
     let clock = SystemClock;
@@ -63,6 +59,10 @@ pub async fn handle_place_order_with_clock(
     clock: &dyn Clock,
 ) -> CallToolResult {
     let req_id = uuid::Uuid::new_v4();
+
+    if let Err(err) = crate::validation::validate_array_bounds(&input.items, 1, 20, "items") {
+        return err;
+    }
 
     // Profile token resolution and allergy merging
     let (
@@ -178,10 +178,7 @@ pub async fn handle_place_order_with_clock(
                 return res;
             }
             Err(e) => {
-                return CallToolResult::error(vec![ContentBlock::text(format!(
-                    "Database error resolving profile token: {}",
-                    e
-                ))]);
+                return crate::validation::internal_tool_error("resolving profile token", e);
             }
         }
     } else {
@@ -204,7 +201,7 @@ pub async fn handle_place_order_with_clock(
         input.idempotency_key.as_deref(),
     ) {
         tracing::warn!(request_id = %req_id, error = %val_err, "Order validation failed");
-        return tool_validation_error(val_err.to_string());
+        return crate::validation::tool_error(val_err.to_string());
     }
 
     let tx_req = PlaceOrderTxRequest {
@@ -306,7 +303,7 @@ pub async fn handle_place_order_with_clock(
         }
         Err(e) => {
             tracing::error!(request_id = %req_id, error = %e, "Database transaction error placing order");
-            tool_validation_error(format!("Internal order placement error: {}", e))
+            crate::validation::internal_tool_error("placing order", e)
         }
     }
 }

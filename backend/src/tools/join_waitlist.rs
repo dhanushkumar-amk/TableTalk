@@ -2,7 +2,7 @@ use crate::{
     availability::{Clock, SystemClock},
     negotiation::{format_spoken_waitlist_code, MAX_ACTIVE_WAITLIST_PER_GUEST},
 };
-use chrono::{Datelike, NaiveDate, NaiveTime};
+use chrono::Datelike;
 use rand::Rng;
 use rmcp::model::{CallToolResult, ContentBlock};
 use schemars::JsonSchema;
@@ -44,10 +44,6 @@ pub struct JoinWaitlistOutput {
     pub message: String,
 }
 
-fn tool_validation_error(msg: impl Into<String>) -> CallToolResult {
-    CallToolResult::error(vec![ContentBlock::text(msg.into())])
-}
-
 pub async fn handle_join_waitlist(pool: &SqlitePool, input: JoinWaitlistInput) -> CallToolResult {
     let clock = SystemClock;
     handle_join_waitlist_with_clock(pool, input, &clock).await
@@ -58,31 +54,36 @@ pub async fn handle_join_waitlist_with_clock(
     input: JoinWaitlistInput,
     clock: &dyn Clock,
 ) -> CallToolResult {
-    let guest_name = input.guest_name.trim();
-    if guest_name.is_empty() {
-        return tool_validation_error("Guest name is required.");
-    }
-    if input.party_size <= 0 {
-        return tool_validation_error("Party size must be at least 1.");
+    let guest_name =
+        match crate::validation::sanitize_string(&input.guest_name, "guest_name", 1, 100) {
+            Ok(n) => n,
+            Err(err) => return err,
+        };
+    if let Err(err) = crate::validation::validate_range_i64(input.party_size, 1, 100, "party_size")
+    {
+        return err;
     }
 
-    let parsed_date = match NaiveDate::parse_from_str(input.date.trim(), "%Y-%m-%d") {
+    let parsed_date = match crate::validation::parse_iso_date(&input.date, "date") {
         Ok(d) => d,
-        Err(_) => return tool_validation_error("Invalid date format. Expected YYYY-MM-DD."),
+        Err(err) => return err,
     };
 
-    let start_time = match NaiveTime::parse_from_str(input.window_start.trim(), "%H:%M") {
+    let start_time = match crate::validation::parse_time_24h(&input.window_start, "window_start") {
         Ok(t) => t,
-        Err(_) => return tool_validation_error("Invalid window_start format. Expected HH:MM."),
+        Err(err) => return err,
     };
 
-    let end_time = match NaiveTime::parse_from_str(input.window_end.trim(), "%H:%M") {
+    let end_time = match crate::validation::parse_time_24h(&input.window_end, "window_end") {
         Ok(t) => t,
-        Err(_) => return tool_validation_error("Invalid window_end format. Expected HH:MM."),
+        Err(err) => return err,
     };
 
     if start_time >= end_time {
-        return tool_validation_error("window_start must be earlier than window_end.");
+        return crate::validation::tool_arg_error(
+            "window_start",
+            "window_start must be earlier than window_end.",
+        );
     }
 
     let area_str = match input
@@ -97,36 +98,48 @@ pub async fn handle_join_waitlist_with_clock(
         "bar" => "bar",
         "any" | "" => "any",
         other => {
-            return tool_validation_error(format!(
-                "Invalid area '{}'. Expected 'indoor', 'patio', 'bar', or 'any'.",
-                other
-            ))
+            return crate::validation::tool_arg_error(
+                "area",
+                format!(
+                    "Invalid area '{}'. Expected 'indoor', 'patio', 'bar', or 'any'.",
+                    other
+                ),
+            );
         }
     };
 
     // Load restaurant config
     let config = match crate::db::repo::restaurant::get_config(pool).await {
         Ok(c) => c,
-        Err(e) => return tool_validation_error(format!("Failed to load config: {}", e)),
+        Err(e) => return crate::validation::internal_tool_error("loading config", e),
     };
 
     if input.party_size > config.max_party_size {
-        return tool_validation_error(format!(
-            "Party size cannot exceed restaurant limit of {} guests.",
-            config.max_party_size
-        ));
+        return crate::validation::tool_arg_error(
+            "party_size",
+            format!(
+                "cannot exceed restaurant limit of {} guests.",
+                config.max_party_size
+            ),
+        );
     }
 
     let now_utc = clock.now();
     let today = now_utc.date_naive();
     if parsed_date < today {
-        return tool_validation_error("Waitlist requests cannot be made for dates in the past.");
+        return crate::validation::tool_arg_error(
+            "date",
+            "Waitlist requests cannot be made for dates in the past.",
+        );
     }
     if (parsed_date - today).num_days() > config.booking_horizon_days {
-        return tool_validation_error(format!(
-            "Date is beyond the {}-day booking horizon.",
-            config.booking_horizon_days
-        ));
+        return crate::validation::tool_arg_error(
+            "date",
+            format!(
+                "is beyond the {}-day booking horizon.",
+                config.booking_horizon_days
+            ),
+        );
     }
 
     // Check operating hours for day of week
@@ -140,7 +153,10 @@ pub async fn handle_join_waitlist_with_clock(
     .unwrap_or(0);
 
     if open_periods == 0 {
-        return tool_validation_error("The restaurant is closed on the selected date.");
+        return crate::validation::tool_arg_error(
+            "date",
+            "The restaurant is closed on the selected date.",
+        );
     }
 
     // Resolve customer_id if profile_token provided
@@ -162,18 +178,18 @@ pub async fn handle_join_waitlist_with_clock(
 
     let mut conn = match pool.acquire().await {
         Ok(c) => c,
-        Err(e) => return tool_validation_error(format!("DB connection error: {}", e)),
+        Err(e) => return crate::validation::internal_tool_error("acquiring connection", e),
     };
 
     if let Err(e) = sqlx::query("BEGIN IMMEDIATE").execute(&mut *conn).await {
-        return tool_validation_error(format!("Failed to begin transaction: {}", e));
+        return crate::validation::internal_tool_error("beginning transaction", e);
     }
 
     // 1. Check active entries cap for guest
     let active_count: i64 = sqlx::query_scalar(
         "SELECT COUNT(*) FROM waitlist_entries WHERE guest_name = ? AND status = 'waiting' AND expires_at > ?"
     )
-    .bind(guest_name)
+    .bind(&guest_name)
     .bind(&now_iso)
     .fetch_one(&mut *conn)
     .await
@@ -181,7 +197,7 @@ pub async fn handle_join_waitlist_with_clock(
 
     if active_count >= MAX_ACTIVE_WAITLIST_PER_GUEST {
         let _ = sqlx::query("ROLLBACK").execute(&mut *conn).await;
-        return tool_validation_error("Maximum active waitlist entries reached for this guest. Please wait or leave an existing entry.");
+        return crate::validation::tool_error("Maximum active waitlist entries reached for this guest. Please wait or leave an existing entry.");
     }
 
     // 2. Check for duplicate entry (same guest, date, overlapping window) -> idempotent return!
@@ -194,7 +210,7 @@ pub async fn handle_join_waitlist_with_clock(
         LIMIT 1
         "#,
     )
-    .bind(guest_name)
+    .bind(&guest_name)
     .bind(&date_str)
     .bind(&now_iso)
     .bind(&end_str)
@@ -261,7 +277,7 @@ pub async fn handle_join_waitlist_with_clock(
         "#,
     )
     .bind(&waitlist_code)
-    .bind(guest_name)
+    .bind(&guest_name)
     .bind(input.contact.as_deref())
     .bind(input.party_size)
     .bind(&date_str)
@@ -277,7 +293,7 @@ pub async fn handle_join_waitlist_with_clock(
 
     if let Err(e) = insert_res {
         let _ = sqlx::query("ROLLBACK").execute(&mut *conn).await;
-        return tool_validation_error(format!("Failed to insert waitlist entry: {}", e));
+        return crate::validation::internal_tool_error("inserting waitlist entry", e);
     }
 
     // Calculate queue position
@@ -291,7 +307,7 @@ pub async fn handle_join_waitlist_with_clock(
     .unwrap_or(1);
 
     if let Err(e) = sqlx::query("COMMIT").execute(&mut *conn).await {
-        return tool_validation_error(format!("Failed to commit waitlist entry: {}", e));
+        return crate::validation::internal_tool_error("committing waitlist entry", e);
     }
 
     let spaced = format_spoken_waitlist_code(&waitlist_code);

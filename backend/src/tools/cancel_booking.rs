@@ -28,10 +28,6 @@ pub struct CancelBookingInput {
     pub reason: Option<String>,
 }
 
-fn tool_validation_error(message: impl Into<String>) -> CallToolResult {
-    CallToolResult::error(vec![ContentBlock::text(message.into())])
-}
-
 /// Handler for `cancel_booking` tool.
 pub async fn handle_cancel_booking(pool: &SqlitePool, input: CancelBookingInput) -> CallToolResult {
     let clock = SystemClock;
@@ -47,37 +43,38 @@ pub async fn handle_cancel_booking_with_clock(
     let req_id = uuid::Uuid::new_v4();
 
     // Input validation
-    let trimmed_code = input.confirmation_code.trim();
-    if trimmed_code.is_empty() {
-        return tool_validation_error(
-            "Confirmation code is required and cannot be empty (e.g. 'TT-8K4MZ').",
-        );
-    }
+    let trimmed_code = match crate::validation::sanitize_string(
+        &input.confirmation_code,
+        "confirmation_code",
+        1,
+        64,
+    ) {
+        Ok(c) => c,
+        Err(err) => return err,
+    };
 
-    let trimmed_name = input.guest_name.trim();
-    if trimmed_name.is_empty() {
-        return tool_validation_error("Guest name is required for booking verification.");
-    }
+    let trimmed_name =
+        match crate::validation::sanitize_string(&input.guest_name, "guest_name", 1, 100) {
+            Ok(n) => n,
+            Err(err) => return err,
+        };
 
-    if let Some(ref r) = input.reason {
-        if r.len() > 200 {
-            return tool_validation_error("Cancellation reason cannot exceed 200 characters.");
-        }
-    }
+    let sanitized_reason =
+        match crate::validation::sanitize_optional_string(input.reason, "reason", 200) {
+            Ok(r) => r,
+            Err(err) => return err,
+        };
 
     let tx_req = CancelBookingTxRequest {
-        confirmation_code: trimmed_code,
-        guest_name: trimmed_name,
-        reason: input.reason.as_deref(),
+        confirmation_code: &trimmed_code,
+        guest_name: &trimmed_name,
+        reason: sanitized_reason.as_deref(),
     };
 
     let outcome = match cancel_booking_tx(pool, tx_req, rate_limiter, clock).await {
         Ok(out) => out,
         Err(err) => {
-            tracing::error!(request_id = %req_id, "Failed to cancel booking in database: {}", err);
-            return CallToolResult::error(vec![ContentBlock::text(
-                "An internal database error occurred while cancelling your reservation. Please try again.",
-            )]);
+            return crate::validation::internal_tool_error("cancelling booking", err);
         }
     };
 

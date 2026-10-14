@@ -25,10 +25,6 @@ pub struct LeaveWaitlistOutput {
     pub message: String,
 }
 
-fn tool_validation_error(msg: impl Into<String>) -> CallToolResult {
-    CallToolResult::error(vec![ContentBlock::text(msg.into())])
-}
-
 pub async fn handle_leave_waitlist(pool: &SqlitePool, input: LeaveWaitlistInput) -> CallToolResult {
     let clock = SystemClock;
     handle_leave_waitlist_with_clock(pool, input, &clock).await
@@ -39,15 +35,15 @@ pub async fn handle_leave_waitlist_with_clock(
     input: LeaveWaitlistInput,
     clock: &dyn Clock,
 ) -> CallToolResult {
-    let code_clean = input.code.trim().to_uppercase();
-    let guest_name = input.guest_name.trim();
-
-    if code_clean.is_empty() {
-        return tool_validation_error("Waitlist code is required.");
-    }
-    if guest_name.is_empty() {
-        return tool_validation_error("Guest name is required.");
-    }
+    let code_clean = match crate::validation::sanitize_string(&input.code, "code", 1, 64) {
+        Ok(c) => c.to_uppercase(),
+        Err(err) => return err,
+    };
+    let guest_name =
+        match crate::validation::sanitize_string(&input.guest_name, "guest_name", 1, 100) {
+            Ok(n) => n,
+            Err(err) => return err,
+        };
 
     let config = crate::db::repo::restaurant::get_config(pool).await.ok();
     let tz: Tz = config
@@ -57,11 +53,11 @@ pub async fn handle_leave_waitlist_with_clock(
 
     let mut conn = match pool.acquire().await {
         Ok(c) => c,
-        Err(e) => return tool_validation_error(format!("DB connection error: {}", e)),
+        Err(e) => return crate::validation::internal_tool_error("acquiring connection", e),
     };
 
     if let Err(e) = sqlx::query("BEGIN IMMEDIATE").execute(&mut *conn).await {
-        return tool_validation_error(format!("Failed to begin transaction: {}", e));
+        return crate::validation::internal_tool_error("beginning transaction", e);
     }
 
     let entry_row: Option<(i64, String, String, String)> =
@@ -89,7 +85,7 @@ pub async fn handle_leave_waitlist_with_clock(
         }
     };
 
-    if !e_guest.trim().eq_ignore_ascii_case(guest_name) {
+    if !e_guest.trim().eq_ignore_ascii_case(&guest_name) {
         let _ = sqlx::query("ROLLBACK").execute(&mut *conn).await;
         let output = LeaveWaitlistOutput {
             status: "not_found".to_string(),
@@ -155,7 +151,7 @@ pub async fn handle_leave_waitlist_with_clock(
         .await;
 
     if let Err(e) = sqlx::query("COMMIT").execute(&mut *conn).await {
-        return tool_validation_error(format!("Failed to commit cancellation: {}", e));
+        return crate::validation::internal_tool_error("committing cancellation", e);
     }
 
     let output = LeaveWaitlistOutput {

@@ -27,10 +27,6 @@ pub struct CancelOrderInput {
 static GLOBAL_ORDER_RATE_LIMITER: std::sync::LazyLock<OrderCancellationRateLimiter> =
     std::sync::LazyLock::new(OrderCancellationRateLimiter::new);
 
-fn tool_validation_error(message: impl Into<String>) -> CallToolResult {
-    CallToolResult::error(vec![ContentBlock::text(message.into())])
-}
-
 pub async fn handle_cancel_order(pool: &SqlitePool, input: CancelOrderInput) -> CallToolResult {
     let clock = SystemClock;
     handle_cancel_order_with_deps(pool, input, &GLOBAL_ORDER_RATE_LIMITER, &clock).await
@@ -44,26 +40,28 @@ pub async fn handle_cancel_order_with_deps(
 ) -> CallToolResult {
     let req_id = uuid::Uuid::new_v4();
 
-    if input.order_code.trim().is_empty() {
-        return tool_validation_error("Order code is required.");
-    }
-    if input.guest_name.trim().is_empty() {
-        return tool_validation_error(
-            "Guest name is required for order cancellation verification.",
-        );
-    }
-    if let Some(r) = &input.reason {
-        if r.len() > 200 {
-            return tool_validation_error(
-                "Cancellation reason exceeds maximum length of 200 characters.",
-            );
-        }
-    }
+    let order_code_clean =
+        match crate::validation::sanitize_string(&input.order_code, "order_code", 1, 64) {
+            Ok(c) => c,
+            Err(err) => return err,
+        };
+
+    let guest_name_clean =
+        match crate::validation::sanitize_string(&input.guest_name, "guest_name", 1, 100) {
+            Ok(n) => n,
+            Err(err) => return err,
+        };
+
+    let sanitized_reason =
+        match crate::validation::sanitize_optional_string(input.reason, "reason", 200) {
+            Ok(r) => r,
+            Err(err) => return err,
+        };
 
     let tx_req = CancelOrderTxRequest {
-        order_code: &input.order_code,
-        guest_name: &input.guest_name,
-        reason: input.reason.as_deref(),
+        order_code: &order_code_clean,
+        guest_name: &guest_name_clean,
+        reason: sanitized_reason.as_deref(),
     };
 
     match cancel_order_tx(pool, tx_req, rate_limiter, clock).await {
@@ -117,7 +115,7 @@ pub async fn handle_cancel_order_with_deps(
         }
         Err(e) => {
             tracing::error!(request_id = %req_id, error = %e, "Database error during order cancellation");
-            tool_validation_error(format!("Internal order cancellation error: {}", e))
+            crate::validation::internal_tool_error("cancelling order", e)
         }
     }
 }

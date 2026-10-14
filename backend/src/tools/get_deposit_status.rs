@@ -40,10 +40,6 @@ pub struct GetDepositStatusOutput {
     pub message: String,
 }
 
-fn tool_validation_error(message: impl Into<String>) -> CallToolResult {
-    CallToolResult::error(vec![ContentBlock::text(message.into())])
-}
-
 pub async fn handle_get_deposit_status(
     pool: &SqlitePool,
     input: GetDepositStatusInput,
@@ -56,15 +52,20 @@ pub async fn handle_get_deposit_status_with_clock(
     input: GetDepositStatusInput,
     clock: &dyn Clock,
 ) -> CallToolResult {
-    let code = input.confirmation_code.trim();
-    if code.is_empty() {
-        return tool_validation_error("Confirmation code is required (e.g. 'TT-8K4MZ').");
-    }
-    let name = input.guest_name.trim();
-    if name.is_empty() {
-        return tool_validation_error("Guest name is required for booking verification.");
-    }
-    let normalized = normalize_confirmation_code(code);
+    let code = match crate::validation::sanitize_string(
+        &input.confirmation_code,
+        "confirmation_code",
+        1,
+        64,
+    ) {
+        Ok(c) => c,
+        Err(err) => return err,
+    };
+    let name = match crate::validation::sanitize_string(&input.guest_name, "guest_name", 1, 100) {
+        Ok(n) => n,
+        Err(err) => return err,
+    };
+    let normalized = normalize_confirmation_code(&code);
 
     let mut booking: Option<Booking> = match sqlx::query_as(&format!(
         "SELECT {} FROM bookings WHERE confirmation_code = ?",
@@ -76,13 +77,13 @@ pub async fn handle_get_deposit_status_with_clock(
     {
         Ok(b) => b,
         Err(e) => {
-            return tool_validation_error(format!("DB error: {}", e));
+            return crate::validation::internal_tool_error("retrieving booking deposit status", e);
         }
     };
 
     let verified = booking
         .as_ref()
-        .map(|b| b.guest_name.trim().eq_ignore_ascii_case(name))
+        .map(|b| b.guest_name.trim().eq_ignore_ascii_case(&name))
         .unwrap_or(false);
     if !verified {
         let output = not_found_output();
@@ -140,7 +141,7 @@ pub async fn handle_get_deposit_status_with_clock(
     .await;
     let config = match config {
         Ok(c) => c,
-        Err(e) => return tool_validation_error(format!("Failed to load config: {}", e)),
+        Err(e) => return crate::validation::internal_tool_error("loading restaurant config", e),
     };
     let tz: Tz = config.timezone.parse().unwrap_or(chrono_tz::Asia::Kolkata);
     let policy = DepositPolicy::from_config(&config);

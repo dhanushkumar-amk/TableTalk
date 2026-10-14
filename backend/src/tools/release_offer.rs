@@ -24,10 +24,6 @@ pub struct ReleaseOfferOutput {
     pub message: String,
 }
 
-fn tool_validation_error(msg: impl Into<String>) -> CallToolResult {
-    CallToolResult::error(vec![ContentBlock::text(msg.into())])
-}
-
 pub async fn handle_release_offer(pool: &SqlitePool, input: ReleaseOfferInput) -> CallToolResult {
     let clock = SystemClock;
     handle_release_offer_with_clock(pool, input, &clock).await
@@ -38,16 +34,18 @@ pub async fn handle_release_offer_with_clock(
     input: ReleaseOfferInput,
     clock: &dyn Clock,
 ) -> CallToolResult {
-    let guest_name = input.guest_name.trim();
-    if guest_name.is_empty() {
-        return tool_validation_error("Guest name is required.");
-    }
-    let token_clean = input.offer_token.trim();
-    if token_clean.is_empty() {
-        return tool_validation_error("Offer token is required.");
-    }
+    let guest_name =
+        match crate::validation::sanitize_string(&input.guest_name, "guest_name", 1, 100) {
+            Ok(n) => n,
+            Err(err) => return err,
+        };
+    let token_clean =
+        match crate::validation::sanitize_string(&input.offer_token, "offer_token", 1, 128) {
+            Ok(t) => t,
+            Err(err) => return err,
+        };
 
-    let computed_hash = hash_token(token_clean);
+    let computed_hash = hash_token(&token_clean);
     let now_iso = clock.now().to_rfc3339();
 
     let config = crate::db::repo::restaurant::get_config(pool).await.ok();
@@ -58,11 +56,11 @@ pub async fn handle_release_offer_with_clock(
 
     let mut conn = match pool.acquire().await {
         Ok(c) => c,
-        Err(e) => return tool_validation_error(format!("DB connection error: {}", e)),
+        Err(e) => return crate::validation::internal_tool_error("acquiring connection", e),
     };
 
     if let Err(e) = sqlx::query("BEGIN IMMEDIATE").execute(&mut *conn).await {
-        return tool_validation_error(format!("Failed to begin transaction: {}", e));
+        return crate::validation::internal_tool_error("beginning transaction", e);
     }
 
     let hold: Option<crate::db::models::SlotHold> = sqlx::query_as(
@@ -89,7 +87,7 @@ pub async fn handle_release_offer_with_clock(
     };
 
     if !verify_token_hash(&computed_hash, &hold.token_hash)
-        || !hold.guest_name.trim().eq_ignore_ascii_case(guest_name)
+        || !hold.guest_name.trim().eq_ignore_ascii_case(&guest_name)
     {
         let _ = sqlx::query("ROLLBACK").execute(&mut *conn).await;
         let output = ReleaseOfferOutput {
@@ -155,7 +153,7 @@ pub async fn handle_release_offer_with_clock(
     }
 
     if let Err(e) = sqlx::query("COMMIT").execute(&mut *conn).await {
-        return tool_validation_error(format!("Failed to commit release: {}", e));
+        return crate::validation::internal_tool_error("committing release", e);
     }
 
     let output = ReleaseOfferOutput {

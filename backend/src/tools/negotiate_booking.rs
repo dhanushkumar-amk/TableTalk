@@ -8,7 +8,7 @@ use crate::{
     },
     tools::create_booking::BookingAreaInput,
 };
-use chrono::{DateTime, Datelike, Duration, NaiveDate, NaiveTime, TimeZone, Timelike, Utc};
+use chrono::{DateTime, Datelike, Duration, NaiveTime, TimeZone, Timelike, Utc};
 use chrono_tz::Tz;
 use rmcp::model::{CallToolResult, ContentBlock};
 use schemars::JsonSchema;
@@ -66,10 +66,6 @@ pub struct NegotiateBookingOutput {
     pub message: String,
 }
 
-fn tool_validation_error(msg: impl Into<String>) -> CallToolResult {
-    CallToolResult::error(vec![ContentBlock::text(msg.into())])
-}
-
 pub async fn handle_negotiate_booking(
     pool: &SqlitePool,
     input: NegotiateBookingInput,
@@ -83,22 +79,24 @@ pub async fn handle_negotiate_booking_with_clock(
     input: NegotiateBookingInput,
     clock: &dyn Clock,
 ) -> CallToolResult {
-    let guest_name = input.guest_name.trim();
-    if guest_name.is_empty() {
-        return tool_validation_error("Guest name is required.");
-    }
-    if input.party_size <= 0 {
-        return tool_validation_error("Party size must be at least 1.");
+    let guest_name =
+        match crate::validation::sanitize_string(&input.guest_name, "guest_name", 1, 100) {
+            Ok(n) => n,
+            Err(err) => return err,
+        };
+    if let Err(err) = crate::validation::validate_range_i64(input.party_size, 1, 100, "party_size")
+    {
+        return err;
     }
 
-    let parsed_date = match NaiveDate::parse_from_str(input.date.trim(), "%Y-%m-%d") {
+    let parsed_date = match crate::validation::parse_iso_date(&input.date, "date") {
         Ok(d) => d,
-        Err(_) => return tool_validation_error("Invalid date format. Expected YYYY-MM-DD."),
+        Err(err) => return err,
     };
 
-    let parsed_time = match NaiveTime::parse_from_str(input.time.trim(), "%H:%M") {
+    let parsed_time = match crate::validation::parse_time_24h(&input.time, "time") {
         Ok(t) => t,
-        Err(_) => return tool_validation_error("Invalid time format. Expected HH:MM."),
+        Err(err) => return err,
     };
 
     let max_opts = input.max_options.unwrap_or(3).clamp(1, 4);
@@ -118,24 +116,24 @@ pub async fn handle_negotiate_booking_with_clock(
     // Load restaurant config and data
     let config = match restaurant::get_config(pool).await {
         Ok(c) => c,
-        Err(e) => return tool_validation_error(format!("Failed to load restaurant config: {}", e)),
+        Err(e) => return crate::validation::internal_tool_error("loading restaurant config", e),
     };
     let opening_hours = match restaurant::get_opening_hours(pool).await {
         Ok(h) => h,
-        Err(e) => return tool_validation_error(format!("Failed to load opening hours: {}", e)),
+        Err(e) => return crate::validation::internal_tool_error("loading opening hours", e),
     };
     let special_closures = match restaurant::get_special_closures(pool).await {
         Ok(s) => s,
-        Err(e) => return tool_validation_error(format!("Failed to load special closures: {}", e)),
+        Err(e) => return crate::validation::internal_tool_error("loading special closures", e),
     };
     let active_tables = match tables::list_active_tables(pool).await {
         Ok(t) => t,
-        Err(e) => return tool_validation_error(format!("Failed to load tables: {}", e)),
+        Err(e) => return crate::validation::internal_tool_error("loading tables", e),
     };
 
     let tz: Tz = match config.timezone.parse() {
         Ok(t) => t,
-        Err(_) => return tool_validation_error("Invalid restaurant timezone."),
+        Err(_) => return crate::validation::tool_error("Invalid restaurant timezone."),
     };
 
     // Resolve profile token if provided
@@ -227,7 +225,7 @@ pub async fn handle_negotiate_booking_with_clock(
     // 2. Resolve or create negotiation record
     let mut conn = match pool.acquire().await {
         Ok(c) => c,
-        Err(e) => return tool_validation_error(format!("DB error: {}", e)),
+        Err(e) => return crate::validation::internal_tool_error("acquiring connection", e),
     };
 
     let (neg_id, round, already_offered): (i64, i64, Vec<StoredOfferSlot>) = if let Some(n_id) =
@@ -322,14 +320,14 @@ pub async fn handle_negotiate_booking_with_clock(
         let active_negs: i64 = sqlx::query_scalar(
             "SELECT COUNT(*) FROM negotiations WHERE guest_name = ? AND status = 'open' AND expires_at > ?"
         )
-        .bind(guest_name)
+        .bind(&guest_name)
         .bind(&now_iso)
         .fetch_one(&mut *conn)
         .await
         .unwrap_or(0);
 
         if active_negs >= MAX_ACTIVE_NEGOTIATIONS_PER_GUEST {
-            return tool_validation_error("Maximum active negotiation sessions reached. Please complete or wait for existing sessions to conclude.");
+            return crate::validation::tool_error("Maximum active negotiation sessions reached. Please complete or wait for existing sessions to conclude.");
         }
 
         let neg_ttl = now_utc + Duration::minutes(DEFAULT_NEGOTIATION_TTL_MINUTES);
@@ -342,7 +340,7 @@ pub async fn handle_negotiate_booking_with_clock(
             ) VALUES (?, ?, ?, ?, ?, ?, 1, '[]', 'open', ?, ?)
             "#,
         )
-        .bind(guest_name)
+        .bind(&guest_name)
         .bind(input.date.trim())
         .bind(input.time.trim())
         .bind(input.party_size)
@@ -355,10 +353,7 @@ pub async fn handle_negotiate_booking_with_clock(
         {
             Ok(r) => r.last_insert_rowid(),
             Err(e) => {
-                return tool_validation_error(format!(
-                    "Failed to create negotiation session: {}",
-                    e
-                ))
+                return crate::validation::internal_tool_error("creating negotiation session", e);
             }
         };
 

@@ -36,7 +36,7 @@ echo " Starting TableTalk MCP Server on port ${PORT}..."
 echo "=================================================="
 
 echo "Starting backend via cargo run --manifest-path backend/Cargo.toml --bin mcp_tabletalk_backend..."
-PORT="${PORT}" RUST_LOG="warn" cargo run --manifest-path backend/Cargo.toml --bin mcp_tabletalk_backend &
+PORT="${PORT}" RUST_LOG="warn" SEED_ON_START="true" cargo run --manifest-path backend/Cargo.toml --bin mcp_tabletalk_backend &
 SERVER_PID=$!
 
 # Wait for /health
@@ -169,7 +169,7 @@ fi
 
 # Check 10: Create -> Get -> Cancel booking lifecycle on a throwaway slot
 echo "Testing booking lifecycle: create_booking -> get_booking -> cancel_booking..."
-THROW_DATE=$(node -e 'const d=new Date(); d.setDate(d.getDate()+14); if (d.getDay() === 2) d.setDate(d.getDate()+1); console.log(d.toISOString().slice(0,10));')
+THROW_DATE=$(node -e 'const d=new Date(); d.setDate(d.getDate()+10); if (d.getDay() === 2) d.setDate(d.getDate()+1); if (d.toISOString().slice(0,10) === "2026-10-28") d.setDate(d.getDate()+1); console.log(d.toISOString().slice(0,10));')
 IDEMP_KEY="smoke-key-$(node -e 'console.log(Date.now());')"
 
 CREATE_OUT=$(npx --yes @modelcontextprotocol/inspector --cli "${MCP_URL}" --method tools/call --tool-name create_booking \

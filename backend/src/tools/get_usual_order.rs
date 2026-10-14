@@ -26,15 +26,14 @@ pub async fn handle_get_usual_order_with_clock(
     input: GetUsualOrderInput,
     clock: &dyn Clock,
 ) -> rmcp::model::CallToolResult {
-    let token_clean = input.profile_token.trim();
-    if token_clean.is_empty() {
-        return rmcp::model::CallToolResult::error(vec![rmcp::model::ContentBlock::text(
-            "Invalid input: 'profile_token' must be provided.",
-        )]);
-    }
+    let token_clean =
+        match crate::validation::sanitize_string(&input.profile_token, "profile_token", 1, 128) {
+            Ok(t) => t,
+            Err(err) => return err,
+        };
 
     let rate_limiter = get_token_rate_limiter();
-    match get_usual_order_tx(pool, token_clean, rate_limiter, clock).await {
+    match get_usual_order_tx(pool, &token_clean, rate_limiter, clock).await {
         Ok(output) => {
             let voice_text = if output.status == "not_found" {
                 "I couldn't find a saved profile with that token. Please check your token or ask to enable memory.".to_string()
@@ -50,12 +49,10 @@ pub async fn handle_get_usual_order_with_clock(
             let structured = match serde_json::to_value(&output) {
                 Ok(v) => v,
                 Err(e) => {
-                    return rmcp::model::CallToolResult::error(vec![
-                        rmcp::model::ContentBlock::text(format!(
-                            "Failed to serialize get_usual_order output: {}",
-                            e
-                        )),
-                    ]);
+                    return crate::validation::internal_tool_error(
+                        "serializing get_usual_order output",
+                        e,
+                    );
                 }
             };
 
@@ -63,8 +60,6 @@ pub async fn handle_get_usual_order_with_clock(
             tool_result.content = vec![rmcp::model::ContentBlock::text(voice_text)];
             tool_result
         }
-        Err(e) => rmcp::model::CallToolResult::error(vec![rmcp::model::ContentBlock::text(
-            format!("Database error retrieving usual order: {}", e),
-        )]),
+        Err(e) => crate::validation::internal_tool_error("retrieving usual order", e),
     }
 }

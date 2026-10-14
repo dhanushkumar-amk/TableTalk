@@ -46,11 +46,6 @@ pub struct SearchMenuInput {
     pub use_profile: Option<bool>,
 }
 
-/// Helper to produce a tool execution error (isError: true) allowing the LLM to self-correct.
-fn tool_validation_error(message: impl Into<String>) -> CallToolResult {
-    CallToolResult::error(vec![ContentBlock::text(message.into())])
-}
-
 /// Business logic for executing menu search with hard safety filtering and voice synthesis.
 pub async fn handle_search_menu(pool: &SqlitePool, input: SearchMenuInput) -> CallToolResult {
     let clock = crate::availability::SystemClock;
@@ -63,41 +58,60 @@ pub async fn handle_search_menu_with_clock(
     clock: &dyn crate::availability::Clock,
 ) -> CallToolResult {
     // 1. Validate inputs
-    if let Some(ref q) = input.query {
-        if q.chars().count() > 200 {
-            return tool_validation_error(format!(
-                "Invalid input: 'query' exceeds maximum length of 200 characters (provided {} characters).",
-                q.chars().count()
-            ));
-        }
-    }
+    let sanitized_query =
+        match crate::validation::sanitize_optional_string(input.query, "query", 200) {
+            Ok(q) => q,
+            Err(err) => return err,
+        };
+
+    let sanitized_category =
+        match crate::validation::sanitize_optional_string(input.category, "category", 100) {
+            Ok(c) => c,
+            Err(err) => return err,
+        };
 
     if let Some(l) = input.limit {
-        if !(1..=10).contains(&l) {
-            return tool_validation_error(format!(
-                "Invalid input: 'limit' must be between 1 and 10 (received {}). Voice responses must remain concise.",
-                l
-            ));
+        if let Err(err) = crate::validation::validate_range_i64(l as i64, 1, 10, "limit") {
+            return err;
         }
     }
 
     if let Some(p) = input.max_price {
-        if p < 0.0 || p.is_nan() || p.is_infinite() {
-            return tool_validation_error(
-                "Invalid input: 'max_price' must be a non-negative finite number in Indian Rupees (INR).",
-            );
+        if let Err(err) = crate::validation::validate_range_f64(p, 0.0, 100_000.0, "max_price") {
+            return err;
         }
     }
+
+    if let Some(ref d) = input.dietary {
+        if let Err(err) = crate::validation::validate_array_bounds(d, 0, 10, "dietary") {
+            return err;
+        }
+    }
+
+    if let Some(ref a) = input.exclude_allergens {
+        if let Err(err) = crate::validation::validate_array_bounds(a, 0, 10, "exclude_allergens") {
+            return err;
+        }
+    }
+
+    let sanitized_profile_token = match crate::validation::sanitize_optional_string(
+        input.profile_token,
+        "profile_token",
+        128,
+    ) {
+        Ok(t) => t,
+        Err(err) => return err,
+    };
 
     // Profile token resolution
     let use_profile_flag = input.use_profile.unwrap_or(false);
     let (profile_applied, needs_reconfirmation, profile_allergies, profile_dietary) = if let Some(
         token_raw,
-    ) = input
-        .profile_token
-        .as_deref()
-        .map(str::trim)
-        .filter(|s| !s.is_empty())
+    ) =
+        sanitized_profile_token
+            .as_deref()
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
     {
         let rate_limiter = crate::memory::get_token_rate_limiter();
         match crate::memory::resolve_profile_token(pool, token_raw, rate_limiter, clock).await {
@@ -149,8 +163,8 @@ pub async fn handle_search_menu_with_clock(
                 let output = SearchMenuOutput {
                     query_summary: "Search cancelled: profile not found.".to_string(),
                     applied_filters: AppliedFilters {
-                        query: input.query,
-                        category: input.category,
+                        query: sanitized_query.clone(),
+                        category: sanitized_category.clone(),
                         dietary: vec![],
                         exclude_allergens: vec![],
                         max_price_inr: None,
@@ -173,10 +187,7 @@ pub async fn handle_search_menu_with_clock(
                 return res;
             }
             Err(e) => {
-                return CallToolResult::error(vec![ContentBlock::text(format!(
-                    "Database error resolving profile token: {}",
-                    e
-                ))]);
+                return crate::validation::internal_tool_error("resolving profile token", e);
             }
         }
     } else {
@@ -184,8 +195,8 @@ pub async fn handle_search_menu_with_clock(
     };
 
     // 2. Prepare normalized search query
-    let raw_query = input.query.clone();
-    let normalized_query = input.query.as_deref().and_then(|q| {
+    let raw_query = sanitized_query;
+    let normalized_query = raw_query.as_deref().and_then(|q| {
         let norm = normalize_query_text(q);
         if norm.is_empty() {
             None
@@ -229,7 +240,7 @@ pub async fn handle_search_menu_with_clock(
     let search_spec = MenuSearchQuery {
         raw_query,
         normalized_query,
-        category: input.category,
+        category: sanitized_category,
         dietary,
         exclude_allergens,
         max_price_cents,

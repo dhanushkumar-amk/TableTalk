@@ -80,10 +80,6 @@ pub struct CreateBookingInput {
     pub negotiate: Option<bool>,
 }
 
-fn tool_validation_error(message: impl Into<String>) -> CallToolResult {
-    CallToolResult::error(vec![ContentBlock::text(message.into())])
-}
-
 /// Handler for `create_booking` tool.
 pub async fn handle_create_booking(pool: &SqlitePool, input: CreateBookingInput) -> CallToolResult {
     let clock = SystemClock;
@@ -163,10 +159,7 @@ pub async fn handle_create_booking_with_clock(
                 return res;
             }
             Err(e) => {
-                return CallToolResult::error(vec![ContentBlock::text(format!(
-                    "Database error resolving profile token: {}",
-                    e
-                ))]);
+                return crate::validation::internal_tool_error("resolving profile token", e);
             }
         }
     } else {
@@ -185,7 +178,7 @@ pub async fn handle_create_booking_with_clock(
         input.idempotency_key.as_deref(),
         12, // Max restaurant party size
     ) {
-        return tool_validation_error(val_err.to_string());
+        return crate::validation::tool_error(val_err.to_string());
     }
 
     let explicit_area = input.area.map(|a| a.as_str());

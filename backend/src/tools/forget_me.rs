@@ -28,23 +28,21 @@ pub async fn handle_forget_me_with_clock(
     input: ForgetMeInput,
     clock: &dyn Clock,
 ) -> rmcp::model::CallToolResult {
-    let token_clean = input.profile_token.trim();
-    if token_clean.is_empty() {
-        return rmcp::model::CallToolResult::error(vec![rmcp::model::ContentBlock::text(
-            "Invalid input: 'profile_token' must be provided.",
-        )]);
-    }
+    let token_clean =
+        match crate::validation::sanitize_string(&input.profile_token, "profile_token", 1, 128) {
+            Ok(t) => t,
+            Err(err) => return err,
+        };
 
     if !input.confirm {
-        return rmcp::model::CallToolResult::error(vec![
-            rmcp::model::ContentBlock::text(
-                "Confirmation required: 'confirm: true' is required to permanently hard-delete profile data.",
-            ),
-        ]);
+        return crate::validation::tool_arg_error(
+            "confirm",
+            "Confirmation required: 'confirm: true' is required to permanently hard-delete profile data.",
+        );
     }
 
     let rate_limiter = get_token_rate_limiter();
-    match forget_me_tx(pool, token_clean, rate_limiter, clock).await {
+    match forget_me_tx(pool, &token_clean, rate_limiter, clock).await {
         Ok(output) => {
             let voice_text = if output.status == "not_found" {
                 "I couldn't find an active profile associated with that token.".to_string()
@@ -55,12 +53,10 @@ pub async fn handle_forget_me_with_clock(
             let structured = match serde_json::to_value(&output) {
                 Ok(v) => v,
                 Err(e) => {
-                    return rmcp::model::CallToolResult::error(vec![
-                        rmcp::model::ContentBlock::text(format!(
-                            "Failed to serialize forget_me output: {}",
-                            e
-                        )),
-                    ]);
+                    return crate::validation::internal_tool_error(
+                        "serializing forget_me output",
+                        e,
+                    );
                 }
             };
 
@@ -68,8 +64,6 @@ pub async fn handle_forget_me_with_clock(
             tool_result.content = vec![rmcp::model::ContentBlock::text(voice_text)];
             tool_result
         }
-        Err(e) => rmcp::model::CallToolResult::error(vec![rmcp::model::ContentBlock::text(
-            format!("Database error processing forget_me: {}", e),
-        )]),
+        Err(e) => crate::validation::internal_tool_error("processing forget_me", e),
     }
 }

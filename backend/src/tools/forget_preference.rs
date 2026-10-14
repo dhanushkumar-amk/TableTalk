@@ -32,21 +32,30 @@ pub async fn handle_forget_preference_with_clock(
     input: ForgetPreferenceInput,
     clock: &dyn Clock,
 ) -> rmcp::model::CallToolResult {
-    let token_clean = input.profile_token.trim();
-    if token_clean.is_empty() {
-        return rmcp::model::CallToolResult::error(vec![rmcp::model::ContentBlock::text(
-            "Invalid input: 'profile_token' must be provided.",
-        )]);
-    }
+    let token_clean =
+        match crate::validation::sanitize_string(&input.profile_token, "profile_token", 1, 128) {
+            Ok(t) => t,
+            Err(err) => return err,
+        };
+
+    let kind_clean = match crate::validation::sanitize_string(&input.kind, "kind", 1, 32) {
+        Ok(k) => k,
+        Err(err) => return err,
+    };
+
+    let value_clean = match crate::validation::sanitize_string(&input.value, "value", 1, 200) {
+        Ok(v) => v,
+        Err(err) => return err,
+    };
 
     let rate_limiter = get_token_rate_limiter();
     let confirm_allergy = input.confirm_remove_allergy.unwrap_or(false);
 
     match forget_preference_tx(
         pool,
-        token_clean,
-        &input.kind,
-        &input.value,
+        &token_clean,
+        &kind_clean,
+        &value_clean,
         confirm_allergy,
         rate_limiter,
         clock,
@@ -59,29 +68,24 @@ pub async fn handle_forget_preference_with_clock(
             } else if output.status == "not_found" {
                 format!(
                     "I couldn't find '{}' in your saved profile preferences.",
-                    input.value.trim()
+                    value_clean
                 )
-            } else if input.kind.to_lowercase() == "allergy" {
+            } else if kind_clean.to_lowercase() == "allergy" {
                 format!(
                     "I've removed {} from your saved profile preferences. Please remember to inform restaurant staff of any active allergies when ordering.",
-                    input.value.trim()
+                    value_clean
                 )
             } else {
-                format!(
-                    "I've removed {} from your saved preferences.",
-                    input.value.trim()
-                )
+                format!("I've removed {} from your saved preferences.", value_clean)
             };
 
             let structured = match serde_json::to_value(&output) {
                 Ok(v) => v,
                 Err(e) => {
-                    return rmcp::model::CallToolResult::error(vec![
-                        rmcp::model::ContentBlock::text(format!(
-                            "Failed to serialize forget_preference output: {}",
-                            e
-                        )),
-                    ]);
+                    return crate::validation::internal_tool_error(
+                        "serializing forget_preference output",
+                        e,
+                    );
                 }
             };
 
@@ -89,13 +93,7 @@ pub async fn handle_forget_preference_with_clock(
             tool_result.content = vec![rmcp::model::ContentBlock::text(voice_text)];
             tool_result
         }
-        Ok(Err(validation_err)) => {
-            rmcp::model::CallToolResult::error(vec![rmcp::model::ContentBlock::text(
-                validation_err,
-            )])
-        }
-        Err(e) => rmcp::model::CallToolResult::error(vec![rmcp::model::ContentBlock::text(
-            format!("Database error removing preference: {}", e),
-        )]),
+        Ok(Err(validation_err)) => crate::validation::tool_error(validation_err),
+        Err(e) => crate::validation::internal_tool_error("removing preference", e),
     }
 }

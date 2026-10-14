@@ -16,21 +16,22 @@ pub struct GetOrderInput {
     pub guest_name: String,
 }
 
-fn tool_validation_error(message: impl Into<String>) -> CallToolResult {
-    CallToolResult::error(vec![ContentBlock::text(message.into())])
-}
-
 pub async fn handle_get_order(pool: &SqlitePool, input: GetOrderInput) -> CallToolResult {
     let req_id = uuid::Uuid::new_v4();
 
-    if input.order_code.trim().is_empty() {
-        return tool_validation_error("Order code is required.");
-    }
-    if input.guest_name.trim().is_empty() {
-        return tool_validation_error("Guest name is required for order lookup verification.");
-    }
+    let order_code_clean =
+        match crate::validation::sanitize_string(&input.order_code, "order_code", 1, 64) {
+            Ok(c) => c,
+            Err(err) => return err,
+        };
 
-    match get_order_tx(pool, &input.order_code, &input.guest_name).await {
+    let guest_name_clean =
+        match crate::validation::sanitize_string(&input.guest_name, "guest_name", 1, 100) {
+            Ok(n) => n,
+            Err(err) => return err,
+        };
+
+    match get_order_tx(pool, &order_code_clean, &guest_name_clean).await {
         Ok(outcome) => {
             let (output, voice_text) = match outcome {
                 GetOrderOutcome::Found { output, voice_text } => {
@@ -69,7 +70,7 @@ pub async fn handle_get_order(pool: &SqlitePool, input: GetOrderInput) -> CallTo
         }
         Err(e) => {
             tracing::error!(request_id = %req_id, error = %e, "Database error retrieving order");
-            tool_validation_error(format!("Internal order lookup error: {}", e))
+            crate::validation::internal_tool_error("retrieving order", e)
         }
     }
 }
