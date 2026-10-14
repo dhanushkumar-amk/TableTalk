@@ -506,6 +506,37 @@ TableTalk provides an opt-in profile memory engine allowing voice assistants to 
 
 ---
 
+## Rich Cards & Developer Gallery (Phase 13)
+
+TableTalk provides an accessible, high-fidelity card system driven by MCP `structuredContent` with a typed TypeScript contract and runtime payload validation:
+
+- **Menu & Dietary**: `MenuCarousel` with keyboard snap-scroll navigation, spice meters, dietary chips, and verbatim allergen notices.
+- **Availability & Bookings**: `AvailabilityCard` with snapshot disclaimers and alternative slot chips; `BookingConfirmationCard` with monospace confirmation code and one-click copy.
+- **Negotiation & Offers**: `NegotiationOptionsCard` translating machine reason codes into human phrases, real-time hold countdown timers with live-region announcements.
+- **Simulated Payments**: `PaymentCard` with explicit `"SIMULATED PAYMENT — no real money"` banner and mock checkout button.
+- **Order & Waitlist**: `OrderSummaryCard` displaying lines, taxes, and pay-at-pickup status; `WaitlistCard` tracking approximate queue positions.
+- **Privacy & Safety**: Zero sensitive profile tokens in DOM; user notes strictly escaped as inert text; prohibited terms (`safe`, `guaranteed`, `allergy-free`) and green checkmarks are strictly prevented.
+
+### Running the Card Gallery
+
+A dedicated developer harness renders every card component against 33 real-server JSON fixtures:
+
+```bash
+cd frontend
+npm run dev
+```
+
+Open your browser to: **`http://localhost:5173/dev/cards`**
+
+**Developer Controls**:
+1. **Theme Toggle**: Switch between Light and Dark mode.
+2. **Viewport Width**: Test responsiveness across 360px (mobile), 768px (tablet), and 100% (desktop).
+3. **Voice-Only Fallback**: Simulate what non-card clients display (spoken caption only).
+4. **Reduced Motion**: Verify that animations and transitions adhere to `prefers-reduced-motion`.
+5. **Live Event Monitor**: Observe typed UI events (`onAcceptOption`, `onCancelBooking`, `onOpenCheckout`) dispatched from card interactions without violating the human/AI boundary.
+
+---
+
 ## License
 
 This project is licensed under the [MIT License](LICENSE).

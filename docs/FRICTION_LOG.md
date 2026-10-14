@@ -251,6 +251,20 @@ A running log of unexpected friction, hurdles, bugs, or developer experience iss
 - **Workaround**: Refactored the workflow to validate and canonicalize all initial preferences against lookup tables **before** opening the `BEGIN IMMEDIATE` write transaction.
 - **Suggestion**: Always perform read-only canonicalization and validation queries against static reference tables prior to entering write-exclusive database transactions.
 
+### Lack of Standard Host Display Capability Signaling in MCP & Alexa+
+- **Date**: 2026-10-14
+- **Task attempted**: Detecting whether the calling host (e.g., Echo Show screen vs. headless Echo Dot speaker) can render visual cards or interactive UI.
+- **Steps taken**:
+  1. Reviewed MCP `2025-11-25` client `capabilities` specification.
+  2. Researched Alexa+ developer documentation regarding screen capability negotiation.
+  3. Inspected draft `ext-apps` (SEP-1865) specification for host signaling.
+- **Expected vs actual**:
+  - *Expected*: The client `capabilities` dictionary in `initialize` or request headers indicates whether the client has a screen, supports rich cards, or can run interactive UI components.
+  - *Actual*: Neither standard MCP `2025-11-25` nor public Alexa+ developer materials provide a standardized display capability handshake. The MCP server has no protocol-level method to know whether its caller has a screen or is voice-only.
+- **Severity**: High
+- **Workaround**: Dual-output architecture: every tool response returns natural, human-formatted spoken text in `content[0].text` alongside complete data in `structuredContent`. Audio-only clients speak the text without error, while screen-enabled clients render accessible cards. In addition, every card component renders a collapsible secondary transcript caption to guarantee that speech and visual output never disagree.
+- **Suggestion**: Standardize a `capabilities.display` structure in the MCP client initialization handshake (e.g., `{ screen: boolean, touch: boolean, maxViewportWidth?: number }`) allowing servers to tailor data payloads and media formats to device capabilities.
+
 
 
 

@@ -272,18 +272,27 @@ All checklist items below have been formally proven by automated tests in `backe
   - `forget_me`: `readOnlyHint: false`, `destructiveHint: true`, `idempotentHint: true`, `openWorldHint: false`.
   - Explicit consent enforcement, 256-bit CSPRNG bearer tokens stored as SHA-256 hashes, constant-time comparisons, rate-limiting failed token attempts, non-bypassable stored profile allergies, live menu re-validation for usual orders without order creation, untrusted note prompt-injection protection, and atomic PII hard deletion and scrubbing.
 
+- [x] **Conflict Negotiation, Holds & Waitlist Engine (Phase 11)**:
+  - Added 6 negotiation and waitlist tools (`negotiate_booking`, `accept_offer`, `release_offer`, `join_waitlist`, `get_waitlist_status`, `leave_waitlist`), bringing the tool count to 22.
+  - Multi-criteria deterministic option scoring, time-limited 15-minute slot holds, FIFO waitlist promotion, and atomic state transitions.
+- [x] **Simulated Deposits & Payment Ledger (Phase 12)**:
+  - Added 2 deposit management tools (`get_deposit_status`, `refresh_payment_session`), bringing total tool count to exactly 24.
+  - Double-entry append-only ledger (`deposit_ledger`), integer minor paise arithmetic, policy-driven deposit requirement evaluation, round-half-up basis points refund quotes, Luhn card safeguarding, and mock human checkout page (`/checkout/:token`).
+- [x] **Accessible Rich Cards & MCP Apps Research (Phase 13)**:
+  - Researched MCP Apps (`@modelcontextprotocol/ext-apps`, SEP-1865: DRAFT/EXPERIMENTAL status) and Alexa+ Echo Show rendering (status: **UNVERIFIED**).
+  - Adopted **Option B**: Standalone React card renderer driven by canonical `structuredContent` and type-safe contracts (`types.ts`), preserving byte-for-byte backward compatibility across all 24 tools.
+  - Zero safety vocabulary violations (`safe`, `guaranteed`, `allergy-free`), full keyboard navigation, WCAG 2.2 AA compliance, and dedicated `/dev/cards` gallery harness with 33 real server fixtures.
+
 ---
 
 ## 8. Remaining Known Gaps (Deferred to Later Phases)
 
 The following capabilities are intentionally deferred per the project roadmap:
 
-1. **Payments & Deposits**: Online payments, credit card capture, deposit processing, and payment ledgers are deferred to Phase 12. Orders are strictly `"unpaid_pay_at_pickup"`.
-2. **Session Memory & "Your Usual"**: **Completed in Phase 10** (`enable_memory`, `get_profile`, `remember_preference`, `forget_preference`, `get_usual_order`, `rotate_profile_token`, `forget_me`).
-3. **Conflict Negotiation Dialogue**: Multi-turn dialogue for booking conflicts is deferred to Phase 11.
-4. **Rich Cards / UI Elements**: MCP UI widgets and visual interactive order cards are deferred to Phase 13.
-5. **Persistent Session Storage**: Sessions are managed in-memory via `LocalSessionManager`. Server restarts invalidate existing sessions (clients must re-initialize). Distributed session persistence (Redis/DynamoDB) is deferred.
-6. **Authentication & Authorization**: The `/mcp` transport does not yet require OAuth 2.0 Bearer tokens or API keys (scheduled for future security phase).
-7. **Bedrock / LLM Orchestration**: Direct AWS Bedrock agent wiring is scheduled for later phases.
+1. **Simulated Alexa+ Voice & Chat Shell**: Phase 17.
+2. **Validation Hardening**: Phase 14.
+3. **Persistent Distributed Session Storage**: Sessions are managed in-memory via `LocalSessionManager`. Distributed session persistence (Redis/DynamoDB) is deferred to production infrastructure phases.
+4. **Production OAuth 2.0 / Bedrock Auth**: Transport authorization per RFC 6749 and AWS Bedrock agent wiring are scheduled for future infrastructure phases.
+
 
 

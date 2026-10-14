@@ -2493,3 +2493,51 @@ To execute manual verification using the web-based MCP Inspector UI:
      { "profile_token": "<TOKEN>", "confirm": true }
      ```
    - Click **Run Tool**. Verify `status: "forgotten"` and components scrubbed.
+
+---
+
+## 14. Phase 13 Verification: Accessible Cards & MCP Apps Evaluation
+
+### 14.1 MCP Apps & Host Support Research Summary
+- **MCP Apps Specification (`@modelcontextprotocol/ext-apps`, SEP-1865)**: Status is **DRAFT / EXPERIMENTAL EXTENSION**. The core `2025-11-25` spec does not define a sandboxed UI runtime.
+- **Rust SDK (`rmcp 3.5.1`)**: Supports resources and tool `_meta`, but does not provide iframe bundlers or app hosting runtimes.
+- **Alexa+ & Echo Show Rendering Status**: **UNVERIFIED**. Amazon public documentation does not document rendering of arbitrary third-party `ui://` iframes or MCP Apps.
+- **Architectural Decision**: **Option B**. Ship standalone React card renderer driven by `structuredContent`.
+
+### 14.2 Tool Count & Backward Compatibility
+- Exactly **24 tools** registered and verified via `tools/list` (`backend/tests/mcp_integration_test.rs`).
+- Byte-for-byte backward compatibility maintained across all tools; existing `content` text and `structuredContent` envelopes remain unchanged.
+
+### 14.3 Automated Verification Suite
+- **TypeScript Type Generation Freshness**: `npm run check:types-fresh` passes (0 drift between backend `output_schemas.json` and `src/cards/types.ts`).
+- **Safety DOM Scan**: Automated scan across all 33 real-server fixtures asserts:
+  - Zero instances of prohibited words: `"safe"`, `"guaranteed"`, `"allergy-free"`.
+  - Zero green checkmark icons on allergen notices.
+  - Zero sensitive tokens (`tt_prof_...`) rendered in the DOM.
+  - Zero checkout URLs rendered as visible text.
+  - Zero internal database IDs leaked.
+  - User notes (`user_provided_note`) containing script/HTML/markdown injection strings rendered strictly as escaped plain text.
+- **Accessibility (WCAG 2.2 AA)**: `axe-core` automated audits across all card states report 0 critical and 0 serious violations.
+- **Production Bundle**: `npm run build` succeeds cleanly; `CardGallery` chunk is code-split into 101.52 kB (gzip 22.01 kB).
+
+### 14.4 Interactive Card Gallery Verification (`/dev/cards`)
+*Note on Browser Automation*: Playwright driver download failed due to sandbox network restrictions (`404` from driver CDN). Manual interactive steps and expected visual behaviors are documented below:
+
+1. **Start the Frontend Dev Server**:
+   ```bash
+   cd frontend
+   npm run dev
+   ```
+2. **Open the Developer Gallery**:
+   Navigate in your browser to `http://localhost:5173/dev/cards`.
+3. **Verify Header Controls**:
+   - **Theme**: Click the Moon/Sun toggle to toggle between Light mode (clean off-white `#ffffff` cards with subtle borders) and Dark mode (deep `#09090b` surfaces).
+   - **Viewport Width**: Click `360px` to verify mobile responsiveness (no horizontal window overflow, snap-carousel smoothly scrollable). Click `768px` and `100%` for tablet and desktop widths.
+   - **Voice-Only Mode**: Toggle "Voice-Only Mode" on. Verify that every card switches to displaying only the spoken transcript caption as a text-only assistant response.
+   - **Reduced Motion**: Toggle "Reduced Motion" on. Verify animations are suppressed.
+   - **Category Filter**: Select "Menu", "Bookings", "Negotiation", "Payments", "Orders", "Waitlist", or "Profile" to filter cards.
+4. **Card Interactions & Event Log**:
+   - **MenuCarousel**: Swipe or click the `<` and `>` arrow buttons to navigate dishes.
+   - **NegotiationOptionsCard**: Click "Accept Option". Verify the live event panel logs `onAcceptOption` with `{ optionId: "opt_1" }`.
+   - **BookingConfirmationCard**: Click "Copy" next to the confirmation code. Verify the code copies to clipboard and logs `onCopyCode`. Click "Cancel Booking" and verify the confirmation dialog appears before `onCancelBooking` is emitted.
+   - **PaymentCard**: Verify the prominent `"SIMULATED PAYMENT — no real money"` banner is displayed. Click "Open Mock Checkout". Verify the browser does not show the raw checkout URL as text, and logs `onOpenCheckout`.

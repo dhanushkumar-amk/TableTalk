@@ -119,5 +119,23 @@ Feedback and evaluation of core developer tools and platform components used in 
 - **Onboarding experience**: High satisfaction. Rust's strict typing and SQLx transactions made atomic data unlinking and cryptographic hashing seamless.
 - **Would I build with it again**: **Yes** — The design strikes an optimal balance between conversational delight ("the usual") and uncompromising allergen safety and data privacy.
 
+---
+
+## Phase 13: Accessible Rich Cards, MCP Apps & Screen-Capability Negotiation
+
+- **What I used it for**: Evaluating MCP Apps (`@modelcontextprotocol/ext-apps`, SEP-1865) and building an accessible React card rendering engine driven by `structuredContent` across all 24 tools.
+- **What worked well**:
+  - **Single Source of Truth (`output_schemas.json`)**: Exporting real tool schemas from the Rust backend via hermetic integration test and generating TypeScript definitions (`json-schema-to-typescript`) ensured frontend card contracts never drift from server payloads.
+  - **Decoupled Architecture (Option B)**: By adopting Option B (pure `structuredContent` rendering rather than bundling unstable `ui://` iframes into the Rust binary), backend tool execution remained clean, lightweight, and byte-for-byte backward compatible.
+  - **Safety-Critical Presentation**: Strict validation against dangerous vocabulary (`safe`, `guaranteed`, `allergy-free`) and preventing green checkmarks on allergen badges protects diner safety.
+  - **Typed Event Delegation**: Cards emit strongly typed events (`onAcceptOption`, `onOpenCheckout`, `onCancelBooking`) to the host rather than invoking MCP tools directly, maintaining the AI/human boundary.
+- **What needs work**:
+  - **MCP Apps Specification Maturity**: The `ext-apps` (SEP-1865) standard is still draft/experimental. Common MCP hosts (MCP Inspector, Claude Desktop) lack turnkey support for interactive sandboxed UI resources without proprietary extensions.
+  - **Host Display Discovery Gaps**: The MCP protocol provides no standard mechanism for a server to discover whether the client is a screen device (e.g., Echo Show) or audio-only (e.g., Echo Dot). As a result, servers must always produce dual representations (voice text + structured JSON) for every tool response.
+  - **Alexa+ Public Guidance**: Public documentation for Alexa+ does not specify how or if third-party MCP servers can provide custom visual card templates or interactive widgets on Echo Show screens.
+- **Onboarding experience**: Building the typed React component layer with Tailwind CSS, shadcn/ui primitives, and Vitest/Testing Library was smooth and highly productive.
+- **Would I build with it again**: **Yes** — Driving UI rendering from server-validated `structuredContent` delivers a superior, accessible, and testable developer and user experience compared to embedding volatile iframe widgets into server binaries.
+
+
 
 
