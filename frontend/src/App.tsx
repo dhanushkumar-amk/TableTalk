@@ -2,8 +2,28 @@ import { useState, useEffect } from "react"
 import { motion } from "framer-motion"
 import { UtensilsCrossed, Moon, Sun, Radio, Sparkles } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import CheckoutPage from "@/pages/CheckoutPage"
+
+function usePathname() {
+  const [pathname, setPathname] = useState(window.location.pathname)
+  useEffect(() => {
+    const onPop = () => setPathname(window.location.pathname)
+    window.addEventListener("popstate", onPop)
+    return () => window.removeEventListener("popstate", onPop)
+  }, [])
+  return pathname
+}
 
 export default function App() {
+  const pathname = usePathname()
+  const checkoutMatch = pathname.match(/^\/checkout\/(.+)$/)
+  if (checkoutMatch) {
+    return <CheckoutPage token={decodeURIComponent(checkoutMatch[1])} />
+  }
+  return <LandingPage />
+}
+
+function LandingPage() {
   const [isDark, setIsDark] = useState(false)
 
   useEffect(() => {

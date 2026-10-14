@@ -77,8 +77,9 @@ pub async fn list_payments_for_order(
 ) -> Result<Vec<Payment>, DbError> {
     let payments = sqlx::query_as::<_, Payment>(
         r#"
-        SELECT id, booking_id, order_id, amount_cents, currency, status,
-               provider_reference, created_at
+        SELECT id, booking_id, order_id, session_id, kind, amount_minor, currency,
+               provider, provider_reference, status, payer_name, payer_contact,
+               created_at, updated_at
         FROM payments
         WHERE order_id = ?
         ORDER BY created_at ASC

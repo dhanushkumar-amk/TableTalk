@@ -154,6 +154,7 @@ pub async fn handle_create_booking_with_clock(
                         seat_preference_honored: None,
                         negotiation_id: None,
                         negotiation_options: None,
+                        payment: None,
                     };
                 let mut res = CallToolResult::structured(serde_json::to_value(&output).unwrap());
                 res.content = vec![ContentBlock::text(

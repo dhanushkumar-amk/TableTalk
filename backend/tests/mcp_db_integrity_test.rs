@@ -340,7 +340,7 @@ async fn test_concurrent_overlap_prevention_primitive() {
             "Competitor One",
             None,
             Some("Window seat"),
-            DepositStatus::None,
+            DepositStatus::NotRequired,
             0,
             now_utc,
         )
@@ -359,7 +359,7 @@ async fn test_concurrent_overlap_prevention_primitive() {
             "Competitor Two",
             None,
             Some("Any seat"),
-            DepositStatus::None,
+            DepositStatus::NotRequired,
             0,
             now_utc,
         )

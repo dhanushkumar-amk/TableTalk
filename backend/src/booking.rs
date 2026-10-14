@@ -352,6 +352,9 @@ pub struct CreateBookingOutput {
     pub negotiation_id: Option<i64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub negotiation_options: Option<Vec<crate::negotiation::NegotiationOption>>,
+    /// Present only when a simulated deposit is required for this booking.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub payment: Option<crate::payments::PaymentObject>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
@@ -362,6 +365,9 @@ pub struct CancelBookingOutput {
     pub booking: Option<BookingSummary>,
     pub already_cancelled: bool,
     pub policy_note: Option<String>,
+    /// Present only when a deposit was captured and a refund was evaluated.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub refund: Option<crate::payments::RefundSummary>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
@@ -369,6 +375,9 @@ pub struct GetBookingOutput {
     pub status: String,
     pub booking: Option<BookingSummary>,
     pub message: String,
+    /// Present only when the booking carries a deposit (paid or pending).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub deposit: Option<crate::payments::DepositInfo>,
 }
 
 #[derive(Debug)]
@@ -481,7 +490,12 @@ pub async fn create_booking_tx(
                    max_party_size, lead_time_minutes, booking_horizon_days, deposit_required_party_size,
                    deposit_amount_per_person_cents, created_at, updated_at,
                    cancellation_cutoff_hours, late_cancellation_fee_cents,
-                   tax_rate_basis_points, last_order_before_close_minutes, phone
+                   tax_rate_basis_points, last_order_before_close_minutes, phone,
+                   deposit_max_amount_cents, deposit_payment_deadline_minutes,
+                   deposit_refund_full_basis_points, deposit_refund_partial_basis_points,
+                   deposit_refund_full_hours, deposit_refund_partial_hours,
+                   deposit_peak_days, deposit_peak_start_time, deposit_peak_end_time,
+                   deposit_demo_mode, deposit_decline_retry_limit
             FROM restaurant
             WHERE id = 1
             "#,
@@ -543,6 +557,7 @@ pub async fn create_booking_tx(
                         seat_preference_honored: None,
                         negotiation_id: None,
                         negotiation_options: None,
+                        payment: None,
                     };
                     let voice_text = "This idempotency key was previously used with different booking details. Please use a new key or check your request.".to_string();
                     return Ok(CreateBookingOutcome::IdempotencyConflict {
@@ -593,6 +608,7 @@ pub async fn create_booking_tx(
                 seat_preference_honored: None,
                 negotiation_id: None,
                 negotiation_options: None,
+                payment: None,
             };
             let voice_text = format!(
                 "You already have {} active reservations, which is the maximum allowed. Please cancel an existing booking before making a new one.",
@@ -629,19 +645,20 @@ pub async fn create_booking_tx(
         let search_start_iso = search_start.and_hms_opt(0, 0, 0).unwrap().and_utc().to_rfc3339();
         let search_end_iso = search_end.and_hms_opt(0, 0, 0).unwrap().and_utc().to_rfc3339();
 
-        let day_bookings: Vec<Booking> = sqlx::query_as(
+        let day_bookings: Vec<Booking> = sqlx::query_as(&format!(
             r#"
-            SELECT id, confirmation_code, customer_id, guest_name, party_size,
-                   start_at, end_at, status, table_id, special_requests,
-                   deposit_status, deposit_amount_cents, created_at, updated_at, cancelled_at,
-                   guest_phone, guest_email
+            SELECT {cols}
             FROM bookings
             WHERE status IN ('pending', 'confirmed')
+              AND NOT (status = 'pending' AND deposit_status = 'requires_payment'
+                       AND payment_deadline_at IS NOT NULL AND payment_deadline_at <= ?)
               AND start_at < ?
               AND end_at > ?
             ORDER BY start_at ASC
             "#,
-        )
+            cols = crate::db::models::BOOKING_SELECT_COLUMNS
+        ))
+        .bind(&now_utc_iso)
         .bind(&search_end_iso)
         .bind(&search_start_iso)
         .fetch_all(&mut *conn)
@@ -677,8 +694,10 @@ pub async fn create_booking_tx(
                 status: BookingStatus::Pending,
                 table_id: Some(table_id),
                 special_requests: None,
-                deposit_status: crate::db::models::DepositStatus::None,
-                deposit_amount_cents: 0,
+                deposit_status: crate::db::models::DepositStatus::NotRequired,
+                deposit_amount_minor: 0,
+                payment_deadline_at: None,
+                cancel_reason: None,
                 created_at: now_iso.clone(),
                 updated_at: now_iso.clone(),
                 cancelled_at: None,
@@ -782,6 +801,7 @@ pub async fn create_booking_tx(
                 seat_preference_honored: None,
                 negotiation_id: neg_id,
                 negotiation_options: neg_options,
+                payment: None,
             };
             let voice_text = generate_availability_voice_text(&avail_res);
             return Ok(CreateBookingOutcome::Unavailable { output, voice_text });
@@ -839,16 +859,39 @@ pub async fn create_booking_tx(
 
         let booking_id = uuid::Uuid::new_v4().to_string();
 
+        // 7b. Deposit policy: decide whether this booking needs a simulated deposit.
+        let policy = crate::payments::DepositPolicy::from_config(&restaurant);
+        let slot_start_tz: DateTime<Tz> = DateTime::parse_from_rfc3339(&assigned_slot.start_local)
+            .map(|d| d.with_timezone(&rest_tz))
+            .unwrap_or_else(|_| now.with_timezone(&rest_tz));
+        let deposit_required =
+            crate::payments::deposit_required(&policy, req.party_size, &slot_start_tz);
+
+        let (booking_status, deposit_status, deposit_amount_minor, payment_deadline_at) =
+            if deposit_required {
+                let amount = crate::payments::compute_deposit_amount(&policy, req.party_size)
+                    .map_err(|e| sqlx::Error::Protocol(format!("Deposit computation failed: {}", e)))?;
+                let deadline = now + Duration::minutes(policy.payment_deadline_minutes);
+                (
+                    "pending",
+                    "requires_payment",
+                    amount,
+                    Some(deadline.to_rfc3339()),
+                )
+            } else {
+                ("confirmed", "not_required", 0, None)
+            };
+
         // 8. Insert new booking row
         sqlx::query(
             r#"
             INSERT INTO bookings (
                 id, confirmation_code, customer_id, guest_name, party_size,
                 start_at, end_at, status, table_id, special_requests,
-                deposit_status, deposit_amount_cents, created_at, updated_at,
+                deposit_status, deposit_amount_minor, payment_deadline_at, created_at, updated_at,
                 guest_phone, guest_email
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, 'confirmed', ?, ?, 'none', 0, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             "#,
         )
         .bind(&booking_id)
@@ -858,14 +901,39 @@ pub async fn create_booking_tx(
         .bind(req.party_size)
         .bind(&start_utc_iso)
         .bind(&end_utc_iso)
+        .bind(booking_status)
         .bind(table_id)
         .bind(req.special_requests.map(|s| s.trim()))
+        .bind(deposit_status)
+        .bind(deposit_amount_minor)
+        .bind(payment_deadline_at.as_deref())
         .bind(&now_utc_iso)
         .bind(&now_utc_iso)
         .bind(req.phone.map(|s| s.trim()))
         .bind(req.email.map(|s| s.trim()))
         .execute(&mut *conn)
         .await?;
+
+        // 8b. Create the payment session inside the same transaction when a deposit is due.
+        let payment = if deposit_required {
+            let deadline = now + Duration::minutes(policy.payment_deadline_minutes);
+            Some(
+                crate::payments::create_payment_session_in_conn(
+                    &mut conn,
+                    &booking_id,
+                    deposit_amount_minor,
+                    &restaurant.currency,
+                    deadline,
+                    now,
+                    &rest_tz,
+                    &crate::payments::CheckoutConfig::default(),
+                )
+                .await
+                .map_err(|e| sqlx::Error::Protocol(format!("Payment session creation failed: {}", e)))?,
+            )
+        } else {
+            None
+        };
 
         // 9. Write audit event
         let audit_payload = serde_json::json!({
@@ -890,10 +958,21 @@ pub async fn create_booking_tx(
         .await?;
 
         // 10. Assemble success output
-        let cancellation_policy = format!(
-            "Free cancellation up to {} hours prior to reservation.",
-            restaurant.cancellation_cutoff_hours
-        );
+        let cancellation_policy = if deposit_required {
+            format!(
+                "Deposit required for this reservation. Full refund if cancelled at least {} hours before the start time, {}% refund between {} and {} hours, no refund less than {} hours before.",
+                policy.refund_full_hours,
+                policy.refund_partial_bps / 100,
+                policy.refund_partial_hours,
+                policy.refund_full_hours,
+                policy.refund_partial_hours
+            )
+        } else {
+            format!(
+                "Free cancellation up to {} hours prior to reservation.",
+                restaurant.cancellation_cutoff_hours
+            )
+        };
 
         let booking_summary = BookingSummary {
             confirmation_code: confirmation_code.clone(),
@@ -903,16 +982,31 @@ pub async fn create_booking_tx(
             end_local: assigned_slot.end_local.clone(),
             area: assigned_slot.area.clone(),
             table_label: assigned_slot.table_label.clone(),
-            status: "confirmed".to_string(),
+            status: booking_status.to_string(),
             special_requests: req.special_requests.map(|s| s.trim().to_string()),
             created_at: now_utc_iso.clone(),
             source: None,
         };
 
         let output = CreateBookingOutput {
-            status: "confirmed".to_string(),
-            reason: None,
-            reason_detail: None,
+            status: if deposit_required {
+                "pending".to_string()
+            } else {
+                "confirmed".to_string()
+            },
+            reason: if deposit_required {
+                Some("deposit_required".to_string())
+            } else {
+                None
+            },
+            reason_detail: if deposit_required {
+                Some(format!(
+                    "A simulated deposit of {} is required. Complete the payment to confirm the reservation.",
+                    crate::payments::money(deposit_amount_minor, &restaurant.currency).display
+                ))
+            } else {
+                None
+            },
             booking: Some(booking_summary),
             idempotent_replay: false,
             alternatives: vec![],
@@ -922,6 +1016,7 @@ pub async fn create_booking_tx(
             seat_preference_honored: None,
             negotiation_id: None,
             negotiation_options: None,
+            payment,
         };
 
         // 11. Record idempotency key if provided
@@ -950,7 +1045,18 @@ pub async fn create_booking_tx(
         // 12. Commit transaction
         sqlx::query("COMMIT").execute(&mut *conn).await?;
 
-        let voice_text = generate_create_booking_voice_text(&output);
+        let voice_text = if deposit_required {
+            crate::payments::voice_deposit_required(
+                &policy,
+                deposit_amount_minor,
+                &restaurant.currency,
+                req.party_size,
+                policy.payment_deadline_minutes,
+                &confirmation_code,
+            )
+        } else {
+            generate_create_booking_voice_text(&output)
+        };
         Ok(CreateBookingOutcome::Created { output, voice_text })
     }
     .await;
@@ -988,6 +1094,7 @@ pub async fn cancel_booking_tx(
             booking: None,
             already_cancelled: false,
             policy_note: None,
+            refund: None,
         };
         let voice_text =
             "Too many failed verification attempts for this reservation. Please try again later."
@@ -1000,16 +1107,10 @@ pub async fn cancel_booking_tx(
 
     let res: Result<CancelBookingOutcome, sqlx::Error> = async {
         // 2. Fetch booking and restaurant config
-        let booking_opt: Option<Booking> = sqlx::query_as(
-            r#"
-            SELECT id, confirmation_code, customer_id, guest_name, party_size,
-                   start_at, end_at, status, table_id, special_requests,
-                   deposit_status, deposit_amount_cents, created_at, updated_at, cancelled_at,
-                   guest_phone, guest_email
-            FROM bookings
-            WHERE confirmation_code = ?
-            "#,
-        )
+        let booking_opt: Option<Booking> = sqlx::query_as(&format!(
+            "SELECT {cols} FROM bookings WHERE confirmation_code = ?",
+            cols = crate::db::models::BOOKING_SELECT_COLUMNS
+        ))
         .bind(&normalized_code)
         .fetch_optional(&mut *conn)
         .await?;
@@ -1038,6 +1139,7 @@ pub async fn cancel_booking_tx(
                 booking: None,
                 already_cancelled: false,
                 policy_note: None,
+                refund: None,
             };
             let voice_text = "I couldn't find a booking with that confirmation code and name. Please check the code and the name on the booking.".to_string();
             return Ok(CancelBookingOutcome::NotFound { output, voice_text });
@@ -1053,7 +1155,12 @@ pub async fn cancel_booking_tx(
                    max_party_size, lead_time_minutes, booking_horizon_days, deposit_required_party_size,
                    deposit_amount_per_person_cents, created_at, updated_at,
                    cancellation_cutoff_hours, late_cancellation_fee_cents,
-                   tax_rate_basis_points, last_order_before_close_minutes, phone
+                   tax_rate_basis_points, last_order_before_close_minutes, phone,
+                   deposit_max_amount_cents, deposit_payment_deadline_minutes,
+                   deposit_refund_full_basis_points, deposit_refund_partial_basis_points,
+                   deposit_refund_full_hours, deposit_refund_partial_hours,
+                   deposit_peak_days, deposit_peak_start_time, deposit_peak_end_time,
+                   deposit_demo_mode, deposit_decline_retry_limit
             FROM restaurant
             WHERE id = 1
             "#,
@@ -1072,6 +1179,7 @@ pub async fn cancel_booking_tx(
                 booking: Some(summary),
                 already_cancelled: true,
                 policy_note: None,
+                refund: None,
             };
             let voice_text = format!(
                 "This reservation under code {} was already cancelled. No further action is needed.",
@@ -1091,6 +1199,7 @@ pub async fn cancel_booking_tx(
                 booking: None,
                 already_cancelled: false,
                 policy_note: None,
+                refund: None,
             };
             let voice_text =
                 "This reservation cannot be cancelled because it has already been completed."
@@ -1111,23 +1220,48 @@ pub async fn cancel_booking_tx(
                 booking: None,
                 already_cancelled: false,
                 policy_note: None,
+                refund: None,
             };
             let voice_text = "This reservation cannot be cancelled because it is in the past."
                 .to_string();
             return Ok(CancelBookingOutcome::NotCancellable { output, voice_text });
         }
 
+        // 5b. Deposits: close an open session for an unpaid booking, or apply the
+        //     refund schedule for a paid deposit. Both happen in this transaction.
+        let policy = crate::payments::DepositPolicy::from_config(&restaurant);
+        let mut refund: Option<crate::payments::RefundSummary> = None;
+        if booking.deposit_status == crate::db::models::DepositStatus::RequiresPayment {
+            // Unpaid pending booking: just close the session; no money moved.
+            crate::payments::close_open_sessions_in_conn(&mut conn, &booking.id)
+                .await
+                .map_err(|e| sqlx::Error::Protocol(format!("Failed to close session: {}", e)))?;
+        } else if booking.deposit_status == crate::db::models::DepositStatus::Paid {
+            refund = crate::payments::refund_deposit_on_cancel_in_conn(
+                &mut conn,
+                &booking,
+                &policy,
+                &restaurant.currency,
+                now,
+            )
+            .await
+            .map_err(|e| sqlx::Error::Protocol(format!("Refund failed: {}", e)))?;
+        }
+
         // 6. Update booking status to cancelled
+        let cancel_reason = req.reason.map(|r| r.trim()).filter(|r| !r.is_empty()).unwrap_or("user_requested");
         sqlx::query(
             r#"
             UPDATE bookings
             SET status = 'cancelled',
                 cancelled_at = ?,
+                cancel_reason = ?,
                 updated_at = ?
             WHERE id = ?
             "#,
         )
         .bind(&now_utc_iso)
+        .bind(cancel_reason)
         .bind(&now_utc_iso)
         .bind(&booking.id)
         .execute(&mut *conn)
@@ -1208,6 +1342,7 @@ pub async fn cancel_booking_tx(
             booking: Some(summary),
             already_cancelled: false,
             policy_note,
+            refund,
         };
 
         let voice_text = generate_cancel_booking_voice_text(&output);
@@ -1225,27 +1360,40 @@ pub async fn cancel_booking_tx(
 }
 
 /// Reads a booking summary, verifying guest_name match to prevent enumeration.
+/// Lazily expires an overdue pending deposit booking before reporting its state.
 pub async fn get_booking_tx(
     pool: &SqlitePool,
     confirmation_code: &str,
     guest_name: &str,
+    clock: &dyn Clock,
 ) -> Result<GetBookingOutcome, sqlx::Error> {
     let normalized_code = normalize_confirmation_code(confirmation_code);
     let mut conn = pool.acquire().await?;
 
-    let booking_opt: Option<Booking> = sqlx::query_as(
-        r#"
-        SELECT id, confirmation_code, customer_id, guest_name, party_size,
-               start_at, end_at, status, table_id, special_requests,
-               deposit_status, deposit_amount_cents, created_at, updated_at, cancelled_at,
-               guest_phone, guest_email
-        FROM bookings
-        WHERE confirmation_code = ?
-        "#,
-    )
+    let mut booking_opt: Option<Booking> = sqlx::query_as(&format!(
+        "SELECT {cols} FROM bookings WHERE confirmation_code = ?",
+        cols = crate::db::models::BOOKING_SELECT_COLUMNS
+    ))
     .bind(&normalized_code)
     .fetch_optional(&mut *conn)
     .await?;
+
+    // Lazy expiry: if this is an unpaid deposit booking past its deadline,
+    // transition it now so the reported state matches reality without a sweeper.
+    if let Some(ref b) = booking_opt {
+        if b.status == BookingStatus::Pending
+            && b.deposit_status == crate::db::models::DepositStatus::RequiresPayment
+        {
+            let _ = crate::payments::lazy_expire_booking_by_id(pool, &b.id, clock).await;
+            booking_opt = sqlx::query_as(&format!(
+                "SELECT {cols} FROM bookings WHERE confirmation_code = ?",
+                cols = crate::db::models::BOOKING_SELECT_COLUMNS
+            ))
+            .bind(&normalized_code)
+            .fetch_optional(&mut *conn)
+            .await?;
+        }
+    }
 
     let verified = if let Some(ref b) = booking_opt {
         b.guest_name.trim().eq_ignore_ascii_case(guest_name.trim())
@@ -1259,6 +1407,7 @@ pub async fn get_booking_tx(
             booking: None,
             message: "No matching booking found for the provided confirmation code and guest name."
                 .to_string(),
+            deposit: None,
         };
         let voice_text = "I couldn't find a booking with that confirmation code and name. Please check the code and the name on the booking.".to_string();
         return Ok(GetBookingOutcome::NotFound { output, voice_text });
@@ -1271,7 +1420,12 @@ pub async fn get_booking_tx(
                max_party_size, lead_time_minutes, booking_horizon_days, deposit_required_party_size,
                deposit_amount_per_person_cents, created_at, updated_at,
                cancellation_cutoff_hours, late_cancellation_fee_cents,
-               tax_rate_basis_points, last_order_before_close_minutes, phone
+               tax_rate_basis_points, last_order_before_close_minutes, phone,
+               deposit_max_amount_cents, deposit_payment_deadline_minutes,
+               deposit_refund_full_basis_points, deposit_refund_partial_basis_points,
+               deposit_refund_full_hours, deposit_refund_partial_hours,
+               deposit_peak_days, deposit_peak_start_time, deposit_peak_end_time,
+               deposit_demo_mode, deposit_decline_retry_limit
         FROM restaurant
         WHERE id = 1
         "#,
@@ -1280,10 +1434,36 @@ pub async fn get_booking_tx(
     .await?;
 
     let summary = build_booking_summary(&booking, &restaurant, &mut conn).await?;
+
+    // Deposit details surface only when a deposit is involved (backward compatible:
+    // deposit-free bookings keep the Phase 8 output shape).
+    let deposit = if booking.deposit_status != crate::db::models::DepositStatus::NotRequired {
+        let rest_tz: Tz = restaurant.timezone.parse().unwrap_or(chrono_tz::Asia::Kolkata);
+        let deadline_local = booking
+            .payment_deadline_at
+            .as_deref()
+            .and_then(|s| DateTime::parse_from_rfc3339(s).ok())
+            .map(|d| d.with_timezone(&rest_tz).to_rfc3339());
+        let minutes = booking
+            .payment_deadline_at
+            .as_deref()
+            .and_then(|s| DateTime::parse_from_rfc3339(s).ok())
+            .map(|d| crate::payments::minutes_remaining(d.with_timezone(&Utc), clock.now()));
+        Some(crate::payments::DepositInfo {
+            status: booking.deposit_status.as_str().to_string(),
+            amount: crate::payments::money(booking.deposit_amount_minor, &restaurant.currency),
+            deadline_local,
+            minutes_remaining: minutes,
+        })
+    } else {
+        None
+    };
+
     let output = GetBookingOutput {
         status: "found".to_string(),
         booking: Some(summary.clone()),
         message: "Booking retrieved successfully.".to_string(),
+        deposit,
     };
     let voice_text = generate_get_booking_voice_text(&output);
     Ok(GetBookingOutcome::Found { output, voice_text })
@@ -1351,6 +1531,22 @@ pub async fn build_booking_summary(
 pub fn generate_create_booking_voice_text(out: &CreateBookingOutput) -> String {
     if let Some(ref b) = out.booking {
         let spoken_code = format_spoken_code(&b.confirmation_code);
+        // Deposit path: a pending booking with a simulated payment to complete.
+        if let Some(ref payment) = out.payment {
+            if payment.required {
+                return crate::payments::voice_deposit_required(
+                    &crate::payments::DepositPolicy {
+                        demo_mode: true,
+                        ..crate::payments::DepositPolicy::defaults()
+                    },
+                    payment.amount.amount_minor,
+                    &payment.amount.currency,
+                    b.party_size,
+                    payment.minutes_remaining,
+                    &b.confirmation_code,
+                );
+            }
+        }
         if let Ok(start_dt) = DateTime::parse_from_rfc3339(&b.start_local) {
             let spoken_date = format_spoken_date(start_dt.date_naive());
             let spoken_time = format_spoken_time(start_dt.time());
@@ -1387,22 +1583,31 @@ pub fn generate_cancel_booking_voice_text(out: &CancelBookingOutput) -> String {
         }
     } else if let Some(ref b) = out.booking {
         let spoken_code = format_spoken_code(&b.confirmation_code);
+        let refund_clause = out
+            .refund
+            .as_ref()
+            .map(|r| format!(" {}", crate::payments::voice_refund_summary(r)))
+            .unwrap_or_default();
         if let Ok(start_dt) = DateTime::parse_from_rfc3339(&b.start_local) {
             let spoken_date = format_spoken_date(start_dt.date_naive());
-            let policy_clause = match out.policy_note.as_deref() {
-                Some(note) if note.contains("Late cancellation") => {
-                    " Please note that this was cancelled past our standard cutoff."
+            let policy_clause = if out.refund.is_some() {
+                ""
+            } else {
+                match out.policy_note.as_deref() {
+                    Some(note) if note.contains("Late cancellation") => {
+                        " Please note that this was cancelled past our standard cutoff."
+                    }
+                    _ => "",
                 }
-                _ => "",
             };
             format!(
-                "Your reservation for {} under code {} has been cancelled.{} We hope to welcome you another time.",
-                spoken_date, spoken_code, policy_clause
+                "Your reservation for {} under code {} has been cancelled.{}{} We hope to welcome you another time.",
+                spoken_date, spoken_code, policy_clause, refund_clause
             )
         } else {
             format!(
-                "Your reservation under code {} has been cancelled.",
-                spoken_code
+                "Your reservation under code {} has been cancelled.{}",
+                spoken_code, refund_clause
             )
         }
     } else {
@@ -1413,17 +1618,35 @@ pub fn generate_cancel_booking_voice_text(out: &CancelBookingOutput) -> String {
 pub fn generate_get_booking_voice_text(out: &GetBookingOutput) -> String {
     if let Some(ref b) = out.booking {
         let spoken_code = format_spoken_code(&b.confirmation_code);
+        let deposit_clause = match out.deposit.as_ref() {
+            Some(dep) if dep.status == "paid" => format!(
+                " {}",
+                crate::payments::voice_deposit_paid(dep.amount.amount_minor, &dep.amount.currency)
+            ),
+            Some(dep) if dep.status == "requires_payment" => format!(
+                " {}",
+                crate::payments::voice_deposit_pending(
+                    dep.amount.amount_minor,
+                    &dep.amount.currency,
+                    dep.minutes_remaining.unwrap_or(0)
+                )
+            ),
+            Some(dep) if dep.status == "expired" => {
+                " The deposit was not paid and the booking was released.".to_string()
+            }
+            _ => String::new(),
+        };
         if let Ok(start_dt) = DateTime::parse_from_rfc3339(&b.start_local) {
             let spoken_date = format_spoken_date(start_dt.date_naive());
             let spoken_time = format_spoken_time(start_dt.time());
             format!(
-                "I found your reservation for {} guests on {} at {} under the name {}. Confirmation code is {}.",
-                b.party_size, spoken_date, spoken_time, b.guest_name, spoken_code
+                "I found your reservation for {} guests on {} at {} under the name {}. Confirmation code is {}.{}",
+                b.party_size, spoken_date, spoken_time, b.guest_name, spoken_code, deposit_clause
             )
         } else {
             format!(
-                "I found your reservation under the name {} with confirmation code {}.",
-                b.guest_name, spoken_code
+                "I found your reservation under the name {} with confirmation code {}.{}",
+                b.guest_name, spoken_code, deposit_clause
             )
         }
     } else {
@@ -1757,6 +1980,7 @@ mod tests {
             note: "availability is a snapshot, not a reservation".to_string(),
             profile_applied: None,
             seat_preference_honored: None,
+            payment: None,
         };
 
         let voice_text = generate_create_booking_voice_text(&out);

@@ -69,16 +69,21 @@ async fn main() {
             .await
             .unwrap_or_else(|err| panic!("Failed to initialize database: {}", err));
 
-        info!("Sweeping expired holds, negotiations, and waitlist entries...");
+        info!("Sweeping expired holds, negotiations, waitlist entries, and deposit deadlines...");
         let clock = tabletalk_backend::availability::SystemClock;
         let swept =
             tabletalk_backend::negotiation::sweep_expired_holds_and_negotiations(&pool, &clock)
                 .await
                 .unwrap_or_else(|err| panic!("Failed to sweep expired records: {}", err));
+        let expired_deposits =
+            tabletalk_backend::payments::expire_overdue_deposit_bookings(&pool, &clock)
+                .await
+                .unwrap_or_else(|err| panic!("Failed to sweep expired deposits: {}", err));
 
         println!("==================================================");
         println!(" Expiry Sweep Completed");
-        println!(" Swept Records Count: {}", swept);
+        println!(" Swept Holds/Negotiations/Waitlist: {}", swept);
+        println!(" Expired Deposit Bookings: {}", expired_deposits);
         println!("==================================================");
         return;
     }
@@ -111,12 +116,44 @@ async fn main() {
         addr, addr
     );
 
-    let app = build_router_with_db(&config, Some(pool));
+    let app = build_router_with_db(&config, Some(pool.clone()));
 
-    axum::serve(listener, app)
-        .with_graceful_shutdown(shutdown_signal())
-        .await
-        .unwrap_or_else(|err| panic!("Server runtime encountered fatal error: {}", err));
+    // Background sweeper: expires overdue holds/negotiations and unpaid deposit
+    // bookings. Correctness does not depend on it (lazy expiry covers reads),
+    // but it keeps the database tidy.
+    {
+        let sweeper_pool = pool.clone();
+        tokio::spawn(async move {
+            let clock = tabletalk_backend::availability::SystemClock;
+            let mut ticker = tokio::time::interval(std::time::Duration::from_secs(30));
+            loop {
+                ticker.tick().await;
+                if let Err(e) =
+                    tabletalk_backend::negotiation::sweep_expired_holds_and_negotiations(
+                        &sweeper_pool,
+                        &clock,
+                    )
+                    .await
+                {
+                    tracing::warn!("hold/negotiation sweep failed: {}", e);
+                }
+                if let Err(e) =
+                    tabletalk_backend::payments::expire_overdue_deposit_bookings(&sweeper_pool, &clock)
+                        .await
+                {
+                    tracing::warn!("deposit sweep failed: {}", e);
+                }
+            }
+        });
+    }
+
+    axum::serve(
+        listener,
+        app.into_make_service_with_connect_info::<SocketAddr>(),
+    )
+    .with_graceful_shutdown(shutdown_signal())
+    .await
+    .unwrap_or_else(|err| panic!("Server runtime encountered fatal error: {}", err));
 
     info!("TableTalk server gracefully shut down");
 }

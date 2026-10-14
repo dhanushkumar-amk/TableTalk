@@ -1,3 +1,4 @@
+use crate::availability::{Clock, SystemClock};
 use crate::booking::{get_booking_tx, GetBookingOutcome};
 use rmcp::model::{CallToolResult, ContentBlock};
 use schemars::JsonSchema;
@@ -20,6 +21,15 @@ fn tool_validation_error(message: impl Into<String>) -> CallToolResult {
 
 /// Handler for `get_booking` tool.
 pub async fn handle_get_booking(pool: &SqlitePool, input: GetBookingInput) -> CallToolResult {
+    handle_get_booking_with_clock(pool, input, &SystemClock).await
+}
+
+/// Handler for `get_booking` tool with an injectable clock.
+pub async fn handle_get_booking_with_clock(
+    pool: &SqlitePool,
+    input: GetBookingInput,
+    clock: &dyn Clock,
+) -> CallToolResult {
     let req_id = uuid::Uuid::new_v4();
 
     let trimmed_code = input.confirmation_code.trim();
@@ -34,7 +44,7 @@ pub async fn handle_get_booking(pool: &SqlitePool, input: GetBookingInput) -> Ca
         return tool_validation_error("Guest name is required for booking verification.");
     }
 
-    let outcome = match get_booking_tx(pool, trimmed_code, trimmed_name).await {
+    let outcome = match get_booking_tx(pool, trimmed_code, trimmed_name, clock).await {
         Ok(out) => out,
         Err(err) => {
             tracing::error!(request_id = %req_id, "Failed to retrieve booking from database: {}", err);

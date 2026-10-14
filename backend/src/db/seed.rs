@@ -16,14 +16,28 @@ pub async fn seed_database(
     let now_iso = now.to_rfc3339();
 
     // 1. Restaurant Config (Idempotent single row)
+    // Deposit policy (Phase 12, simulated):
+    //   - large-party threshold: 6 guests
+    //   - per person: 25000 paise (₹250) -> party of 8 = ₹2000 (the demo moment)
+    //   - cap: ₹4000
+    //   - payment deadline: 15 minutes
+    //   - refund schedule: 100% >= 24h before, 50% in [2h, 24h), 0% < 2h
+    //   - peak windows: disabled by default (empty deposit_peak_days); enable by
+    //     setting e.g. deposit_peak_days = '4,5' and peak times for Fri/Sat dinner.
     sqlx::query(
         r#"
         INSERT OR IGNORE INTO restaurant (
             id, name, timezone, currency, dining_duration_minutes, slot_granularity_minutes,
             max_party_size, lead_time_minutes, booking_horizon_days, deposit_required_party_size,
-            deposit_amount_per_person_cents, created_at, updated_at
+            deposit_amount_per_person_cents, created_at, updated_at,
+            deposit_max_amount_cents, deposit_payment_deadline_minutes,
+            deposit_refund_full_basis_points, deposit_refund_partial_basis_points,
+            deposit_refund_full_hours, deposit_refund_partial_hours,
+            deposit_peak_days, deposit_peak_start_time, deposit_peak_end_time,
+            deposit_demo_mode, deposit_decline_retry_limit
         )
-        VALUES (1, 'The Saffron Nebula Bistro', 'Asia/Kolkata', 'INR', 90, 15, 12, 30, 30, 6, 50000, ?, ?)
+        VALUES (1, 'The Saffron Nebula Bistro', 'Asia/Kolkata', 'INR', 90, 15, 12, 30, 30, 6, 25000, ?, ?,
+                400000, 15, 10000, 5000, 24, 2, '', NULL, NULL, 1, 3)
         "#,
     )
     .bind(&now_iso)
@@ -736,7 +750,7 @@ pub async fn seed_database(
             BookingStatus::Completed,
             Some(7), // P01
             Some("Quiet corner on patio"),
-            DepositStatus::None,
+            DepositStatus::NotRequired,
             0,
         ),
         (
@@ -750,7 +764,7 @@ pub async fn seed_database(
             BookingStatus::Completed,
             Some(1), // T01
             Some("Strict vegan dining"),
-            DepositStatus::None,
+            DepositStatus::NotRequired,
             0,
         ),
         (
@@ -764,7 +778,7 @@ pub async fn seed_database(
             BookingStatus::Confirmed,
             Some(3), // T03
             Some("Family dinner celebration"),
-            DepositStatus::None,
+            DepositStatus::NotRequired,
             0,
         ),
         (
@@ -778,7 +792,7 @@ pub async fn seed_database(
             BookingStatus::Confirmed,
             Some(4), // T04
             Some("Window booth requested"),
-            DepositStatus::None,
+            DepositStatus::NotRequired,
             0,
         ),
         (
@@ -805,7 +819,7 @@ pub async fn seed_database(
             INSERT OR IGNORE INTO bookings (
                 id, confirmation_code, customer_id, guest_name, party_size,
                 start_at, end_at, status, table_id, special_requests,
-                deposit_status, deposit_amount_cents, created_at, updated_at
+                deposit_status, deposit_amount_minor, created_at, updated_at
             )
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             "#,
@@ -967,51 +981,91 @@ pub async fn seed_database(
         .await?;
     }
 
-    // 16. Payments (Simulated Ledger)
+    // 16. Payments (Simulated mockpay ledger) + append-only ledger entries.
+    //     The deposit on the group booking is captured, so its ledger balance
+    //     (authorize + capture) equals the payment amount.
     let payments_data = [
         (
             "p0000000-0000-0000-0000-000000000001",
             Some("b0000000-0000-0000-0000-000000000005"),
             None,
+            "deposit",
             300000,
             "INR",
             PaymentStatus::Captured,
             "sim_pay_dep_9f8a12",
+            Some("Vikramaditya Rao"),
         ),
         (
             "p0000000-0000-0000-0000-000000000002",
             None,
             Some("o0000000-0000-0000-0000-000000000001"),
+            "order",
             149400,
             "INR",
             PaymentStatus::Captured,
             "sim_pay_ord_1c4b77",
+            Some("Rohan Sharma"),
         ),
         (
             "p0000000-0000-0000-0000-000000000003",
             None,
             Some("o0000000-0000-0000-0000-000000000002"),
+            "order",
             111850,
             "INR",
             PaymentStatus::Captured,
             "sim_pay_ord_2e9d33",
+            Some("Priya Patel"),
         ),
     ];
 
-    for (p_id, b_id, o_id, amt, curr, status, prov_ref) in payments_data {
+    for (p_id, b_id, o_id, kind, amt, curr, status, prov_ref, payer) in payments_data {
         sqlx::query(
             r#"
-            INSERT OR IGNORE INTO payments (id, booking_id, order_id, amount_cents, currency, status, provider_reference, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT OR IGNORE INTO payments (
+                id, booking_id, order_id, session_id, kind, amount_minor, currency,
+                provider, provider_reference, status, payer_name, payer_contact, created_at, updated_at
+            )
+            VALUES (?, ?, ?, NULL, ?, ?, ?, 'mockpay', ?, ?, ?, NULL, ?, ?)
             "#,
         )
         .bind(p_id)
         .bind(b_id)
         .bind(o_id)
+        .bind(kind)
         .bind(amt)
         .bind(curr)
-        .bind(status)
         .bind(prov_ref)
+        .bind(status)
+        .bind(payer)
+        .bind(&now_iso)
+        .bind(&now_iso)
+        .execute(pool)
+        .await?;
+
+        // Ledger entries so the derived balance matches the captured status.
+        sqlx::query(
+            r#"
+            INSERT OR IGNORE INTO ledger_entries (payment_id, entry_type, amount_minor, idempotency_key, created_at)
+            VALUES (?, 'authorize', ?, ?, ?)
+            "#,
+        )
+        .bind(p_id)
+        .bind(amt)
+        .bind(format!("seed:authorize:{}", p_id))
+        .bind(&now_iso)
+        .execute(pool)
+        .await?;
+        sqlx::query(
+            r#"
+            INSERT OR IGNORE INTO ledger_entries (payment_id, entry_type, amount_minor, idempotency_key, created_at)
+            VALUES (?, 'capture', ?, ?, ?)
+            "#,
+        )
+        .bind(p_id)
+        .bind(amt)
+        .bind(format!("seed:capture:{}", p_id))
         .bind(&now_iso)
         .execute(pool)
         .await?;

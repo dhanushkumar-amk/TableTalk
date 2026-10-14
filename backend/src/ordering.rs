@@ -721,7 +721,12 @@ pub async fn place_order_tx(
                    max_party_size, lead_time_minutes, booking_horizon_days, deposit_required_party_size,
                    deposit_amount_per_person_cents, created_at, updated_at,
                    cancellation_cutoff_hours, late_cancellation_fee_cents,
-                   tax_rate_basis_points, last_order_before_close_minutes, phone
+                   tax_rate_basis_points, last_order_before_close_minutes, phone,
+                   deposit_max_amount_cents, deposit_payment_deadline_minutes,
+                   deposit_refund_full_basis_points, deposit_refund_partial_basis_points,
+                   deposit_refund_full_hours, deposit_refund_partial_hours,
+                   deposit_peak_days, deposit_peak_start_time, deposit_peak_end_time,
+                   deposit_demo_mode, deposit_decline_retry_limit
             FROM restaurant
             WHERE id = 1
             "#,

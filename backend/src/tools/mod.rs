@@ -7,6 +7,7 @@ pub mod enable_memory;
 pub mod forget_me;
 pub mod forget_preference;
 pub mod get_booking;
+pub mod get_deposit_status;
 pub mod get_order;
 pub mod get_profile;
 pub mod get_usual_order;
@@ -16,6 +17,7 @@ pub mod leave_waitlist;
 pub mod negotiate_booking;
 pub mod ping;
 pub mod place_order;
+pub mod refresh_payment_session;
 pub mod release_offer;
 pub mod remember_preference;
 pub mod rotate_profile_token;
@@ -39,7 +41,11 @@ pub use forget_me::{handle_forget_me, handle_forget_me_with_clock, ForgetMeInput
 pub use forget_preference::{
     handle_forget_preference, handle_forget_preference_with_clock, ForgetPreferenceInput,
 };
-pub use get_booking::{handle_get_booking, GetBookingInput};
+pub use get_booking::{handle_get_booking, handle_get_booking_with_clock, GetBookingInput};
+pub use get_deposit_status::{
+    handle_get_deposit_status, handle_get_deposit_status_with_clock, GetDepositStatusInput,
+    GetDepositStatusOutput,
+};
 pub use get_order::{handle_get_order, GetOrderInput};
 pub use get_profile::{handle_get_profile, handle_get_profile_with_clock, GetProfileInput};
 pub use get_usual_order::{
@@ -62,6 +68,10 @@ pub use negotiate_booking::{
 };
 pub use ping::{handle_ping, PingInput, PingOutput};
 pub use place_order::{handle_place_order, handle_place_order_with_clock, PlaceOrderInput};
+pub use refresh_payment_session::{
+    handle_refresh_payment_session, handle_refresh_payment_session_with_clock,
+    RefreshPaymentSessionInput, RefreshPaymentSessionOutput,
+};
 pub use release_offer::{
     handle_release_offer, handle_release_offer_with_clock, ReleaseOfferInput, ReleaseOfferOutput,
 };

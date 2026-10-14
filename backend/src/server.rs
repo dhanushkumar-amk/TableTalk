@@ -202,6 +202,68 @@ impl TableTalkServer {
         Ok(result)
     }
 
+    /// Check the simulated deposit status for a reservation. Read-only.
+    #[tool(
+        description = "Check the deposit status of a dining reservation using its confirmation code and guest name. Returns whether a simulated deposit is required, its status, amount, payment deadline and minutes remaining, and what refund would apply if cancelled now. This is a READ-ONLY tool: it never completes, approves or refunds a payment. Payments are only ever completed by the guest through the separate mock checkout page; refunds happen only via cancel_booking.",
+        output_schema = rmcp::handler::server::tool::schema_for_output::<crate::tools::get_deposit_status::GetDepositStatusOutput>(),
+        annotations(
+            read_only_hint = true,
+            idempotent_hint = true,
+            destructive_hint = false,
+            open_world_hint = false
+        )
+    )]
+    async fn get_deposit_status(
+        &self,
+        Parameters(input): Parameters<crate::tools::get_deposit_status::GetDepositStatusInput>,
+    ) -> Result<rmcp::model::CallToolResult, rmcp::ErrorData> {
+        let pool = match &self.db {
+            Some(p) => p,
+            None => {
+                return Ok(rmcp::model::CallToolResult::error(vec![
+                    rmcp::model::ContentBlock::text(
+                        "Database connection pool is not configured on TableTalkServer.",
+                    ),
+                ]));
+            }
+        };
+
+        let result = crate::tools::get_deposit_status::handle_get_deposit_status(pool, input).await;
+        Ok(result)
+    }
+
+    /// Issue a fresh simulated payment link for a pending reservation. Does not extend the deadline.
+    #[tool(
+        description = "Issue a fresh simulated payment checkout link for a reservation that is still pending and within its payment deadline. Invalidates any previous open payment session. It never extends the booking's payment deadline and never marks a payment as paid: the guest must still complete the payment on the checkout page. Use this when the guest lost or expired their payment link.",
+        output_schema = rmcp::handler::server::tool::schema_for_output::<crate::tools::refresh_payment_session::RefreshPaymentSessionOutput>(),
+        annotations(
+            read_only_hint = false,
+            idempotent_hint = false,
+            destructive_hint = false,
+            open_world_hint = false
+        )
+    )]
+    async fn refresh_payment_session(
+        &self,
+        Parameters(input): Parameters<crate::tools::refresh_payment_session::RefreshPaymentSessionInput>,
+    ) -> Result<rmcp::model::CallToolResult, rmcp::ErrorData> {
+        let pool = match &self.db {
+            Some(p) => p,
+            None => {
+                return Ok(rmcp::model::CallToolResult::error(vec![
+                    rmcp::model::ContentBlock::text(
+                        "Database connection pool is not configured on TableTalkServer.",
+                    ),
+                ]));
+            }
+        };
+
+        let result =
+            crate::tools::refresh_payment_session::handle_refresh_payment_session(pool, input)
+                .await;
+        Ok(result)
+    }
+
     /// Place a pickup order for food and beverages from the restaurant.
     #[tool(
         description = "Place a pickup order for food and beverages from the restaurant. Computes exact server-side pricing and tax, validates item availability, enforces kitchen preparation timing, and verifies safety-critical allergen restrictions. Returns a confirmed order with an order code (e.g. 'TO-8K4MZ') or reports conflicts and alternative dishes.",

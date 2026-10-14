@@ -5,6 +5,24 @@
 -- deposit_status enum and payment deadline column.
 
 -- ---------------------------------------------------------------------------
+-- 0. Rebuild audit_events so checkout completions performed by a human at the
+--    mock checkout can be attributed to actor 'guest' (no MCP tool may do so).
+-- ---------------------------------------------------------------------------
+CREATE TABLE audit_events_new (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    entity TEXT NOT NULL,
+    entity_id TEXT NOT NULL,
+    action TEXT NOT NULL,
+    actor TEXT NOT NULL CHECK (actor IN ('mcp', 'seed', 'system', 'admin', 'guest')),
+    payload_json TEXT,
+    created_at TEXT NOT NULL
+);
+INSERT INTO audit_events_new (id, entity, entity_id, action, actor, payload_json, created_at)
+SELECT id, entity, entity_id, action, actor, payload_json, created_at FROM audit_events;
+DROP TABLE audit_events;
+ALTER TABLE audit_events_new RENAME TO audit_events;
+
+-- ---------------------------------------------------------------------------
 -- 1. Restaurant deposit policy configuration (defaults documented in
 --    docs/PAYMENTS_DESIGN.md)
 -- ---------------------------------------------------------------------------
@@ -144,7 +162,7 @@ CREATE TABLE payments (
     booking_id TEXT REFERENCES bookings(id) ON DELETE SET NULL,
     order_id TEXT REFERENCES orders(id) ON DELETE SET NULL,
     session_id TEXT REFERENCES payment_sessions(id) ON DELETE SET NULL,
-    kind TEXT NOT NULL CHECK (kind IN ('deposit', 'refund')),
+    kind TEXT NOT NULL CHECK (kind IN ('deposit', 'refund', 'order')),
     amount_minor INTEGER NOT NULL CHECK (amount_minor > 0),
     currency TEXT NOT NULL,
     provider TEXT NOT NULL DEFAULT 'mockpay',

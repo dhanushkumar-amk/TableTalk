@@ -148,6 +148,7 @@ pub enum SessionStatus {
 pub enum PaymentKind {
     Deposit,
     Refund,
+    Order,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, sqlx::Type)]
@@ -167,6 +168,7 @@ pub enum Actor {
     Seed,
     System,
     Admin,
+    Guest,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, sqlx::Type)]

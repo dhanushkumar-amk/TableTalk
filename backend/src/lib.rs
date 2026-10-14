@@ -1,5 +1,6 @@
 pub mod availability;
 pub mod booking;
+pub mod checkout;
 pub mod config;
 pub mod db;
 pub mod http;
@@ -7,6 +8,7 @@ pub mod memory;
 pub mod menu_search;
 pub mod negotiation;
 pub mod ordering;
+pub mod payments;
 pub mod server;
 pub mod tools;
 

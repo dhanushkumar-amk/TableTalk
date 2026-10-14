@@ -6,7 +6,7 @@ use crate::{
         StoredOfferSlot, DEFAULT_HOLD_MINUTES, MAX_ACTIVE_HOLDS_PER_GUEST,
     },
 };
-use chrono::{DateTime, Duration};
+use chrono::{DateTime, Duration, Utc};
 use chrono_tz::Tz;
 use rand::Rng;
 use rmcp::model::{CallToolResult, ContentBlock};
@@ -43,10 +43,69 @@ pub struct AcceptOfferOutput {
     pub hold: Option<HoldSummary>,
     pub offer_token: Option<String>,
     pub message: String,
+    /// Present only when a simulated deposit is required to confirm the booking.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub payment: Option<crate::payments::PaymentObject>,
 }
 
 fn tool_validation_error(msg: impl Into<String>) -> CallToolResult {
     CallToolResult::error(vec![ContentBlock::text(msg.into())])
+}
+
+/// Compute deposit requirement for a slot and, if due, create the booking as
+/// pending with a payment session. Returns (status, deposit_status, amount,
+/// deadline, payment_object).
+#[allow(clippy::too_many_arguments)]
+async fn apply_deposit_policy(
+    conn: &mut sqlx::SqliteConnection,
+    booking_id: &str,
+    config: &crate::db::models::RestaurantConfig,
+    party_size: i64,
+    start_at_utc: &str,
+    now: DateTime<Utc>,
+    checkout_config: &crate::payments::CheckoutConfig,
+) -> Result<
+    (
+        &'static str,
+        &'static str,
+        i64,
+        Option<String>,
+        Option<crate::payments::PaymentObject>,
+    ),
+    sqlx::Error,
+> {
+    let tz: Tz = config.timezone.parse().unwrap_or(chrono_tz::Asia::Kolkata);
+    let policy = crate::payments::DepositPolicy::from_config(config);
+    let slot_start_tz = DateTime::parse_from_rfc3339(start_at_utc)
+        .map(|d| d.with_timezone(&tz))
+        .unwrap_or_else(|_| now.with_timezone(&tz));
+
+    if crate::payments::deposit_required(&policy, party_size, &slot_start_tz) {
+        let amount = crate::payments::compute_deposit_amount(&policy, party_size)
+            .map_err(|e| sqlx::Error::Protocol(format!("Deposit computation failed: {}", e)))?;
+        let deadline = now + Duration::minutes(policy.payment_deadline_minutes);
+        let payment = crate::payments::create_payment_session_in_conn(
+            conn,
+            booking_id,
+            amount,
+            &config.currency,
+            deadline,
+            now,
+            &tz,
+            checkout_config,
+        )
+        .await
+        .map_err(|e| sqlx::Error::Protocol(format!("Payment session creation failed: {}", e)))?;
+        Ok((
+            "pending",
+            "requires_payment",
+            amount,
+            Some(deadline.to_rfc3339()),
+            Some(payment),
+        ))
+    } else {
+        Ok(("confirmed", "not_required", 0, None, None))
+    }
 }
 
 pub async fn handle_accept_offer(pool: &SqlitePool, input: AcceptOfferInput) -> CallToolResult {
@@ -66,6 +125,7 @@ pub async fn handle_accept_offer_with_clock(
 
     let now_utc = clock.now();
     let now_iso = now_utc.to_rfc3339();
+    let checkout_config = crate::payments::CheckoutConfig::default();
 
     let mut conn = match pool.acquire().await {
         Ok(c) => c,
@@ -107,6 +167,7 @@ pub async fn handle_accept_offer_with_clock(
                     hold: None,
                     offer_token: None,
                     message: "Offer not found or invalid offer token.".to_string(),
+                    payment: None,
                 };
                 let mut res = CallToolResult::structured(serde_json::to_value(&output).unwrap());
                 res.content = vec![ContentBlock::text("I couldn't find that held offer. It may have expired or already been released.")];
@@ -125,6 +186,7 @@ pub async fn handle_accept_offer_with_clock(
                 hold: None,
                 offer_token: None,
                 message: "Offer not found or invalid offer token.".to_string(),
+                payment: None,
             };
             let mut res = CallToolResult::structured(serde_json::to_value(&output).unwrap());
             res.content = vec![ContentBlock::text(
@@ -136,9 +198,10 @@ pub async fn handle_accept_offer_with_clock(
         // Idempotency replay check if hold was already converted
         if hold.status == crate::db::models::HoldStatus::Converted {
             // Find existing booking
-            let existing_booking: Option<crate::db::models::Booking> = sqlx::query_as(
-                "SELECT * FROM bookings WHERE table_id = ? AND start_at = ? AND end_at = ? AND status = 'confirmed' LIMIT 1"
-            )
+            let existing_booking: Option<crate::db::models::Booking> = sqlx::query_as(&format!(
+                "SELECT {} FROM bookings WHERE table_id = ? AND start_at = ? AND end_at = ? AND status IN ('pending', 'confirmed') LIMIT 1",
+                crate::db::models::BOOKING_SELECT_COLUMNS
+            ))
             .bind(hold.table_id)
             .bind(&hold.start_at)
             .bind(&hold.end_at)
@@ -169,6 +232,7 @@ pub async fn handle_accept_offer_with_clock(
                     hold: None,
                     offer_token: None,
                     message: "Reservation confirmed (idempotent replay).".to_string(),
+                    payment: None,
                 };
                 let mut res = CallToolResult::structured(serde_json::to_value(&output).unwrap());
                 res.content = vec![ContentBlock::text(voice_text)];
@@ -184,6 +248,7 @@ pub async fn handle_accept_offer_with_clock(
                 hold: None,
                 offer_token: None,
                 message: "This held offer was previously released.".to_string(),
+                payment: None,
             };
             let mut res = CallToolResult::structured(serde_json::to_value(&output).unwrap());
             res.content = vec![ContentBlock::text("This hold was previously released. Would you like to search for fresh availability?")];
@@ -212,6 +277,7 @@ pub async fn handle_accept_offer_with_clock(
                     hold: None,
                     offer_token: None,
                     message: "This hold has expired and the table is no longer available. Please search for fresh options.".to_string(),
+                    payment: None,
                 };
                 let mut res = CallToolResult::structured(serde_json::to_value(&output).unwrap());
                 res.content = vec![ContentBlock::text("Your hold has expired and that table is no longer available. Would you like to check other times?")];
@@ -228,7 +294,7 @@ pub async fn handle_accept_offer_with_clock(
         let neg_id = hold.negotiation_id;
         let wl_id = hold.waitlist_entry_id;
 
-        // Convert hold to confirmed booking!
+        // Convert hold to booking (confirmed, or pending when a deposit is due).
         let code_suffix: String = (0..5)
             .map(|_| {
                 let charset = b"23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
@@ -239,14 +305,33 @@ pub async fn handle_accept_offer_with_clock(
         let confirmation_code = format!("BK-{}", code_suffix);
         let booking_id = uuid::Uuid::new_v4().to_string();
 
+        let (booking_status, deposit_status, deposit_amount, payment_deadline, payment) =
+            match apply_deposit_policy(
+                &mut conn,
+                &booking_id,
+                &config,
+                party_size,
+                &start_at,
+                now_utc,
+                &checkout_config,
+            )
+            .await
+            {
+                Ok(v) => v,
+                Err(e) => {
+                    let _ = sqlx::query("ROLLBACK").execute(&mut *conn).await;
+                    return tool_validation_error(format!("Failed to prepare deposit: {}", e));
+                }
+            };
+
         let insert_res = sqlx::query(
             r#"
             INSERT INTO bookings (
                 id, confirmation_code, guest_name, party_size,
                 start_at, end_at, status, table_id, special_requests,
-                deposit_status, deposit_amount_cents, created_at, updated_at,
+                deposit_status, deposit_amount_minor, payment_deadline_at, created_at, updated_at,
                 guest_phone, guest_email
-            ) VALUES (?, ?, ?, ?, ?, ?, 'confirmed', ?, ?, 'none', 0, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             "#,
         )
         .bind(&booking_id)
@@ -255,8 +340,12 @@ pub async fn handle_accept_offer_with_clock(
         .bind(party_size)
         .bind(&start_at)
         .bind(&end_at)
+        .bind(booking_status)
         .bind(table_id)
         .bind(input.special_requests.as_deref())
+        .bind(deposit_status)
+        .bind(deposit_amount)
+        .bind(payment_deadline.as_deref())
         .bind(&now_iso)
         .bind(&now_iso)
         .bind(input.phone.as_deref())
@@ -318,23 +407,42 @@ pub async fn handle_accept_offer_with_clock(
             end_local: dt_end.format("%H:%M").to_string(),
             area,
             table_label,
-            status: "confirmed".to_string(),
+            status: booking_status.to_string(),
             special_requests: input.special_requests,
             created_at: now_iso,
             source: Some("negotiation".to_string()),
         };
 
-        let spoken_code = format_spoken_code(&confirmation_code);
-        let voice_text = format!(
-            "Your reservation is confirmed! Your confirmation code is {}.",
-            spoken_code
-        );
+        let voice_text = if let Some(ref p) = payment {
+            crate::payments::voice_deposit_required(
+                &crate::payments::DepositPolicy::from_config(&config),
+                p.amount.amount_minor,
+                &p.amount.currency,
+                party_size,
+                p.minutes_remaining,
+                &confirmation_code,
+            )
+        } else {
+            format!(
+                "Your reservation is confirmed! Your confirmation code is {}.",
+                format_spoken_code(&confirmation_code)
+            )
+        };
         let output = AcceptOfferOutput {
-            status: "confirmed".to_string(),
+            status: if payment.is_some() {
+                "payment_required".to_string()
+            } else {
+                "confirmed".to_string()
+            },
             booking: Some(summary),
             hold: None,
             offer_token: None,
-            message: "Reservation confirmed successfully from hold.".to_string(),
+            message: if payment.is_some() {
+                "Reservation created pending a simulated deposit.".to_string()
+            } else {
+                "Reservation confirmed successfully from hold.".to_string()
+            },
+            payment,
         };
 
         let mut res = CallToolResult::structured(serde_json::to_value(&output).unwrap());
@@ -395,6 +503,7 @@ pub async fn handle_accept_offer_with_clock(
             offer_token: None,
             message: "Negotiation session has expired. Please perform a fresh reservation check."
                 .to_string(),
+            payment: None,
         };
         let mut res = CallToolResult::structured(serde_json::to_value(&output).unwrap());
         res.content = vec![ContentBlock::text(
@@ -445,6 +554,7 @@ pub async fn handle_accept_offer_with_clock(
             hold: None,
             offer_token: None,
             message: "The selected dining option is no longer available.".to_string(),
+            payment: None,
         };
         let mut res = CallToolResult::structured(serde_json::to_value(&output).unwrap());
         res.content = vec![ContentBlock::text("That table was just taken by another guest. Would you like me to check other available times?")];
@@ -529,6 +639,7 @@ pub async fn handle_accept_offer_with_clock(
                 "Table hold successfully placed for {} minutes. Offer token returned.",
                 DEFAULT_HOLD_MINUTES
             ),
+            payment: None,
         };
 
         let mut res = CallToolResult::structured(serde_json::to_value(&output).unwrap());
@@ -536,7 +647,7 @@ pub async fn handle_accept_offer_with_clock(
         return res;
     }
 
-    // Direct booking without prior hold
+    // Direct booking without prior hold (deposit applies when the policy requires it).
     let code_suffix: String = (0..5)
         .map(|_| {
             let charset = b"23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
@@ -547,14 +658,33 @@ pub async fn handle_accept_offer_with_clock(
     let confirmation_code = format!("BK-{}", code_suffix);
     let booking_id = uuid::Uuid::new_v4().to_string();
 
+    let (booking_status, deposit_status, deposit_amount, payment_deadline, payment) =
+        match apply_deposit_policy(
+            &mut conn,
+            &booking_id,
+            &config,
+            slot.party_size,
+            &slot.start_at,
+            now_utc,
+            &checkout_config,
+        )
+        .await
+        {
+            Ok(v) => v,
+            Err(e) => {
+                let _ = sqlx::query("ROLLBACK").execute(&mut *conn).await;
+                return tool_validation_error(format!("Failed to prepare deposit: {}", e));
+            }
+        };
+
     let insert_res = sqlx::query(
         r#"
         INSERT INTO bookings (
             id, confirmation_code, guest_name, party_size,
             start_at, end_at, status, table_id, special_requests,
-            deposit_status, deposit_amount_cents, created_at, updated_at,
+            deposit_status, deposit_amount_minor, payment_deadline_at, created_at, updated_at,
             guest_phone, guest_email
-        ) VALUES (?, ?, ?, ?, ?, ?, 'confirmed', ?, ?, 'none', 0, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         "#,
     )
     .bind(&booking_id)
@@ -563,8 +693,12 @@ pub async fn handle_accept_offer_with_clock(
     .bind(slot.party_size)
     .bind(&slot.start_at)
     .bind(&slot.end_at)
+    .bind(booking_status)
     .bind(slot.table_id)
     .bind(input.special_requests.as_deref())
+    .bind(deposit_status)
+    .bind(deposit_amount)
+    .bind(payment_deadline.as_deref())
     .bind(&now_iso)
     .bind(&now_iso)
     .bind(input.phone.as_deref())
@@ -594,23 +728,42 @@ pub async fn handle_accept_offer_with_clock(
         end_local: slot.end_local,
         area: slot.area,
         table_label: slot.table_label,
-        status: "confirmed".to_string(),
+        status: booking_status.to_string(),
         special_requests: input.special_requests,
         created_at: now_iso,
         source: Some("negotiation".to_string()),
     };
 
-    let spoken_code = format_spoken_code(&confirmation_code);
-    let voice_text = format!(
-        "Your reservation is confirmed! Your confirmation code is {}.",
-        spoken_code
-    );
+    let voice_text = if let Some(ref p) = payment {
+        crate::payments::voice_deposit_required(
+            &crate::payments::DepositPolicy::from_config(&config),
+            p.amount.amount_minor,
+            &p.amount.currency,
+            slot.party_size,
+            p.minutes_remaining,
+            &confirmation_code,
+        )
+    } else {
+        format!(
+            "Your reservation is confirmed! Your confirmation code is {}.",
+            format_spoken_code(&confirmation_code)
+        )
+    };
     let output = AcceptOfferOutput {
-        status: "confirmed".to_string(),
+        status: if payment.is_some() {
+            "payment_required".to_string()
+        } else {
+            "confirmed".to_string()
+        },
         booking: Some(summary),
         hold: None,
         offer_token: None,
-        message: "Reservation confirmed successfully from negotiation.".to_string(),
+        message: if payment.is_some() {
+            "Reservation created pending a simulated deposit.".to_string()
+        } else {
+            "Reservation confirmed successfully from negotiation.".to_string()
+        },
+        payment,
     };
 
     let mut res = CallToolResult::structured(serde_json::to_value(&output).unwrap());

@@ -20,6 +20,21 @@ const MAX_BODY_SIZE_BYTES: usize = 2 * 1024 * 1024; // 2 MB
 
 pub const SUPPORTED_PROTOCOL_VERSIONS: &[&str] = &["2025-11-25", "2024-11-05"];
 
+/// Redacts payment-token path segments before they reach request logging.
+/// Any path segment beginning with the payment token prefix is replaced.
+fn redact_token_segments(uri: &str) -> String {
+    uri.split('/')
+        .map(|seg| {
+            if crate::payments::looks_like_payment_token(seg) {
+                "tt_pay_[redacted]"
+            } else {
+                seg
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("/")
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct HealthResponse {
     pub status: String,
@@ -71,7 +86,7 @@ async fn request_id_and_tracing(req: Request, next: Next) -> Response {
         .unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
 
     let method = req.method().clone();
-    let uri = req.uri().clone();
+    let uri = redact_token_segments(&req.uri().to_string());
 
     let span = tracing::info_span!(
         "http_request",
@@ -158,10 +173,11 @@ pub fn build_router(config: &Config) -> Router {
 
 /// Build the application router with an optional database connection pool wired into TableTalkServer.
 pub fn build_router_with_db(config: &Config, pool: Option<sqlx::SqlitePool>) -> Router {
-    let server = match pool {
-        Some(p) => TableTalkServer::with_db(p),
+    let server = match &pool {
+        Some(p) => TableTalkServer::with_db(p.clone()),
         None => TableTalkServer::new(),
     };
+    let pool_for_checkout = pool;
     let session_manager = Arc::new(LocalSessionManager::default());
 
     let mcp_config =
@@ -199,6 +215,14 @@ pub fn build_router_with_db(config: &Config, pool: Option<sqlx::SqlitePool>) -> 
 
     Router::new()
         .route("/health", get(health_handler))
+        .merge(match pool_for_checkout {
+            Some(p) => crate::checkout::checkout_router(crate::checkout::CheckoutState {
+                pool: p,
+                clock: Arc::new(crate::availability::SystemClock),
+                rate_limiter: Arc::new(crate::checkout::CheckoutRateLimiter::new()),
+            }),
+            None => Router::new(),
+        })
         .nest_service("/mcp", mcp_service)
         .layer(from_fn_with_state(allowed_origins_state, validate_origin))
         .layer(axum::middleware::from_fn(validate_protocol_version))

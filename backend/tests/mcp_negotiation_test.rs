@@ -23,7 +23,6 @@ use tabletalk_backend::{
             handle_get_waitlist_status_with_clock, GetWaitlistStatusInput, GetWaitlistStatusOutput,
         },
         join_waitlist::{handle_join_waitlist_with_clock, JoinWaitlistInput, JoinWaitlistOutput},
-        leave_waitlist::{handle_leave_waitlist_with_clock, LeaveWaitlistInput},
         negotiate_booking::{
             handle_negotiate_booking_with_clock, NegotiateBookingInput, NegotiateBookingOutput,
             NegotiationFlexibility,
@@ -1218,8 +1217,8 @@ async fn test_mcp_tools_list_twenty_two_tools_http() {
 
     assert_eq!(
         tools.len(),
-        22,
-        "tools/list must return exactly 22 tools in Phase 11"
+        24,
+        "tools/list must return exactly 24 tools in Phase 12"
     );
 
     let tool_names: Vec<&str> = tools.iter().map(|t| t["name"].as_str().unwrap()).collect();

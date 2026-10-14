@@ -730,6 +730,22 @@ pub async fn forget_me_tx(
         .await?
         .rows_affected() as i64;
 
+        // 2a. Scrub payer identity from payment rows (financial record retained:
+        //     amounts, timestamps and states are preserved). Must run before the
+        //     bookings scrub, which clears customer_id. payment_sessions hold no
+        //     payer data by design.
+        sqlx::query(
+            r#"
+            UPDATE payments
+            SET payer_name = '[redacted]',
+                payer_contact = NULL
+            WHERE booking_id IN (SELECT id FROM bookings WHERE customer_id = ?)
+            "#,
+        )
+        .bind(cust_id)
+        .execute(&mut *conn)
+        .await?;
+
         // 2. Scrub bookings
         let bookings_affected = sqlx::query(
             r#"
