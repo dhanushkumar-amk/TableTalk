@@ -49,6 +49,12 @@ pub async fn handle_leave_waitlist_with_clock(
         return tool_validation_error("Guest name is required.");
     }
 
+    let config = crate::db::repo::restaurant::get_config(pool).await.ok();
+    let tz: Tz = config
+        .as_ref()
+        .and_then(|c| c.timezone.parse().ok())
+        .unwrap_or(chrono_tz::Asia::Kolkata);
+
     let mut conn = match pool.acquire().await {
         Ok(c) => c,
         Err(e) => return tool_validation_error(format!("DB connection error: {}", e)),
@@ -132,11 +138,7 @@ pub async fn handle_leave_waitlist_with_clock(
                 .execute(&mut *conn)
                 .await;
 
-        let config = crate::db::repo::restaurant::get_config(pool).await.ok();
-        let tz: Tz = config
-            .as_ref()
-            .and_then(|c| c.timezone.parse().ok())
-            .unwrap_or(chrono_tz::Asia::Kolkata);
+
 
         if let Ok(dt_utc) = DateTime::parse_from_rfc3339(&start_at) {
             let local_dt = dt_utc.with_timezone(&tz);

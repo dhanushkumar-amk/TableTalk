@@ -127,17 +127,17 @@ pub async fn handle_accept_offer_with_clock(
     let now_iso = now_utc.to_rfc3339();
     let checkout_config = crate::payments::CheckoutConfig::default();
 
-    let mut conn = match pool.acquire().await {
-        Ok(c) => c,
-        Err(e) => return tool_validation_error(format!("DB connection error: {}", e)),
-    };
-
-    // Load restaurant config
+    // Load restaurant config before acquiring exclusive connection
     let config = match crate::db::repo::restaurant::get_config(pool).await {
         Ok(c) => c,
         Err(e) => return tool_validation_error(format!("Failed to load config: {}", e)),
     };
     let tz: Tz = config.timezone.parse().unwrap_or(chrono_tz::Asia::Kolkata);
+
+    let mut conn = match pool.acquire().await {
+        Ok(c) => c,
+        Err(e) => return tool_validation_error(format!("DB connection error: {}", e)),
+    };
 
     // --- CASE A: Converting an existing hold using offer_token ---
     if let Some(ref raw_token) = input.offer_token {
@@ -258,31 +258,23 @@ pub async fn handle_accept_offer_with_clock(
         let is_expired =
             hold.expires_at <= now_iso || hold.status == crate::db::models::HoldStatus::Expired;
         if is_expired {
-            // Re-check if table is still free
-            let overlap: i64 = sqlx::query_scalar(
-                "SELECT COUNT(*) FROM bookings WHERE table_id = ? AND status IN ('pending', 'confirmed') AND start_at < ? AND end_at > ?"
-            )
-            .bind(hold.table_id)
-            .bind(&hold.end_at)
-            .bind(&hold.start_at)
-            .fetch_one(&mut *conn)
-            .await
-            .unwrap_or(1);
-
-            if overlap > 0 {
-                let _ = sqlx::query("ROLLBACK").execute(&mut *conn).await;
-                let output = AcceptOfferOutput {
-                    status: "offer_expired".to_string(),
-                    booking: None,
-                    hold: None,
-                    offer_token: None,
-                    message: "This hold has expired and the table is no longer available. Please search for fresh options.".to_string(),
-                    payment: None,
-                };
-                let mut res = CallToolResult::structured(serde_json::to_value(&output).unwrap());
-                res.content = vec![ContentBlock::text("Your hold has expired and that table is no longer available. Would you like to check other times?")];
-                return res;
-            }
+            let _ = sqlx::query("UPDATE slot_holds SET status = 'expired', updated_at = ? WHERE id = ?")
+                .bind(&now_iso)
+                .bind(hold.id)
+                .execute(&mut *conn)
+                .await;
+            let _ = sqlx::query("ROLLBACK").execute(&mut *conn).await;
+            let output = AcceptOfferOutput {
+                status: "offer_expired".to_string(),
+                booking: None,
+                hold: None,
+                offer_token: None,
+                message: "This hold has expired. Please search for fresh options.".to_string(),
+                payment: None,
+            };
+            let mut res = CallToolResult::structured(serde_json::to_value(&output).unwrap());
+            res.content = vec![ContentBlock::text("Your hold has expired. Would you like to check other times?")];
+            return res;
         }
 
         let hold_id = hold.id;
@@ -388,7 +380,7 @@ pub async fn handle_accept_offer_with_clock(
         let table_label: String =
             sqlx::query_scalar("SELECT label FROM dining_tables WHERE id = ?")
                 .bind(table_id)
-                .fetch_one(pool)
+                .fetch_one(&mut *conn)
                 .await
                 .unwrap_or_else(|_| "T1".to_string());
 
@@ -631,7 +623,7 @@ pub async fn handle_accept_offer_with_clock(
 
         let voice_text = format_spoken_hold(&slot.area, &slot.start_local, DEFAULT_HOLD_MINUTES);
         let output = AcceptOfferOutput {
-            status: "hold_placed".to_string(),
+            status: "held".to_string(),
             booking: None,
             hold: Some(hold_summary),
             offer_token: Some(plain_token),

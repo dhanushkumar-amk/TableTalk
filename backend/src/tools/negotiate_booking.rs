@@ -1,8 +1,5 @@
 use crate::{
-    availability::{
-        check_availability_engine, AreaFilter, AvailabilityConfig, AvailabilityQuery, Clock,
-        SystemClock,
-    },
+    availability::{AreaFilter, Clock, SystemClock},
     db::repo::{restaurant, tables},
     negotiation::{
         format_spoken_options, score_candidate, sort_scored_candidates, CandidateSlot,
@@ -227,51 +224,7 @@ pub async fn handle_negotiate_booking_with_clock(
         .duration_minutes
         .unwrap_or(config.dining_duration_minutes);
 
-    // 1. If negotiation_id is None, check if the EXACT requested slot is available!
-    if input.negotiation_id.is_none() {
-        let exact_query = AvailabilityQuery {
-            date: parsed_date,
-            time: parsed_time,
-            party_size: input.party_size,
-            area: area_filter,
-            duration_minutes: Some(duration_mins),
-            alternatives_limit: 0,
-        };
-        let exact_res = check_availability_engine(
-            exact_query,
-            &config,
-            &opening_hours,
-            &special_closures,
-            &active_tables,
-            &combined_bookings,
-            &AvailabilityConfig::default(),
-            clock,
-        );
 
-        if exact_res.status == "available" {
-            if let Some(slot) = exact_res.slot {
-                let voice_text = format!(
-                    "I have a table for {} on {} at {} {}. Would you like me to book it?",
-                    input.party_size,
-                    parsed_date.format("%A, %B %e"),
-                    parsed_time.format("%l:%M %P").to_string().trim(),
-                    slot.area
-                );
-                let output = NegotiateBookingOutput {
-                status: "available_as_requested".to_string(),
-                negotiation_id: None,
-                round: None,
-                slot: Some(slot),
-                options: vec![],
-                profile_applied,
-                message: "The requested dining slot is currently available. You may proceed to create a booking or place a hold.".to_string(),
-            };
-                let mut res = CallToolResult::structured(serde_json::to_value(&output).unwrap());
-                res.content = vec![ContentBlock::text(voice_text)];
-                return res;
-            }
-        }
-    }
 
     // 2. Resolve or create negotiation record
     let mut conn = match pool.acquire().await {

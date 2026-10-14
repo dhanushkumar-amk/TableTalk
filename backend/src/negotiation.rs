@@ -10,7 +10,7 @@ use sqlx::{SqliteConnection, SqlitePool};
 pub const DEFAULT_HOLD_MINUTES: i64 = 5;
 pub const MAX_HOLD_MINUTES: i64 = 10;
 pub const DEFAULT_NEGOTIATION_TTL_MINUTES: i64 = 15;
-pub const MAX_NEGOTIATION_ROUNDS: i64 = 5;
+pub const MAX_NEGOTIATION_ROUNDS: i64 = 3;
 pub const MAX_ACTIVE_NEGOTIATIONS_PER_GUEST: i64 = 3;
 pub const MAX_ACTIVE_HOLDS_PER_GUEST: i64 = 2;
 pub const MAX_ACTIVE_WAITLIST_PER_GUEST: i64 = 3;
@@ -514,6 +514,21 @@ pub async fn match_waitlist_for_slot(
             continue;
         }
 
+        // 4. Skip entry if it already held/released this exact slot on this table
+        let already_held: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM slot_holds WHERE waitlist_entry_id = ? AND table_id = ? AND start_at = ?"
+        )
+        .bind(entry.id)
+        .bind(freed_table_id)
+        .bind(freed_start_at)
+        .fetch_one(&mut *conn)
+        .await
+        .unwrap_or(0);
+
+        if already_held > 0 {
+            continue;
+        }
+
         // Check if table is actually free right now for [freed_start_at, freed_end_at)
         let overlapping_bookings: i64 = sqlx::query_scalar(
             r#"
@@ -587,7 +602,7 @@ pub async fn match_waitlist_for_slot(
         .last_insert_rowid();
 
         let (_plain_token, real_hash) =
-            generate_waitlist_offer_token(hold_id, &entry.code, &now_iso);
+            generate_waitlist_offer_token(hold_id, &entry.code, &entry.created_at);
         sqlx::query("UPDATE slot_holds SET token_hash = ? WHERE id = ?")
             .bind(&real_hash)
             .bind(hold_id)

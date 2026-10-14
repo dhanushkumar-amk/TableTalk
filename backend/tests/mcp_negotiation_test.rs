@@ -376,7 +376,7 @@ async fn test_holds_block_availability_and_booking_and_lazy_expiry() {
         NegotiateBookingInput {
             date: test_date.to_string(),
             time: "20:00".to_string(),
-            party_size: 2,
+            party_size: 8,
             guest_name: "Holder Dan".to_string(),
             area: Some(BookingAreaInput::Indoor),
             duration_minutes: Some(75),
@@ -421,7 +421,7 @@ async fn test_holds_block_availability_and_booking_and_lazy_expiry() {
         CheckAvailabilityInput {
             date: test_date.to_string(),
             time: opt.start_local.clone(),
-            party_size: 2,
+            party_size: 8,
             area: Some(AreaFilter::Indoor),
             duration_minutes: Some(75),
             alternatives: Some(0),
@@ -444,7 +444,7 @@ async fn test_holds_block_availability_and_booking_and_lazy_expiry() {
         CreateBookingInput {
             date: test_date.to_string(),
             time: opt.start_local.clone(),
-            party_size: 2,
+            party_size: 8,
             guest_name: "Intruder Eve".to_string(),
             phone: None,
             email: None,
@@ -680,12 +680,12 @@ async fn test_the_race_1_concurrent_accept_offer_20_tasks() {
 
         // Spawn 20 concurrent tasks trying to accept_offer on opt_id
         let mut handles = Vec::new();
-        for task_idx in 0..20 {
+        for _task_idx in 0..20 {
             let p = pool.clone();
             let c = clock.clone();
             let n_id = neg_id;
             let o_id = opt_id.clone();
-            let g = format!("Racer_{}_{}", iter, task_idx);
+            let g = guest.clone();
 
             handles.push(tokio::spawn(async move {
                 handle_accept_offer_with_clock(
@@ -734,6 +734,10 @@ async fn test_the_race_1_concurrent_accept_offer_20_tasks() {
             "Iteration {}: Exactly 19 tasks must be rejected, got {}",
             iter, rejected_count
         );
+
+        // Reset iteration state
+        sqlx::query("DELETE FROM bookings WHERE guest_name = ?").bind(&guest).execute(&pool).await.unwrap();
+        sqlx::query("DELETE FROM negotiations").execute(&pool).await.unwrap();
     }
 }
 
@@ -996,6 +1000,11 @@ async fn test_the_race_3_cancel_booking_vs_waitlist_vs_concurrent_create_booking
             "Iteration {}: Exactly one waitlist entry must be offered the freed slot",
             iter
         );
+
+        // Reset state for next iteration
+        sqlx::query("DELETE FROM waitlist_entries").execute(&pool).await.unwrap();
+        sqlx::query("DELETE FROM slot_holds").execute(&pool).await.unwrap();
+        sqlx::query("DELETE FROM bookings WHERE guest_name LIKE 'CancelRacer_%' OR guest_name LIKE 'Outside_%'").execute(&pool).await.unwrap();
     }
 }
 
