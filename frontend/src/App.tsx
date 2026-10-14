@@ -1,8 +1,10 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, lazy, Suspense } from "react"
 import { motion } from "framer-motion"
-import { UtensilsCrossed, Moon, Sun, Radio, Sparkles } from "lucide-react"
+import { UtensilsCrossed, Moon, Sun, Radio, Sparkles, LayoutGrid } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import CheckoutPage from "@/pages/CheckoutPage"
+
+const CardGallery = lazy(() => import("@/dev/CardGallery"))
 
 function usePathname() {
   const [pathname, setPathname] = useState(window.location.pathname)
@@ -16,6 +18,13 @@ function usePathname() {
 
 export default function App() {
   const pathname = usePathname()
+  if (pathname === "/dev/cards" || pathname.startsWith("/dev/cards")) {
+    return (
+      <Suspense fallback={<div className="min-h-screen flex items-center justify-center p-6 text-sm text-muted-foreground">Loading Card Gallery...</div>}>
+        <CardGallery />
+      </Suspense>
+    )
+  }
   const checkoutMatch = pathname.match(/^\/checkout\/(.+)$/)
   if (checkoutMatch) {
     return <CheckoutPage token={decodeURIComponent(checkoutMatch[1])} />
@@ -55,7 +64,20 @@ function LandingPage() {
       </div>
 
       {/* Top action bar */}
-      <header className="absolute top-6 right-6 z-10">
+      <header className="absolute top-6 right-6 z-10 flex items-center gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            window.history.pushState({}, "", "/dev/cards")
+            window.dispatchEvent(new Event("popstate"))
+          }}
+          aria-label="View Card Gallery"
+          className="cursor-pointer gap-2"
+        >
+          <LayoutGrid className="h-4 w-4" />
+          <span>Card Gallery</span>
+        </Button>
         <Button
           variant="outline"
           size="sm"
