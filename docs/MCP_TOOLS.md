@@ -8,12 +8,13 @@ This document serves as the canonical reference for all MCP tools exposed by the
 
 ---
 
-## 1. Tool Index
+## 1. Tool Index (All 24 Tools)
 
 | Tool Name | Lifecycle Phase | Read-Only | Idempotent | Description |
 |---|---|---|---|---|
 | `ping_restaurant` | Phase 3 | Yes | Yes | Connectivity check and server metadata verification. |
 | `search_menu` | Phase 6 | Yes | Yes | Search food items with dietary/allergen filters, profile memory integration, and spoken prices. |
+| `get_menu_item` | Phase 6 | Yes | Yes | Retrieve individual food item details by item ID or name. |
 | `check_availability` | Phase 7 | Yes | Yes | Check table availability, snap slot grid, and propose alternatives. |
 | `create_booking` | Phase 8 | No | Yes (with key) | Transactionally create a table reservation with idempotency, race safety, and seating preference tie-breaking. |
 | `cancel_booking` | Phase 8 | No (destructive) | Yes | Cancel an existing reservation with guest-name verification and anti-enumeration. |
@@ -28,6 +29,66 @@ This document serves as the canonical reference for all MCP tools exposed by the
 | `get_usual_order` | Phase 10 | Yes | Yes | Read-only deterministic calculation of usual order from history, re-validated against current menu. |
 | `rotate_profile_token` | Phase 10 | No | No | Atomic issuance of new bearer profile token with instant revocation of previous token. |
 | `forget_me` | Phase 10 | No (destructive) | Yes | Complete hard delete of profile and preferences with unlinking and scrubbing of historical business records. |
+| `negotiate_booking` | Phase 11 | Yes | Yes | Multi-criteria slot exploration, scoring trade-offs across time, area, and dates. |
+| `accept_offer` | Phase 11 | No | Yes | Confirm a held slot reservation with token verification and transaction rollback. |
+| `release_offer` | Phase 11 | No (destructive) | Yes | Release a held slot reservation ahead of its automatic expiration. |
+| `join_waitlist` | Phase 11 | No | Yes | Queue a party onto the FIFO waitlist when all matching tables are fully booked. |
+| `get_waitlist_status` | Phase 11 | Yes | Yes | Read-only waitlist status lookup verified by guest name and waitlist code. |
+| `leave_waitlist` | Phase 11 | No (destructive) | Yes | Remove a party from the waitlist prior to fulfillment. |
+| `get_deposit_status` | Phase 12 | Yes | Yes | Read-only deposit payment requirement and ledger status lookup for a booking. |
+| `refresh_payment_session` | Phase 12 | No | Yes | Regenerate an active mock checkout URL and token for bookings requiring deposits. |
+
+---
+
+## 1.5 Shared Validation & Error Architecture (Phase 14)
+
+All 24 tools follow a unified validation and error architecture:
+
+### 1. Unknown Extra Fields Policy
+* **Ignore Policy**: All tools silently ignore unrecognized extra keys in arguments payloads.
+* **Compatibility**: Ensures forward and backward compatibility when LLMs include auxiliary fields (e.g. `context`, `thought`, or optional attributes).
+
+### 2. Input Sanitization
+* **Whitespace**: Leading and trailing whitespace is stripped across all string fields.
+* **Control Characters**: Null bytes (`\x00`), ASCII control characters (`\x01`..`\x1F`), and ANSI escape sequences are completely stripped before processing.
+* **Dates & Times**: Dates require strict ISO-8601 `YYYY-MM-DD`. Times require strict 24-hour `HH:MM`.
+* **String & Array Caps**: String fields are capped (names: 100, codes: 32, tokens: 128, notes/reasons: 500-1000). Array fields (items, preferences, allergens) are bounded between 1 and 20 elements.
+
+### 3. Error Categories & Envelope Format
+* **Tool Argument Errors (`isError: true`)**:
+  When input arguments violate constraints or types, tools return an execution error envelope specifying the field and valid constraint:
+  ```json
+  {
+    "content": [
+      {
+        "type": "text",
+        "text": "Invalid argument for 'date': must be in ISO format YYYY-MM-DD (e.g. '2026-10-17'). Received '17-10-2026'."
+      }
+    ],
+    "isError": true
+  }
+  ```
+* **Business Outcomes (`isError: false`)**:
+  Standard business events (e.g., table fully booked, restaurant closed, booking not found) are returned as valid tool execution results with a structured payload:
+  ```json
+  {
+    "content": [
+      {
+        "type": "text",
+        "text": "The restaurant is closed on Tuesdays. Would you like to check Wednesday instead?"
+      }
+    ],
+    "structuredContent": {
+      "status": "closed",
+      "reason": "regular_closure"
+    },
+    "isError": false
+  }
+  ```
+* **Internal Server Errors**:
+  Internal database, transactional, or system failures return a generic message containing a unique UUID Request ID (`Request ID: <uuid>`). SQL queries, database drivers, file paths, and stack traces are **never** leaked to callers. The full context is logged securely on the server via `tracing::error!`.
+* **Protocol Violations**:
+  Transport and protocol errors (invalid JSON, unknown JSON-RPC methods, uninitialized sessions) return standard JSON-RPC protocol error structures.
 
 ---
 

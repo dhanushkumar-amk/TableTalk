@@ -109,6 +109,8 @@ TableTalk backend accepts configuration via environment variables (see `.env.exa
 | `DATABASE_URL` | SQLite database connection string | `sqlite://data/tabletalk.db` |
 | `SEED_ON_START` | Seed database on boot if empty | `false` |
 | `RESTAURANT_TZ` | Establishment IANA timezone override | `Asia/Kolkata` |
+| `RATE_LIMIT_PER_MINUTE` | Max requests per minute per IP on `/mcp` and checkout endpoints | `600` |
+| `REQUEST_TIMEOUT_SECS` | Maximum HTTP request timeout in seconds | `30` |
 
 Copy the example configuration:
 ```bash
@@ -145,6 +147,11 @@ cargo run -- seed
 - **Supported Protocol Version**: `2025-11-25`
 - **Session Management**: Stateful via `mcp-session-id` header
 - **DNS Rebinding Protection**: Validates incoming `Origin` headers against `ALLOWED_ORIGINS` (requests without `Origin` are allowed for non-browser clients)
+- **Rate Limiting**: Sliding-window limiter on `/mcp` and checkout endpoints (default 600 req/min per IP, configurable via `RATE_LIMIT_PER_MINUTE`). Returns HTTP `429 Too Many Requests` with a `Retry-After` header. `/health` is unthrottled.
+- **Request Body Limit**: 2 MB max body size (`413 Payload Too Large`).
+- **Request Timeout**: 30-second timeout on requests (`408 Request Timeout`).
+- **Panic Resilience**: Unhandled panics are caught by `CatchPanicLayer`, logging the incident with a UUID Request ID and returning a generic 500 without crashing the server.
+- **Input Validation**: All 24 tools enforce bounds, ISO dates/times, and sanitized strings. Extra unknown fields are ignored per Postel's Law.
 
 ### Testing with `curl`
 

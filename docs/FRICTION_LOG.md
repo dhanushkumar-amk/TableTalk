@@ -265,7 +265,41 @@ A running log of unexpected friction, hurdles, bugs, or developer experience iss
 - **Workaround**: Dual-output architecture: every tool response returns natural, human-formatted spoken text in `content[0].text` alongside complete data in `structuredContent`. Audio-only clients speak the text without error, while screen-enabled clients render accessible cards. In addition, every card component renders a collapsible secondary transcript caption to guarantee that speech and visual output never disagree.
 - **Suggestion**: Standardize a `capabilities.display` structure in the MCP client initialization handshake (e.g., `{ screen: boolean, touch: boolean, maxViewportWidth?: number }`) allowing servers to tailor data payloads and media formats to device capabilities.
 
+### SQLite Foreign Key Cascade Constraint Violation During Table Rebuilds
+- **Date**: 2026-10-14
+- **Task attempted**: Rebuilding the `bookings` table via migration 7 to update schema constraints in SQLite.
+- **Steps taken**:
+  1. Created `bookings_new` and copied records from `bookings`.
+  2. Executed `DROP TABLE bookings;` with the intention of later dropping and recreating the `payments` table.
+- **Expected vs actual**:
+  - *Expected*: Dropping the table proceeds smoothly.
+  - *Actual*: SQLite's active foreign key enforcement triggered `ON DELETE SET NULL` on the existing `payments.booking_id` column for rows that referenced bookings. Because `payments` had a `CHECK (booking_id IS NOT NULL OR order_id IS NOT NULL)` constraint and `order_id` was also NULL, the cascade update immediately failed with `(code: 275) CHECK constraint failed: booking_id IS NOT NULL OR order_id IS NOT NULL`, aborting migration 7 on pre-seeded databases.
+- **Severity**: High
+- **Workaround**: Dropped child referencing tables (`DROP TABLE IF EXISTS payments;`) **before** dropping and renaming parent tables during schema migrations.
+- **Suggestion**: In SQLite migrations that rebuild tables with foreign keys and mutual nullability checks, child tables must be dropped or foreign keys disabled prior to dropping parent tables.
 
+### Unchecked Slice Indexing Panic Hazards in Voice Formatting
+- **Date**: 2026-10-14
+- **Task attempted**: Formatting spoken suggestion strings for negotiation alternatives.
+- **Steps taken**:
+  1. Split alternative strings into a vector of phrases.
+  2. Accessed `parts[0]`, `parts[1]`, `parts[2]` directly to join them with natural Oxford commas and conjunctions.
+- **Expected vs actual**:
+  - *Expected*: Code safely formats the suggestions.
+  - *Actual*: If the suggestion generator returned fewer than 3 suggestions (e.g. only 1 or 2 slots available), direct indexing `parts[2]` caused an immediate slice bounds panic on worker threads.
+- **Severity**: Medium
+- **Workaround**: Replaced direct slice indexing with Rust slice pattern matching (`match parts.as_slice() { [] => ..., [single] => ..., [first, second] => ..., [first, second, third, ..] => ... }`), guaranteeing panic-free bounds safety regardless of alternative counts.
+- **Suggestion**: Avoid unchecked index access `[i]` on vectors across all user-reachable handlers; favor slice pattern matching or `.get(i)`.
 
-
-
+### Test Concurrency Throttling with In-Memory Rate Limiter
+- **Date**: 2026-10-14
+- **Task attempted**: Running 50 concurrent synthetic Alexa+ client sessions in integration tests (`mcp_concurrency_and_stream_test.rs`).
+- **Steps taken**:
+  1. Implemented per-IP sliding-window rate limiting middleware with an initial default of 120 requests/minute.
+  2. Ran concurrent load test spawning 50 tasks against `127.0.0.1`, each performing `initialize`, `notifications/initialized`, and `tools/call ping_restaurant` (150 requests total).
+- **Expected vs actual**:
+  - *Expected*: Concurrent sessions complete within benchmark latency thresholds (<30ms).
+  - *Actual*: Requests 121..150 were throttled with `429 Too Many Requests`, failing the test.
+- **Severity**: Low
+- **Workaround**: Increased default rate limit threshold from 120 to 600 requests per minute (10 requests/second per IP), allowing rapid local test suites and concurrent browser tabs to run unthrottled while reliably blocking abusive request floods.
+- **Suggestion**: Expose rate limit thresholds via environment configuration and ensure defaults accommodate legitimate multi-tab or concurrent integration test traffic.
