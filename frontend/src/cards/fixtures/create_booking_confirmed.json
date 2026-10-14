@@ -1,7 +1,7 @@
 {
   "content": [
     {
-      "text": "I have confirmed your table for 2 guests on Friday the sixteenth at eight in the evening under the name Aarav Sharma. Your confirmation code is T T B 3 D M A. If you need to cancel or change your reservation, just mention this code.",
+      "text": "I have confirmed your table for 2 guests on Friday the sixteenth at eight in the evening under the name Aarav Sharma. Your confirmation code is T T K S Y 5 6. If you need to cancel or change your reservation, just mention this code.",
       "type": "text"
     }
   ],
@@ -10,8 +10,8 @@
     "alternatives": [],
     "booking": {
       "area": "patio",
-      "confirmation_code": "TT-B3DMA",
-      "created_at": "2026-10-14T12:58:03.229764100+00:00",
+      "confirmation_code": "TT-KSY56",
+      "created_at": "2026-10-14T14:49:45.106658300+00:00",
       "end_local": "2026-10-16T21:15:00+05:30",
       "guest_name": "Aarav Sharma",
       "party_size": 2,

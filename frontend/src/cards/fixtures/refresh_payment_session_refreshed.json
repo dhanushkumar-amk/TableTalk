@@ -1,21 +1,21 @@
 {
   "content": [
     {
-      "text": "A table for six needs a deposit of one thousand five hundred rupees. I've put the payment on your screen, and I'll hold the table for fifteen minutes. This is a simulated payment. Your confirmation code is T T E Q 6 W E.",
+      "text": "A table for six needs a deposit of one thousand five hundred rupees. I've put the payment on your screen, and I'll hold the table for fifteen minutes. This is a simulated payment. Your confirmation code is T T Y 4 W A 9.",
       "type": "text"
     }
   ],
   "isError": false,
   "structuredContent": {
-    "message": "A new simulated payment link was issued for booking T T E Q 6 W E. The payment deadline was not extended.",
+    "message": "A new simulated payment link was issued for booking T T Y 4 W A 9. The payment deadline was not extended.",
     "payment": {
       "amount": {
         "amount_minor": 150000,
         "currency": "INR",
         "display": "₹1500"
       },
-      "checkout_url": "http://localhost:5173/checkout/tt_pay_1e98ad5fcec477e3e336bb7932b61aaf",
-      "deadline_local": "2026-10-14T18:43:03.257283300+05:30",
+      "checkout_url": "http://localhost:5173/checkout/tt_pay_3d197df7ad26b83a569598eea533b5fd",
+      "deadline_local": "2026-10-14T20:34:45.136776400+05:30",
       "minutes_remaining": 15,
       "required": true,
       "simulated": true,
