@@ -421,3 +421,8 @@ export function renderCard({ toolName, envelope, events }: CardRendererProps): R
       )
   }
 }
+
+export function CardRenderer(props: CardRendererProps): React.ReactElement {
+  return renderCard(props)
+}
+
