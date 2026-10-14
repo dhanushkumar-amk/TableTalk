@@ -9,6 +9,7 @@ pub struct Config {
     pub database_url: String,
     pub seed_on_start: bool,
     pub restaurant_tz: String,
+    pub rate_limit_per_minute: usize,
 }
 
 impl Config {
@@ -54,6 +55,11 @@ impl Config {
         let restaurant_tz =
             env::var("RESTAURANT_TZ").unwrap_or_else(|_| "Asia/Kolkata".to_string());
 
+        let rate_limit_per_minute: usize = env::var("RATE_LIMIT_PER_MINUTE")
+            .ok()
+            .and_then(|r| r.parse().ok())
+            .unwrap_or(600);
+
         Self {
             port,
             allowed_origins,
@@ -62,6 +68,7 @@ impl Config {
             database_url,
             seed_on_start,
             restaurant_tz,
+            rate_limit_per_minute,
         }
     }
 }
@@ -81,6 +88,7 @@ impl Default for Config {
             database_url: "sqlite::memory:".to_string(),
             seed_on_start: false,
             restaurant_tz: "Asia/Kolkata".to_string(),
+            rate_limit_per_minute: 600,
         }
     }
 }

@@ -166,6 +166,27 @@ async fn validate_protocol_version(req: Request, next: Next) -> Response {
     next.run(req).await
 }
 
+pub fn handle_panic(err: Box<dyn std::any::Any + Send + 'static>) -> Response {
+    let req_id = uuid::Uuid::new_v4();
+    let panic_msg = if let Some(s) = err.downcast_ref::<&str>() {
+        s.to_string()
+    } else if let Some(s) = err.downcast_ref::<String>() {
+        s.clone()
+    } else {
+        "Unknown panic payload".to_string()
+    };
+    tracing::error!(
+        request_id = %req_id,
+        "Server panic intercepted by CatchPanicLayer: {}",
+        panic_msg
+    );
+    (
+        StatusCode::INTERNAL_SERVER_ERROR,
+        "Internal Server Error: An unexpected error occurred. Please try again.\n",
+    )
+        .into_response()
+}
+
 /// Build the full application router with health check, MCP service, CORS, and security middleware.
 pub fn build_router(config: &Config) -> Router {
     build_router_with_db(config, None)
@@ -187,6 +208,9 @@ pub fn build_router_with_db(config: &Config, pool: Option<sqlx::SqlitePool>) -> 
         StreamableHttpService::new(move || Ok(server.clone()), session_manager, mcp_config);
 
     let allowed_origins_state = Arc::new(config.allowed_origins.clone());
+    let ip_rate_limiter = Arc::new(crate::rate_limit::IpRateLimiter::new(
+        config.rate_limit_per_minute,
+    ));
 
     // Restrictive CORS configuration
     let parsed_origins: Vec<HeaderValue> = config
@@ -213,8 +237,8 @@ pub fn build_router_with_db(config: &Config, pool: Option<sqlx::SqlitePool>) -> 
         ])
         .max_age(Duration::from_secs(3600));
 
-    Router::new()
-        .route("/health", get(health_handler))
+    // Rate-limited router for MCP and checkout endpoints
+    let protected_endpoints = Router::new()
         .merge(match pool_for_checkout {
             Some(p) => crate::checkout::checkout_router(crate::checkout::CheckoutState {
                 pool: p,
@@ -224,6 +248,17 @@ pub fn build_router_with_db(config: &Config, pool: Option<sqlx::SqlitePool>) -> 
             None => Router::new(),
         })
         .nest_service("/mcp", mcp_service)
+        .layer(from_fn_with_state(
+            ip_rate_limiter,
+            crate::rate_limit::rate_limit_middleware,
+        ));
+
+    Router::new()
+        .route("/health", get(health_handler))
+        .merge(protected_endpoints)
+        .layer(tower_http::catch_panic::CatchPanicLayer::custom(
+            handle_panic,
+        ))
         .layer(from_fn_with_state(allowed_origins_state, validate_origin))
         .layer(axum::middleware::from_fn(validate_protocol_version))
         .layer(axum::middleware::from_fn(validate_body_size))
