@@ -37,6 +37,21 @@ globalThis.ResizeObserver = class ResizeObserver {
   disconnect() {}
 }
 
+// Mock IntersectionObserver for framer-motion whileInView
+globalThis.IntersectionObserver = class IntersectionObserver {
+  readonly root: Element | Document | null = null
+  readonly rootMargin: string = ""
+  readonly scrollMargin: string = ""
+  readonly thresholds: ReadonlyArray<number> = []
+  constructor() {}
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+  takeRecords() {
+    return []
+  }
+} as unknown as typeof IntersectionObserver
+
 // Mock scrollIntoView for jsdom
 if (typeof Element !== "undefined" && !Element.prototype.scrollIntoView) {
   Element.prototype.scrollIntoView = vi.fn()
