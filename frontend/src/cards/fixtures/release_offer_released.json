@@ -1,0 +1,14 @@
+{
+  "content": [
+    {
+      "text": "I've released your held table. Let me know if you'd like to check other times.",
+      "type": "text"
+    }
+  ],
+  "isError": false,
+  "structuredContent": {
+    "already_released": false,
+    "message": "Table hold has been successfully released.",
+    "status": "released"
+  }
+}

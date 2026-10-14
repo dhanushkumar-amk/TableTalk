@@ -1,0 +1,14 @@
+{
+  "content": [
+    {
+      "text": "I couldn't find an order with that code and name. Please check the code and the name on the order.",
+      "type": "text"
+    }
+  ],
+  "isError": false,
+  "structuredContent": {
+    "message": "No matching order found for the provided order code and guest name.",
+    "order": null,
+    "status": "not_found"
+  }
+}

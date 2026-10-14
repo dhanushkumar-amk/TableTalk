@@ -1,0 +1,30 @@
+{
+  "content": [
+    {
+      "text": "I have confirmed your table for 2 guests on Friday the sixteenth at eight in the evening under the name Aarav Sharma. Your confirmation code is T T B 3 D M A. If you need to cancel or change your reservation, just mention this code.",
+      "type": "text"
+    }
+  ],
+  "isError": false,
+  "structuredContent": {
+    "alternatives": [],
+    "booking": {
+      "area": "patio",
+      "confirmation_code": "TT-B3DMA",
+      "created_at": "2026-10-14T12:58:03.229764100+00:00",
+      "end_local": "2026-10-16T21:15:00+05:30",
+      "guest_name": "Aarav Sharma",
+      "party_size": 2,
+      "special_requests": null,
+      "start_local": "2026-10-16T20:00:00+05:30",
+      "status": "confirmed",
+      "table_label": "P01"
+    },
+    "cancellation_policy": "Free cancellation up to 6 hours prior to reservation.",
+    "idempotent_replay": false,
+    "note": "availability is a snapshot, not a reservation",
+    "reason": null,
+    "reason_detail": null,
+    "status": "confirmed"
+  }
+}

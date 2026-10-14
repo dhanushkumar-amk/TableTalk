@@ -1,0 +1,43 @@
+{
+  "content": [
+    {
+      "text": "I have a table for 2 guests on Friday the sixteenth at seven thirty in the evening. Want me to book it?",
+      "type": "text"
+    }
+  ],
+  "isError": false,
+  "structuredContent": {
+    "alternatives": [],
+    "note": "availability is a snapshot, not a reservation",
+    "opening_hours_that_day": [
+      {
+        "close": "15:30",
+        "open": "12:00"
+      },
+      {
+        "close": "23:30",
+        "open": "19:00"
+      }
+    ],
+    "reason": null,
+    "reason_detail": null,
+    "requested": {
+      "area": "indoor",
+      "date": "2026-10-16",
+      "duration_minutes": 75,
+      "party_size": 2,
+      "time": "19:30",
+      "timezone": "Asia/Kolkata"
+    },
+    "restaurant_now": "2026-10-14T18:28:03.222575900+05:30",
+    "slot": {
+      "area": "indoor",
+      "capacity": 2,
+      "end_local": "2026-10-16T20:45:00+05:30",
+      "start_local": "2026-10-16T19:30:00+05:30",
+      "table_label": "T01"
+    },
+    "snapped_from": null,
+    "status": "available"
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "content": [
+    {
+      "text": "I don't have any tables available around that time. Would you like to join the waitlist?",
+      "type": "text"
+    }
+  ],
+  "isError": false,
+  "structuredContent": {
+    "message": "No alternative dining options found matching your flexibility criteria. You may join the waitlist.",
+    "negotiation_id": 2,
+    "options": [],
+    "profile_applied": null,
+    "round": 1,
+    "slot": null,
+    "status": "no_more_options"
+  }
+}

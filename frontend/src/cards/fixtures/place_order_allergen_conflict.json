@@ -1,0 +1,25 @@
+{
+  "content": [
+    {
+      "text": "The Crisp Palak Chaat is listed as containing dairy, which you asked to avoid. Would you like to try the Dahi Puri Spheres instead?",
+      "type": "text"
+    }
+  ],
+  "isError": false,
+  "structuredContent": {
+    "allergen_notice": "Kitchen handles common allergens including dairy, peanuts, tree nuts, and gluten. Please inform restaurant staff of any severe allergies before ordering.",
+    "alternatives": [
+      "Dahi Puri Spheres",
+      "Gunpowder Idli Bites",
+      "Kurkuri Bhindi Tartlets"
+    ],
+    "candidates": [],
+    "earliest_pickup_local": null,
+    "idempotent_replay": false,
+    "order": null,
+    "price_changes": [],
+    "reason": "allergen_conflict",
+    "reason_detail": "Order contains items conflicting with requested allergen restrictions: [\"Crisp Palak Chaat\"]",
+    "status": "allergen_conflict"
+  }
+}

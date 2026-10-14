@@ -1,0 +1,68 @@
+{
+  "content": [
+    {
+      "text": "Welcome back, MemoryGuest. I found your profile with 2 saved dining preferences.",
+      "type": "text"
+    }
+  ],
+  "isError": false,
+  "structuredContent": {
+    "consent_granted_at": "2026-10-14T12:58:03.284827500+00:00",
+    "consent_version": "v1.0",
+    "counts": {
+      "preference_count": 2,
+      "total_bookings": 0,
+      "total_orders": 0
+    },
+    "data_export": {
+      "booking_ids": [],
+      "consent_granted_at": "2026-10-14T12:58:03.284827500+00:00",
+      "consent_version": "v1.0",
+      "display_name": "MemoryGuest",
+      "email": null,
+      "order_ids": [],
+      "phone": null,
+      "preferences": [
+        {
+          "confirmed_at": "2026-10-14T12:58:03.288022200+00:00",
+          "created_at": "2026-10-14T12:58:03.288022200+00:00",
+          "id": 14,
+          "kind": "allergy",
+          "severity": "unknown",
+          "value": "peanuts"
+        },
+        {
+          "confirmed_at": null,
+          "created_at": "2026-10-14T12:58:03.291858800+00:00",
+          "id": 15,
+          "kind": "note",
+          "severity": null,
+          "value": "Prefers booth near window, celebrate anniversary <script>alert('xss')</script>"
+        }
+      ]
+    },
+    "email_masked": null,
+    "guest_name": "MemoryGuest",
+    "needs_reconfirmation": [],
+    "phone_masked": null,
+    "preferences": [
+      {
+        "confirmed_at": "2026-10-14T12:58:03.288022200+00:00",
+        "created_at": "2026-10-14T12:58:03.288022200+00:00",
+        "id": 14,
+        "kind": "allergy",
+        "severity": "unknown",
+        "value": "peanuts"
+      },
+      {
+        "confirmed_at": null,
+        "created_at": "2026-10-14T12:58:03.291858800+00:00",
+        "id": 15,
+        "kind": "note",
+        "severity": null,
+        "value": "Prefers booth near window, celebrate anniversary <script>alert('xss')</script>"
+      }
+    ],
+    "status": "found"
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "content": [
+    {
+      "text": "Welcome back, MemoryGuest. You don't have any past orders with us yet. Would you like to check out today's specials or search the menu?",
+      "type": "text"
+    }
+  ],
+  "isError": false,
+  "structuredContent": {
+    "allergen_notice": "Kitchen handles common allergens including dairy, peanuts, tree nuts, and gluten. Please inform restaurant staff of any severe allergies before ordering.",
+    "conflicting_items": [],
+    "guest_name": "MemoryGuest",
+    "needs_allergy_reconfirmation": [],
+    "price_changes": [],
+    "status": "no_history",
+    "subtotal": null,
+    "suggested_lines": [],
+    "tax": null,
+    "total": null,
+    "unavailable_items": []
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "content": [
+    {
+      "text": "You are currently number 1 on the waitlist for 2026-10-16. No table has opened up yet. Please check back later.",
+      "type": "text"
+    }
+  ],
+  "isError": false,
+  "structuredContent": {
+    "message": "Waitlist status retrieved successfully.",
+    "status": "waiting",
+    "waitlist": {
+      "area": "indoor",
+      "code": "WL-78QSZ",
+      "date": "2026-10-16",
+      "expires_at_local": "End of service day",
+      "guest_name": "Ananya Desai",
+      "offer": null,
+      "party_size": 4,
+      "queue_position": 1,
+      "status": "waiting",
+      "window_end": "21:00",
+      "window_start": "19:00"
+    }
+  }
+}

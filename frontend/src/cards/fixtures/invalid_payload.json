@@ -1,0 +1,15 @@
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "I encountered an unexpected format while processing your request. Please try again or ask for assistance."
+    }
+  ],
+  "isError": false,
+  "structuredContent": {
+    "corrupt_field": true,
+    "unexpected_nested": {
+      "random": 12345
+    }
+  }
+}

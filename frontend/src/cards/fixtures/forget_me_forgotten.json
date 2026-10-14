@@ -1,0 +1,26 @@
+{
+  "content": [
+    {
+      "text": "I have completely removed your profile and preferences. Your historical orders and bookings have been anonymized for business records.",
+      "type": "text"
+    }
+  ],
+  "isError": false,
+  "structuredContent": {
+    "message": "Your profile, preferences, and security tokens have been permanently deleted. Historical order and booking records have been scrubbed of all personal identifiers.",
+    "removed_components": [
+      "profile",
+      "preferences",
+      "profile_tokens",
+      "consent_records",
+      "waitlist_entries",
+      "slot_holds",
+      "negotiations"
+    ],
+    "scrubbed_business_records": {
+      "scrubbed_bookings": 0,
+      "scrubbed_orders": 0
+    },
+    "status": "forgotten"
+  }
+}

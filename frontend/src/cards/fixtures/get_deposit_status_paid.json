@@ -1,0 +1,32 @@
+{
+  "content": [
+    {
+      "text": "Your deposit of three thousand rupees is already paid, and your table is confirmed.",
+      "type": "text"
+    }
+  ],
+  "isError": false,
+  "structuredContent": {
+    "amount": {
+      "amount_minor": 300000,
+      "currency": "INR",
+      "display": "₹3000"
+    },
+    "deadline_local": null,
+    "deposit_status": "paid",
+    "message": "Your deposit of three thousand rupees is already paid, and your table is confirmed.",
+    "minutes_remaining": null,
+    "refund_if_cancelled_now": {
+      "amount": {
+        "amount_minor": 300000,
+        "currency": "INR",
+        "display": "₹3000"
+      },
+      "explanation": "If you cancel now, you would receive ₹3000.",
+      "percent_bps": 10000,
+      "percent_display": "100%"
+    },
+    "required": true,
+    "status": "found"
+  }
+}

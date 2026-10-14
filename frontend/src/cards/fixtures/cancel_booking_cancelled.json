@@ -1,0 +1,17 @@
+{
+  "content": [
+    {
+      "text": "I couldn't find a booking with that confirmation code and name. Please check the code and the name on the booking.",
+      "type": "text"
+    }
+  ],
+  "isError": false,
+  "structuredContent": {
+    "already_cancelled": false,
+    "booking": null,
+    "policy_note": null,
+    "reason": "not_found",
+    "reason_detail": "No matching booking found for the provided confirmation code and guest name. Please check your confirmation details.",
+    "status": "not_found"
+  }
+}

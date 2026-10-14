@@ -1,0 +1,25 @@
+{
+  "content": [
+    {
+      "text": "I'm holding the bar at eight thirty for five minutes. Shall I confirm it?",
+      "type": "text"
+    }
+  ],
+  "isError": false,
+  "structuredContent": {
+    "booking": null,
+    "hold": {
+      "area": "bar",
+      "end_local": "22:00",
+      "expires_at_local": "18:33",
+      "hold_id": 1,
+      "party_size": 2,
+      "seconds_remaining": 300,
+      "start_local": "20:30",
+      "table_label": "B01"
+    },
+    "message": "Table hold successfully placed for 5 minutes. Offer token returned.",
+    "offer_token": "tt_offer_2a33463c3c3c1be7c802c0ce244e5603",
+    "status": "held"
+  }
+}

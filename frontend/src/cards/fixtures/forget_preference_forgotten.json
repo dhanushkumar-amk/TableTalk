@@ -1,0 +1,17 @@
+{
+  "content": [
+    {
+      "text": "I've removed peanuts from your saved profile preferences. Please remember to inform restaurant staff of any active allergies when ordering.",
+      "type": "text"
+    }
+  ],
+  "isError": false,
+  "structuredContent": {
+    "kind": "allergy",
+    "message": "Successfully removed 'peanuts' from your profile preferences.",
+    "policy_note": "Allergy preference removed from profile only. The kitchen cannot guarantee an allergy-free environment; severe allergies must always be confirmed directly with staff at each visit.",
+    "removed": true,
+    "status": "forgotten",
+    "value": "peanuts"
+  }
+}

@@ -1,0 +1,159 @@
+{
+  "content": [
+    {
+      "text": "I found 7 matching dishes. Top choices are Dum Gosht Biryani for six hundred eighty rupees, Tandoori Roti for ninety rupees, Laccha Paratha for one hundred forty rupees. Would you like to hear more or narrow down by category?",
+      "type": "text"
+    }
+  ],
+  "isError": false,
+  "structuredContent": {
+    "allergen_notice": "Kitchen handles common allergens including dairy, peanuts, tree nuts, and gluten. Please inform restaurant staff of any severe allergies before ordering.",
+    "applied_filters": {
+      "category": null,
+      "dietary": [],
+      "exclude_allergens": [],
+      "include_unavailable": false,
+      "limit": 5,
+      "max_price_inr": null,
+      "query": "biryani",
+      "sort": "relevance"
+    },
+    "items": [
+      {
+        "allergens": [
+          "dairy"
+        ],
+        "available": true,
+        "calories": 750,
+        "category": "Biryani, Rice & Artisanal Breads",
+        "chefs_special": true,
+        "description": "Tender mutton chunks steeped overnight in spice yogurt and layered with aromatic rice",
+        "dietary_tags": [
+          "gluten_free",
+          "halal",
+          "nut_free"
+        ],
+        "id": 23,
+        "image_url": null,
+        "match_reason": "chef's signature dish",
+        "name": "Dum Gosht Biryani",
+        "prep_time_minutes": 30,
+        "price": {
+          "amount_minor": 68000,
+          "currency": "INR",
+          "display": "₹680"
+        },
+        "spice_level": 2
+      },
+      {
+        "allergens": [
+          "gluten"
+        ],
+        "available": true,
+        "calories": 140,
+        "category": "Biryani, Rice & Artisanal Breads",
+        "chefs_special": false,
+        "description": "Whole wheat unleavened bread baked crisp on tandoor walls",
+        "dietary_tags": [
+          "dairy_free",
+          "nut_free",
+          "vegan",
+          "vegetarian"
+        ],
+        "id": 27,
+        "image_url": null,
+        "match_reason": "matched menu search",
+        "name": "Tandoori Roti",
+        "prep_time_minutes": 6,
+        "price": {
+          "amount_minor": 9000,
+          "currency": "INR",
+          "display": "₹90"
+        },
+        "spice_level": 0
+      },
+      {
+        "allergens": [
+          "dairy",
+          "gluten"
+        ],
+        "available": true,
+        "calories": 240,
+        "category": "Biryani, Rice & Artisanal Breads",
+        "chefs_special": false,
+        "description": "Flaky multi-layered whole wheat bread dusted with crushed dried mint",
+        "dietary_tags": [
+          "nut_free",
+          "vegetarian"
+        ],
+        "id": 26,
+        "image_url": null,
+        "match_reason": "matched menu search",
+        "name": "Laccha Paratha",
+        "prep_time_minutes": 8,
+        "price": {
+          "amount_minor": 14000,
+          "currency": "INR",
+          "display": "₹140"
+        },
+        "spice_level": 0
+      },
+      {
+        "allergens": [
+          "dairy",
+          "gluten"
+        ],
+        "available": true,
+        "calories": 280,
+        "category": "Biryani, Rice & Artisanal Breads",
+        "chefs_special": false,
+        "description": "Tandoor-baked leavened flatbread brushed with black truffle butter and minced garlic",
+        "dietary_tags": [
+          "nut_free",
+          "vegetarian"
+        ],
+        "id": 25,
+        "image_url": null,
+        "match_reason": "matched menu search",
+        "name": "Truffle Garlic Butter Naan",
+        "prep_time_minutes": 8,
+        "price": {
+          "amount_minor": 18000,
+          "currency": "INR",
+          "display": "₹180"
+        },
+        "spice_level": 0
+      },
+      {
+        "allergens": [],
+        "available": true,
+        "calories": 230,
+        "category": "Biryani, Rice & Artisanal Breads",
+        "chefs_special": false,
+        "description": "Fluffy aged basmati rice tempered with shahi jeera and clarified butter",
+        "dietary_tags": [
+          "dairy_free",
+          "gluten_free",
+          "nut_free",
+          "vegan",
+          "vegetarian"
+        ],
+        "id": 24,
+        "image_url": null,
+        "match_reason": "matched menu search",
+        "name": "Steamed Jeera Basmati",
+        "prep_time_minutes": 10,
+        "price": {
+          "amount_minor": 22000,
+          "currency": "INR",
+          "display": "₹220"
+        },
+        "spice_level": 0
+      }
+    ],
+    "query_summary": "Found 7 items matching \"biryani\"",
+    "returned": 5,
+    "suggestions": [],
+    "total_matches": 7
+  }
+}

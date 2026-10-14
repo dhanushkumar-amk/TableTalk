@@ -1,0 +1,15 @@
+{
+  "content": [
+    {
+      "text": "I've removed you from the waitlist.",
+      "type": "text"
+    }
+  ],
+  "isError": false,
+  "structuredContent": {
+    "already_cancelled": false,
+    "code": "WL-78QSZ",
+    "message": "You have been successfully removed from the waitlist.",
+    "status": "cancelled"
+  }
+}

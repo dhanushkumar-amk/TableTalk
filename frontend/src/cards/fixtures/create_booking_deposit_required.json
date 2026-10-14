@@ -1,0 +1,43 @@
+{
+  "content": [
+    {
+      "text": "A table for six needs a deposit of one thousand five hundred rupees. I've put the payment on your screen, and I'll hold the table for fifteen minutes. This is a simulated payment. Your confirmation code is T T E Q 6 W E.",
+      "type": "text"
+    }
+  ],
+  "isError": false,
+  "structuredContent": {
+    "alternatives": [],
+    "booking": {
+      "area": "indoor",
+      "confirmation_code": "TT-EQ6WE",
+      "created_at": "2026-10-14T12:58:03.257283300+00:00",
+      "end_local": "2026-10-16T21:15:00+05:30",
+      "guest_name": "Simulated Deposit Guest",
+      "party_size": 6,
+      "special_requests": null,
+      "start_local": "2026-10-16T19:30:00+05:30",
+      "status": "pending",
+      "table_label": "T05"
+    },
+    "cancellation_policy": "Deposit required for this reservation. Full refund if cancelled at least 24 hours before the start time, 50% refund between 2 and 24 hours, no refund less than 2 hours before.",
+    "idempotent_replay": false,
+    "note": "availability is a snapshot, not a reservation",
+    "payment": {
+      "amount": {
+        "amount_minor": 150000,
+        "currency": "INR",
+        "display": "₹1500"
+      },
+      "checkout_url": "http://localhost:5173/checkout/tt_pay_ecf87e431998772dd15a5cf9d515f067",
+      "deadline_local": "2026-10-14T18:43:03.257283300+05:30",
+      "minutes_remaining": 15,
+      "required": true,
+      "simulated": true,
+      "status": "requires_payment"
+    },
+    "reason": "deposit_required",
+    "reason_detail": "A simulated deposit of ₹1500 is required. Complete the payment to confirm the reservation.",
+    "status": "pending"
+  }
+}

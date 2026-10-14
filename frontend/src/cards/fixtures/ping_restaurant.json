@@ -1,0 +1,14 @@
+{
+  "content": [
+    {
+      "text": "{\"message\":\"Hello, Guest! TableTalk restaurant MCP server is online.\",\"server\":\"tabletalk\",\"version\":\"0.1.0\"}",
+      "type": "text"
+    }
+  ],
+  "isError": false,
+  "structuredContent": {
+    "message": "Hello, Guest! TableTalk restaurant MCP server is online.",
+    "server": "tabletalk",
+    "version": "0.1.0"
+  }
+}

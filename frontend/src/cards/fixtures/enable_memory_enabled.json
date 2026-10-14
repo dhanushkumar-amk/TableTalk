@@ -1,0 +1,17 @@
+{
+  "content": [
+    {
+      "text": "I've saved your profile, MemoryGuest. We will remember your dining preferences and past orders for future visits. You can ask me to forget your profile at any time.",
+      "type": "text"
+    }
+  ],
+  "isError": false,
+  "structuredContent": {
+    "consent_version": "v1.0",
+    "guest_name": "MemoryGuest",
+    "message": "Memory profile successfully enabled. Keep your profile token secure; it will not be shown again.",
+    "preferences_saved": 0,
+    "profile_token": "tt_prof_N3fFqI0CLrrPaAiDIDvw9iDRdn7xeNwDhwaI0kr5nck",
+    "status": "enabled"
+  }
+}

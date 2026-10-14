@@ -1,0 +1,22 @@
+{
+  "content": [
+    {
+      "text": "I've noted that you would like to avoid peanuts.",
+      "type": "text"
+    }
+  ],
+  "isError": false,
+  "structuredContent": {
+    "deduplicated": false,
+    "message": "Preference successfully saved to your profile.",
+    "preference": {
+      "confirmed_at": "2026-10-14T12:58:03.288022200+00:00",
+      "created_at": "2026-10-14T12:58:03.288022200+00:00",
+      "id": 14,
+      "kind": "allergy",
+      "severity": "unknown",
+      "value": "peanuts"
+    },
+    "status": "remembered"
+  }
+}

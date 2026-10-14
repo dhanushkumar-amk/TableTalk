@@ -1,0 +1,28 @@
+{
+  "content": [
+    {
+      "text": "The restaurant is closed on Tuesday the twentieth. Would you like to check availability for tomorrow?",
+      "type": "text"
+    }
+  ],
+  "isError": false,
+  "structuredContent": {
+    "alternatives": [],
+    "note": "availability is a snapshot, not a reservation",
+    "opening_hours_that_day": [],
+    "reason": "closed_day",
+    "reason_detail": "The restaurant is closed on Tuesdays.",
+    "requested": {
+      "area": "any",
+      "date": "2026-10-20",
+      "duration_minutes": 75,
+      "party_size": 2,
+      "time": "19:30",
+      "timezone": "Asia/Kolkata"
+    },
+    "restaurant_now": "2026-10-14T18:28:03.228243900+05:30",
+    "slot": null,
+    "snapped_from": null,
+    "status": "closed"
+  }
+}

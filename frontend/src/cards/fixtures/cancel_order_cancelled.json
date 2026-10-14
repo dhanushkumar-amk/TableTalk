@@ -1,0 +1,17 @@
+{
+  "content": [
+    {
+      "text": "I couldn't find an order with that code and name. Please check the code and the name on the order.",
+      "type": "text"
+    }
+  ],
+  "isError": false,
+  "structuredContent": {
+    "already_cancelled": false,
+    "order": null,
+    "policy_note": null,
+    "reason": "not_found",
+    "reason_detail": "No matching order found for the provided order code and guest name. Please check your order details.",
+    "status": "not_found"
+  }
+}

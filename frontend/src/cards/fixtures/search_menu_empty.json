@@ -1,0 +1,29 @@
+{
+  "content": [
+    {
+      "text": "I couldn't find any items matching all your filters. Browsing without the specific search keyword would match 33 dishes. Would you like to try that?",
+      "type": "text"
+    }
+  ],
+  "isError": false,
+  "structuredContent": {
+    "allergen_notice": "Kitchen handles common allergens including dairy, peanuts, tree nuts, and gluten. Please inform restaurant staff of any severe allergies before ordering.",
+    "applied_filters": {
+      "category": null,
+      "dietary": [],
+      "exclude_allergens": [],
+      "include_unavailable": false,
+      "limit": 5,
+      "max_price_inr": null,
+      "query": "nonexistent_dish_xyz_99",
+      "sort": "relevance"
+    },
+    "items": [],
+    "query_summary": "Found 0 items matching \"nonexistent_dish_xyz_99\"",
+    "returned": 0,
+    "suggestions": [
+      "Browsing without the specific search keyword would match 33 dishes"
+    ],
+    "total_matches": 0
+  }
+}

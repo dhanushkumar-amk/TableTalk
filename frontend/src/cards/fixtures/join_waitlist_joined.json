@@ -1,0 +1,22 @@
+{
+  "content": [
+    {
+      "text": "You're on the waitlist at position 1 for Friday, October 16 between 7:00 pm and 9:00 pm. Your code is W L - 7 8 Q S Z. Since we don't send notifications, please check back for updates.",
+      "type": "text"
+    }
+  ],
+  "isError": false,
+  "structuredContent": {
+    "area": "indoor",
+    "code": "WL-78QSZ",
+    "date": "2026-10-16",
+    "expires_at_local": "End of service day",
+    "guest_name": "Ananya Desai",
+    "message": "Successfully joined waitlist.",
+    "party_size": 4,
+    "queue_position": 1,
+    "status": "waiting",
+    "window_end": "21:00",
+    "window_start": "19:00"
+  }
+}
