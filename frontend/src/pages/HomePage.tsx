@@ -21,13 +21,12 @@ import {
   ChevronRight,
   Zap,
   Radio,
-  Layers,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { StatusBadge } from "@/components/primitives/StatusBadge"
 import { CodeBlock } from "@/components/primitives/CodeBlock"
 import { VoiceNebulaOrb } from "@/components/home/VoiceNebulaOrb"
-import { LiveTableRadar } from "@/components/home/LiveTableRadar"
+import { ProtocolBenchmark } from "@/components/home/ProtocolBenchmark"
 
 interface Scenario {
   id: string
@@ -430,22 +429,9 @@ export function HomePage() {
         </section>
 
         {/* ========================================================= */}
-        {/* 4. VISUAL RESTAURANT RADAR: 14 INTERACTIVE TABLES         */}
+        {/* 4. PERFORMANCE BENCHMARK: OLD WAY VS TABLETALK           */}
         {/* ========================================================= */}
-        <section className="mb-20 sm:mb-28 space-y-6">
-          <div className="text-center max-w-xl mx-auto space-y-2 mb-8">
-            <div className="inline-flex items-center gap-1.5 text-xs font-mono font-semibold uppercase tracking-wider text-primary">
-              <Layers className="size-3.5" />
-              <span>SPATIAL TABLE CONCURRENCY</span>
-            </div>
-            <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-foreground">
-              Real-time floorplan & capacity engine
-            </h2>
-            <p className="text-sm text-muted-foreground">
-              Every table has a live concurrency lock. Select any table to inspect current dining status, seating area, and instant booking availability.
-            </p>
-          </div>
-
+        <section className="mb-20 sm:mb-28">
           <motion.div
             initial={shouldReduceMotion ? { opacity: 1 } : { opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -453,7 +439,7 @@ export function HomePage() {
             transition={{ duration: 0.5 }}
             className="max-w-4xl mx-auto"
           >
-            <LiveTableRadar />
+            <ProtocolBenchmark />
           </motion.div>
         </section>
 
