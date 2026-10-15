@@ -1,7 +1,7 @@
 {
   "content": [
     {
-      "text": "The kitchen needs about 12 minutes to prepare your order. The earliest pickup time is eight forty-five in the evening. Would that work for you?",
+      "text": "I've placed your pickup order for 2 items totaling seven hundred ninety-eight rupees, ready at seven thirty in the evening. Your order code is T O Z G V 2 R. Pay at pickup. Please let us know if you have any allergies.",
       "type": "text"
     }
   ],
@@ -10,12 +10,61 @@
     "allergen_notice": "Kitchen handles common allergens including dairy, peanuts, tree nuts, and gluten. Please inform restaurant staff of any severe allergies before ordering.",
     "alternatives": [],
     "candidates": [],
-    "earliest_pickup_local": "2026-10-14T20:45:00+05:30",
+    "earliest_pickup_local": "2026-10-15T06:15:00+05:30",
     "idempotent_replay": false,
-    "order": null,
+    "order": {
+      "created_at": "2026-10-15T00:30:50.410728600+00:00",
+      "guest_name": "Meera Rao",
+      "lines": [
+        {
+          "allergens": [
+            "dairy"
+          ],
+          "dietary_tags": [
+            "vegetarian",
+            "gluten_free",
+            "nut_free"
+          ],
+          "item_id": 1,
+          "line_total": {
+            "amount_minor": 76000,
+            "currency": "INR",
+            "display": "₹760"
+          },
+          "name": "Crisp Palak Chaat",
+          "notes": null,
+          "quantity": 2,
+          "unit_price": {
+            "amount_minor": 38000,
+            "currency": "INR",
+            "display": "₹380"
+          }
+        }
+      ],
+      "order_code": "TO-ZGV2R",
+      "payment_status": "unpaid_pay_at_pickup",
+      "pickup_time_local": "2026-10-15T19:30:00+05:30",
+      "stated_allergens": null,
+      "status": "placed",
+      "subtotal": {
+        "amount_minor": 76000,
+        "currency": "INR",
+        "display": "₹760"
+      },
+      "tax": {
+        "amount_minor": 3800,
+        "currency": "INR",
+        "display": "₹38"
+      },
+      "total": {
+        "amount_minor": 79800,
+        "currency": "INR",
+        "display": "₹798"
+      }
+    },
     "price_changes": [],
-    "reason": "pickup_too_soon",
-    "reason_detail": "Requested pickup time 19:30 is before the earliest feasible preparation time 20:45.",
-    "status": "pickup_too_soon"
+    "reason": null,
+    "reason_detail": null,
+    "status": "placed"
   }
 }

@@ -1,7 +1,7 @@
 {
   "content": [
     {
-      "text": "Your reservation is confirmed! Your confirmation code is B K H 5 U 7 U.",
+      "text": "Your reservation is confirmed! Your confirmation code is B K 3 U Q N 4.",
       "type": "text"
     }
   ],
@@ -9,8 +9,8 @@
   "structuredContent": {
     "booking": {
       "area": "bar",
-      "confirmation_code": "BK-H5U7U",
-      "created_at": "2026-10-14T14:49:45.177071100+00:00",
+      "confirmation_code": "BK-3UQN4",
+      "created_at": "2026-10-15T00:30:50.447176400+00:00",
       "end_local": "22:00",
       "guest_name": "HoldTester",
       "party_size": 2,

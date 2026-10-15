@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Link } from "react-router-dom"
 import { motion, useReducedMotion } from "framer-motion"
 import {
@@ -26,10 +26,37 @@ import { Button } from "@/components/ui/button"
 import { BistroPanorama } from "@/components/home/BistroPanorama"
 import { LiveAudioVisualizer } from "@/components/home/LiveAudioVisualizer"
 import { EventHeroBanner } from "@/components/home/EventHeroBanner"
+import { SignatureDishesMarquee } from "@/components/home/SignatureDishesMarquee"
 
 export function HomePage() {
   const shouldReduceMotion = useReducedMotion()
   const [activeTab, setActiveTab] = useState("overview")
+
+  // Auto-scrollspy: highlight current section in navigation as user scrolls
+  useEffect(() => {
+    if (typeof window === "undefined" || !("IntersectionObserver" in window)) {
+      return
+    }
+
+    const sections = ["overview", "how-it-works", "tracks", "suite", "dishes", "atmosphere", "venue"]
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            setActiveTab(entry.target.id)
+          }
+        })
+      },
+      { rootMargin: "-25% 0px -65% 0px" }
+    )
+
+    sections.forEach((id) => {
+      const el = document.getElementById(id)
+      if (el) observer.observe(el)
+    })
+
+    return () => observer.disconnect()
+  }, [])
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -40,11 +67,11 @@ export function HomePage() {
   }
 
   const itemVariants = {
-    hidden: shouldReduceMotion ? { opacity: 1 } : { opacity: 0, y: 16 },
+    hidden: shouldReduceMotion ? { opacity: 1 } : { opacity: 0, y: 20 },
     visible: {
       opacity: 1,
       y: 0,
-      transition: { duration: 0.25, ease: "easeOut" as const },
+      transition: { duration: 0.35, ease: "easeOut" as const },
     },
   }
 
@@ -60,22 +87,36 @@ export function HomePage() {
     <div className="relative overflow-hidden">
       {/* Background radial gradient glow (warm terracotta & twilight atmosphere) */}
       <div
-        className="pointer-events-none absolute -top-40 left-1/2 -z-10 h-[600px] w-[1000px] -translate-x-1/2 rounded-full bg-gradient-to-b from-primary/15 via-primary/5 to-transparent blur-3xl opacity-80 dark:opacity-40"
+        className="pointer-events-none absolute -top-40 left-1/2 -z-10 h-[640px] w-[1000px] -translate-x-1/2 rounded-full bg-gradient-to-b from-primary/15 via-primary/5 to-transparent blur-3xl opacity-80 dark:opacity-40"
         aria-hidden="true"
       />
 
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 sm:pt-8 pb-20">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 sm:pt-8 pb-16">
         {/* ========================================================= */}
         {/* TOP EVENT STICKER / BANNER (Inspired by Screenshot 1)     */}
         {/* ========================================================= */}
-        <EventHeroBanner />
+        <motion.div
+          initial={shouldReduceMotion ? { opacity: 1 } : { opacity: 0, y: -16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4 }}
+        >
+          <EventHeroBanner />
+        </motion.div>
 
         {/* ========================================================= */}
         {/* 1. HERO SECTION                                           */}
         {/* ========================================================= */}
-        <section className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-8 items-start pt-2 sm:pt-4 pb-12 lg:pb-16">
+        <section
+          id="overview"
+          className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-8 items-start pt-2 sm:pt-4 pb-12 lg:pb-16 scroll-mt-28"
+        >
           {/* Left Column: Headline & Value Proposition */}
-          <div className="lg:col-span-6 space-y-6">
+          <motion.div
+            initial={shouldReduceMotion ? { opacity: 1 } : { opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.5, delay: 0.1 }}
+            className="lg:col-span-6 space-y-6"
+          >
             <div className="inline-flex items-center gap-2 rounded-full border border-border/80 bg-muted/60 px-3.5 py-1 text-xs font-medium text-foreground/90 backdrop-blur-xs">
               <span className="flex size-2 rounded-full bg-primary animate-pulse" />
               <span className="font-mono uppercase tracking-wider text-[11px] text-muted-foreground">
@@ -142,10 +183,15 @@ export function HomePage() {
                 </div>
               </div>
             </div>
-          </div>
+          </motion.div>
 
           {/* Right Column: Live Audio Visualizer & Interactive Simulation */}
-          <div className="lg:col-span-6 space-y-4">
+          <motion.div
+            initial={shouldReduceMotion ? { opacity: 1 } : { opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.5, delay: 0.15 }}
+            className="lg:col-span-6 space-y-4"
+          >
             <LiveAudioVisualizer />
 
             {/* Quick Live Bistro Status Card (Inspired by Screenshot 1 Side Widget) */}
@@ -164,19 +210,26 @@ export function HomePage() {
                 </Link>
               </Button>
             </div>
-          </div>
+          </motion.div>
         </section>
       </div>
 
       {/* ========================================================= */}
       {/* 2. PANORAMIC SCENIC SKYLINE BANNER (Inspired by Screenshot 2) */}
       {/* ========================================================= */}
-      <BistroPanorama />
+      <motion.div
+        initial={shouldReduceMotion ? { opacity: 1 } : { opacity: 0 }}
+        whileInView={{ opacity: 1 }}
+        viewport={{ once: true, margin: "-40px" }}
+        transition={{ duration: 0.6 }}
+      >
+        <BistroPanorama />
+      </motion.div>
 
       {/* ========================================================= */}
       {/* 3. IN-PAGE SUB-NAVIGATION BAR (Inspired by Screenshot 2)  */}
       {/* ========================================================= */}
-      <div className="sticky top-16 z-30 w-full border-b border-border/80 bg-background/95 backdrop-blur-md">
+      <div className="sticky top-16 z-30 w-full border-b border-border/80 bg-background/95 backdrop-blur-md transition-all shadow-2xs">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <nav className="flex items-center gap-1 sm:gap-4 overflow-x-auto no-scrollbar py-2 text-xs font-mono uppercase tracking-wider text-muted-foreground">
             {[
@@ -184,8 +237,9 @@ export function HomePage() {
               { id: "how-it-works", label: "02 / HOW IT WORKS" },
               { id: "tracks", label: "03 / CAPABILITIES" },
               { id: "suite", label: "04 / FEATURE SUITE" },
-              { id: "atmosphere", label: "05 / THE BISTRO" },
-              { id: "venue", label: "06 / HACKATHON INFO" },
+              { id: "dishes", label: "05 / SIGNATURE MENU" },
+              { id: "atmosphere", label: "06 / THE BISTRO" },
+              { id: "venue", label: "07 / HACKATHON INFO" },
             ].map((tab) => (
               <button
                 key={tab.id}
@@ -207,7 +261,14 @@ export function HomePage() {
         {/* ========================================================= */}
         {/* 4. HOW IT WORKS (3 STEPS)                                  */}
         {/* ========================================================= */}
-        <section id="how-it-works" className="scroll-mt-28">
+        <motion.section
+          id="how-it-works"
+          className="scroll-mt-28"
+          initial={shouldReduceMotion ? { opacity: 1 } : { opacity: 0, y: 24 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: "-50px" }}
+          transition={{ duration: 0.5 }}
+        >
           <div className="text-center max-w-xl mx-auto space-y-2 mb-12">
             <h2 className="text-xs font-mono font-semibold uppercase tracking-wider text-primary">
               How it works
@@ -227,7 +288,8 @@ export function HomePage() {
             {/* Step 1: Ask */}
             <motion.div
               variants={itemVariants}
-              className="rounded-xl border border-border/80 bg-card p-6 space-y-3 shadow-xs hover:border-border transition-all"
+              whileHover={shouldReduceMotion ? {} : { y: -4 }}
+              className="rounded-xl border border-border/80 bg-card p-6 space-y-3 shadow-xs hover:border-primary/40 hover:shadow-md transition-all"
             >
               <div className="flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary border border-primary/20">
                 <MessageSquare className="size-5" />
@@ -244,7 +306,8 @@ export function HomePage() {
             {/* Step 2: Choose */}
             <motion.div
               variants={itemVariants}
-              className="rounded-xl border border-border/80 bg-card p-6 space-y-3 shadow-xs hover:border-border transition-all"
+              whileHover={shouldReduceMotion ? {} : { y: -4 }}
+              className="rounded-xl border border-border/80 bg-card p-6 space-y-3 shadow-xs hover:border-primary/40 hover:shadow-md transition-all"
             >
               <div className="flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary border border-primary/20">
                 <Sparkles className="size-5" />
@@ -261,7 +324,8 @@ export function HomePage() {
             {/* Step 3: Confirm */}
             <motion.div
               variants={itemVariants}
-              className="rounded-xl border border-border/80 bg-card p-6 space-y-3 shadow-xs hover:border-border transition-all"
+              whileHover={shouldReduceMotion ? {} : { y: -4 }}
+              className="rounded-xl border border-border/80 bg-card p-6 space-y-3 shadow-xs hover:border-primary/40 hover:shadow-md transition-all"
             >
               <div className="flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary border border-primary/20">
                 <CalendarCheck className="size-5" />
@@ -275,12 +339,19 @@ export function HomePage() {
               </p>
             </motion.div>
           </motion.div>
-        </section>
+        </motion.section>
 
         {/* ========================================================= */}
         {/* 5. CAPABILITY TRACKS & FAST-TRACK BANNER (Screenshot 3)  */}
         {/* ========================================================= */}
-        <section id="tracks" className="scroll-mt-28 space-y-8">
+        <motion.section
+          id="tracks"
+          className="scroll-mt-28 space-y-8"
+          initial={shouldReduceMotion ? { opacity: 1 } : { opacity: 0, y: 24 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: "-50px" }}
+          transition={{ duration: 0.5 }}
+        >
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
             <div>
               <div className="text-xs font-mono font-semibold uppercase tracking-wider text-primary">
@@ -296,7 +367,10 @@ export function HomePage() {
           </div>
 
           {/* High-Impact Feature Banner (Inspired by Amazon Fast-Track Banner in Screenshot 3) */}
-          <div className="relative overflow-hidden rounded-2xl border border-primary/40 bg-gradient-to-r from-sky-950 via-slate-900 to-indigo-950 p-6 sm:p-10 text-white shadow-dropdown">
+          <motion.div
+            whileHover={shouldReduceMotion ? {} : { scale: 1.005 }}
+            className="relative overflow-hidden rounded-2xl border border-primary/40 bg-gradient-to-r from-sky-950 via-slate-900 to-indigo-950 p-6 sm:p-10 text-white shadow-dropdown transition-all"
+          >
             {/* Background Pixel & Geometric Accents */}
             <div className="absolute right-4 top-4 opacity-20 pointer-events-none select-none">
               <svg width="220" height="120" viewBox="0 0 220 120" fill="currentColor">
@@ -341,13 +415,15 @@ export function HomePage() {
                 </Link>
               </div>
             </div>
-          </div>
+          </motion.div>
 
           {/* 3 Thematic Track Cards (Inspired by Track 01, Track 02, Track 03 in Screenshot 3) */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {/* Track 1: Capacity & Tables */}
-            <div className="rounded-xl border border-border/80 bg-card overflow-hidden shadow-xs hover:border-primary/50 transition-all flex flex-col">
-              {/* Graphic Header */}
+            <motion.div
+              whileHover={shouldReduceMotion ? {} : { y: -4 }}
+              className="rounded-xl border border-border/80 bg-card overflow-hidden shadow-xs hover:border-primary/50 hover:shadow-md transition-all flex flex-col"
+            >
               <div className="h-32 bg-gradient-to-br from-amber-500/20 via-primary/10 to-transparent p-4 flex items-end justify-between border-b border-border/60">
                 <div className="flex size-10 items-center justify-center rounded-lg bg-background/80 backdrop-blur-xs text-primary border border-border/60 shadow-2xs">
                   <CalendarCheck className="size-5" />
@@ -369,11 +445,13 @@ export function HomePage() {
                   Lock Window: 15-Minute Grace Period
                 </div>
               </div>
-            </div>
+            </motion.div>
 
             {/* Track 2: Allergen Safety */}
-            <div className="rounded-xl border border-border/80 bg-card overflow-hidden shadow-xs hover:border-primary/50 transition-all flex flex-col">
-              {/* Graphic Header */}
+            <motion.div
+              whileHover={shouldReduceMotion ? {} : { y: -4 }}
+              className="rounded-xl border border-border/80 bg-card overflow-hidden shadow-xs hover:border-primary/50 hover:shadow-md transition-all flex flex-col"
+            >
               <div className="h-32 bg-gradient-to-br from-emerald-500/20 via-teal-500/10 to-transparent p-4 flex items-end justify-between border-b border-border/60">
                 <div className="flex size-10 items-center justify-center rounded-lg bg-background/80 backdrop-blur-xs text-emerald-600 dark:text-emerald-400 border border-border/60 shadow-2xs">
                   <ShieldCheck className="size-5" />
@@ -395,11 +473,13 @@ export function HomePage() {
                   Standard: Verbatim Ingredient Audit
                 </div>
               </div>
-            </div>
+            </motion.div>
 
             {/* Track 3: Pickup & Payments */}
-            <div className="rounded-xl border border-border/80 bg-card overflow-hidden shadow-xs hover:border-primary/50 transition-all flex flex-col">
-              {/* Graphic Header */}
+            <motion.div
+              whileHover={shouldReduceMotion ? {} : { y: -4 }}
+              className="rounded-xl border border-border/80 bg-card overflow-hidden shadow-xs hover:border-primary/50 hover:shadow-md transition-all flex flex-col"
+            >
               <div className="h-32 bg-gradient-to-br from-indigo-500/20 via-purple-500/10 to-transparent p-4 flex items-end justify-between border-b border-border/60">
                 <div className="flex size-10 items-center justify-center rounded-lg bg-background/80 backdrop-blur-xs text-indigo-600 dark:text-indigo-400 border border-border/60 shadow-2xs">
                   <ShoppingBag className="size-5" />
@@ -421,14 +501,21 @@ export function HomePage() {
                   Precision: Exact Paisa Currency Math
                 </div>
               </div>
-            </div>
+            </motion.div>
           </div>
-        </section>
+        </motion.section>
 
         {/* ========================================================= */}
         {/* 6. BENTO FEATURE GRID (6 CELLS - Verified for Tests)      */}
         {/* ========================================================= */}
-        <section id="suite" className="scroll-mt-28 py-6 border-t border-border/70">
+        <motion.section
+          id="suite"
+          className="scroll-mt-28 py-6 border-t border-border/70"
+          initial={shouldReduceMotion ? { opacity: 1 } : { opacity: 0, y: 24 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: "-50px" }}
+          transition={{ duration: 0.5 }}
+        >
           <div className="text-center max-w-xl mx-auto space-y-2 mb-12">
             <h2 className="text-xs font-mono font-semibold uppercase tracking-wider text-primary">
               Full Feature Suite
@@ -448,7 +535,8 @@ export function HomePage() {
             {/* Bento 1: Smart Alternatives */}
             <motion.div
               variants={itemVariants}
-              className="rounded-xl border border-border/80 bg-card p-6 space-y-3 shadow-xs hover:border-border transition-colors"
+              whileHover={shouldReduceMotion ? {} : { y: -4 }}
+              className="rounded-xl border border-border/80 bg-card p-6 space-y-3 shadow-xs hover:border-primary/40 hover:shadow-md transition-all"
             >
               <div className="flex size-9 items-center justify-center rounded-lg bg-muted text-foreground">
                 <Clock className="size-4 text-primary" />
@@ -464,7 +552,8 @@ export function HomePage() {
             {/* Bento 2: Allergen-Aware Menu */}
             <motion.div
               variants={itemVariants}
-              className="rounded-xl border border-border/80 bg-card p-6 space-y-3 shadow-xs hover:border-border transition-colors"
+              whileHover={shouldReduceMotion ? {} : { y: -4 }}
+              className="rounded-xl border border-border/80 bg-card p-6 space-y-3 shadow-xs hover:border-primary/40 hover:shadow-md transition-all"
             >
               <div className="flex size-9 items-center justify-center rounded-lg bg-muted text-foreground">
                 <AlertCircle className="size-4 text-primary" />
@@ -480,7 +569,8 @@ export function HomePage() {
             {/* Bento 3: Pickup Orders */}
             <motion.div
               variants={itemVariants}
-              className="rounded-xl border border-border/80 bg-card p-6 space-y-3 shadow-xs hover:border-border transition-colors"
+              whileHover={shouldReduceMotion ? {} : { y: -4 }}
+              className="rounded-xl border border-border/80 bg-card p-6 space-y-3 shadow-xs hover:border-primary/40 hover:shadow-md transition-all"
             >
               <div className="flex size-9 items-center justify-center rounded-lg bg-muted text-foreground">
                 <ShoppingBag className="size-4 text-primary" />
@@ -496,7 +586,8 @@ export function HomePage() {
             {/* Bento 4: Deposits (Simulated) */}
             <motion.div
               variants={itemVariants}
-              className="rounded-xl border border-border/80 bg-card p-6 space-y-3 shadow-xs hover:border-border transition-colors"
+              whileHover={shouldReduceMotion ? {} : { y: -4 }}
+              className="rounded-xl border border-border/80 bg-card p-6 space-y-3 shadow-xs hover:border-primary/40 hover:shadow-md transition-all"
             >
               <div className="flex size-9 items-center justify-center rounded-lg bg-muted text-foreground">
                 <CreditCard className="size-4 text-primary" />
@@ -512,7 +603,8 @@ export function HomePage() {
             {/* Bento 5: Waitlist */}
             <motion.div
               variants={itemVariants}
-              className="rounded-xl border border-border/80 bg-card p-6 space-y-3 shadow-xs hover:border-border transition-colors"
+              whileHover={shouldReduceMotion ? {} : { y: -4 }}
+              className="rounded-xl border border-border/80 bg-card p-6 space-y-3 shadow-xs hover:border-primary/40 hover:shadow-md transition-all"
             >
               <div className="flex size-9 items-center justify-center rounded-lg bg-muted text-foreground">
                 <Users className="size-4 text-primary" />
@@ -528,7 +620,8 @@ export function HomePage() {
             {/* Bento 6: Privacy-First Memory */}
             <motion.div
               variants={itemVariants}
-              className="rounded-xl border border-border/80 bg-card p-6 space-y-3 shadow-xs hover:border-border transition-colors"
+              whileHover={shouldReduceMotion ? {} : { y: -4 }}
+              className="rounded-xl border border-border/80 bg-card p-6 space-y-3 shadow-xs hover:border-primary/40 hover:shadow-md transition-all"
             >
               <div className="flex size-9 items-center justify-center rounded-lg bg-muted text-foreground">
                 <Lock className="size-4 text-primary" />
@@ -541,12 +634,26 @@ export function HomePage() {
               </p>
             </motion.div>
           </motion.div>
-        </section>
+        </motion.section>
 
         {/* ========================================================= */}
-        {/* 7. THE BISTRO ATMOSPHERE (Inspired by Screenshot 2 Gallery) */}
+        {/* 7. SIGNATURE DISHES SHOWCASE (Real Food Photography)      */}
         {/* ========================================================= */}
-        <section id="atmosphere" className="scroll-mt-28 space-y-8">
+        <div id="dishes" className="scroll-mt-28">
+          <SignatureDishesMarquee />
+        </div>
+
+        {/* ========================================================= */}
+        {/* 8. THE BISTRO ATMOSPHERE (Inspired by Screenshot 2)       */}
+        {/* ========================================================= */}
+        <motion.section
+          id="atmosphere"
+          className="scroll-mt-28 space-y-8"
+          initial={shouldReduceMotion ? { opacity: 1 } : { opacity: 0, y: 24 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: "-50px" }}
+          transition={{ duration: 0.5 }}
+        >
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
             <div>
               <div className="text-xs font-mono font-semibold uppercase tracking-wider text-primary">
@@ -563,7 +670,10 @@ export function HomePage() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
             {/* Moment 1 */}
-            <div className="rounded-xl border border-border/80 bg-card p-5 space-y-3 shadow-xs hover:border-primary/40 transition-all">
+            <motion.div
+              whileHover={shouldReduceMotion ? {} : { y: -4 }}
+              className="rounded-xl border border-border/80 bg-card p-5 space-y-3 shadow-xs hover:border-primary/40 hover:shadow-md transition-all"
+            >
               <div className="h-28 rounded-lg bg-gradient-to-br from-amber-500/20 via-primary/10 to-transparent flex items-center justify-center text-primary">
                 <Flame className="size-8" />
               </div>
@@ -572,10 +682,13 @@ export function HomePage() {
               <p className="text-xs text-muted-foreground leading-relaxed">
                 Slow-roasted Bhatti chicken and smoked seekh kebabs charred with live wood embers.
               </p>
-            </div>
+            </motion.div>
 
             {/* Moment 2 */}
-            <div className="rounded-xl border border-border/80 bg-card p-5 space-y-3 shadow-xs hover:border-primary/40 transition-all">
+            <motion.div
+              whileHover={shouldReduceMotion ? {} : { y: -4 }}
+              className="rounded-xl border border-border/80 bg-card p-5 space-y-3 shadow-xs hover:border-primary/40 hover:shadow-md transition-all"
+            >
               <div className="h-28 rounded-lg bg-gradient-to-br from-emerald-500/20 via-teal-500/10 to-transparent flex items-center justify-center text-emerald-600 dark:text-emerald-400">
                 <Coffee className="size-8" />
               </div>
@@ -584,10 +697,13 @@ export function HomePage() {
               <p className="text-xs text-muted-foreground leading-relaxed">
                 Hand-pounded tellicherry peppercorns, green cardamom, and Kashmiri saffron strands.
               </p>
-            </div>
+            </motion.div>
 
             {/* Moment 3 */}
-            <div className="rounded-xl border border-border/80 bg-card p-5 space-y-3 shadow-xs hover:border-primary/40 transition-all">
+            <motion.div
+              whileHover={shouldReduceMotion ? {} : { y: -4 }}
+              className="rounded-xl border border-border/80 bg-card p-5 space-y-3 shadow-xs hover:border-primary/40 hover:shadow-md transition-all"
+            >
               <div className="h-28 rounded-lg bg-gradient-to-br from-indigo-500/20 via-sky-500/10 to-transparent flex items-center justify-center text-sky-600 dark:text-sky-400">
                 <Radio className="size-8" />
               </div>
@@ -596,10 +712,13 @@ export function HomePage() {
               <p className="text-xs text-muted-foreground leading-relaxed">
                 6-character alphanumeric booking code allows direct walk-in seating with zero wait.
               </p>
-            </div>
+            </motion.div>
 
             {/* Moment 4 */}
-            <div className="rounded-xl border border-border/80 bg-card p-5 space-y-3 shadow-xs hover:border-primary/40 transition-all">
+            <motion.div
+              whileHover={shouldReduceMotion ? {} : { y: -4 }}
+              className="rounded-xl border border-border/80 bg-card p-5 space-y-3 shadow-xs hover:border-primary/40 hover:shadow-md transition-all"
+            >
               <div className="h-28 rounded-lg bg-gradient-to-br from-purple-500/20 via-primary/10 to-transparent flex items-center justify-center text-purple-600 dark:text-purple-400">
                 <UtensilsCrossed className="size-8" />
               </div>
@@ -608,14 +727,21 @@ export function HomePage() {
               <p className="text-xs text-muted-foreground leading-relaxed">
                 Every single starter, grill, curry, biryani, and dessert has authentic culinary art and nutrition notes.
               </p>
-            </div>
+            </motion.div>
           </div>
-        </section>
+        </motion.section>
 
         {/* ========================================================= */}
-        {/* 8. IN PERSON & WHO YOU WILL MEET (Inspired by Screenshot 4)*/}
+        {/* 9. IN PERSON & WHO YOU WILL MEET (Inspired by Screenshot 4)*/}
         {/* ========================================================= */}
-        <section id="venue" className="scroll-mt-28 space-y-8">
+        <motion.section
+          id="venue"
+          className="scroll-mt-28 space-y-8"
+          initial={shouldReduceMotion ? { opacity: 1 } : { opacity: 0, y: 24 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: "-50px" }}
+          transition={{ duration: 0.5 }}
+        >
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
             <div>
               <div className="text-xs font-mono font-semibold uppercase tracking-wider text-primary">
@@ -660,7 +786,10 @@ export function HomePage() {
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {/* Person 1 */}
-                <div className="rounded-xl border border-border/70 bg-muted/20 p-4 space-y-2">
+                <motion.div
+                  whileHover={shouldReduceMotion ? {} : { y: -3 }}
+                  className="rounded-xl border border-border/70 bg-muted/20 p-4 space-y-2 hover:border-primary/30 transition-all"
+                >
                   <div className="flex items-center gap-3">
                     <div className="flex size-10 items-center justify-center rounded-full bg-primary/10 text-primary font-bold text-sm">
                       AS
@@ -676,10 +805,13 @@ export function HomePage() {
                   <p className="text-xs text-muted-foreground leading-relaxed pt-1">
                     Guardian of traditional hand-pounded spices, slow-ember curries, and authentic Awadhi biryanis.
                   </p>
-                </div>
+                </motion.div>
 
                 {/* Person 2 */}
-                <div className="rounded-xl border border-border/70 bg-muted/20 p-4 space-y-2">
+                <motion.div
+                  whileHover={shouldReduceMotion ? {} : { y: -3 }}
+                  className="rounded-xl border border-border/70 bg-muted/20 p-4 space-y-2 hover:border-primary/30 transition-all"
+                >
                   <div className="flex items-center gap-3">
                     <div className="flex size-10 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold text-sm">
                       TT
@@ -695,10 +827,13 @@ export function HomePage() {
                   <p className="text-xs text-muted-foreground leading-relaxed pt-1">
                     Powered by 24 atomic Rust tools. Executes conflict-free bookings and allergen validations in under 30ms.
                   </p>
-                </div>
+                </motion.div>
 
                 {/* Person 3 */}
-                <div className="rounded-xl border border-border/70 bg-muted/20 p-4 space-y-2">
+                <motion.div
+                  whileHover={shouldReduceMotion ? {} : { y: -3 }}
+                  className="rounded-xl border border-border/70 bg-muted/20 p-4 space-y-2 hover:border-primary/30 transition-all"
+                >
                   <div className="flex items-center gap-3">
                     <div className="flex size-10 items-center justify-center rounded-full bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 font-bold text-sm">
                       MK
@@ -714,7 +849,7 @@ export function HomePage() {
                   <p className="text-xs text-muted-foreground leading-relaxed pt-1">
                     Curator of single-estate Darjeeling teas, kokum coolers, and personalized dining experiences.
                   </p>
-                </div>
+                </motion.div>
               </div>
             </div>
 
@@ -746,10 +881,10 @@ export function HomePage() {
               </div>
             </div>
           </div>
-        </section>
+        </motion.section>
 
         {/* ========================================================= */}
-        {/* 9. TRUST STRIP                                            */}
+        {/* 10. TRUST STRIP                                           */}
         {/* ========================================================= */}
         <section className="py-2">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4 rounded-xl border border-border/80 bg-muted/30 px-6 py-4 text-xs text-muted-foreground">
@@ -768,9 +903,15 @@ export function HomePage() {
         </section>
 
         {/* ========================================================= */}
-        {/* 10. GRAND CLOSING HERO (Inspired by Screenshot 5)         */}
+        {/* 11. GRAND CLOSING HERO (Inspired by Screenshot 5)         */}
         {/* ========================================================= */}
-        <section className="py-8 text-center">
+        <motion.section
+          className="py-8 text-center"
+          initial={shouldReduceMotion ? { opacity: 1 } : { opacity: 0, scale: 0.98 }}
+          whileInView={{ opacity: 1, scale: 1 }}
+          viewport={{ once: true, margin: "-50px" }}
+          transition={{ duration: 0.5 }}
+        >
           <div className="relative overflow-hidden rounded-3xl border border-border/90 bg-gradient-to-b from-card via-muted/30 to-background p-8 sm:p-14 space-y-6 max-w-4xl mx-auto shadow-dropdown">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-mono font-semibold uppercase">
               EVENT 02 OF 05
@@ -798,10 +939,10 @@ export function HomePage() {
               DTU IN DELHI HOSTS THE BUILD DAY. ONLINE IS OPEN TO ALL OF INDIA.
             </p>
           </div>
-        </section>
+        </motion.section>
 
         {/* ========================================================= */}
-        {/* 11. EDITORIAL FOOTER                                      */}
+        {/* 12. EDITORIAL FOOTER                                      */}
         {/* ========================================================= */}
         <footer className="pt-8 border-t border-border/60 text-xs text-muted-foreground">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4">

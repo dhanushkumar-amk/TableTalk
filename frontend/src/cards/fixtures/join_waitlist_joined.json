@@ -1,14 +1,14 @@
 {
   "content": [
     {
-      "text": "You're on the waitlist at position 1 for Friday, October 16 between 7:00 pm and 9:00 pm. Your code is W L - V 6 F Q G. Since we don't send notifications, please check back for updates.",
+      "text": "You're on the waitlist at position 1 for Friday, October 16 between 7:00 pm and 9:00 pm. Your code is W L - X 8 S E N. Since we don't send notifications, please check back for updates.",
       "type": "text"
     }
   ],
   "isError": false,
   "structuredContent": {
     "area": "indoor",
-    "code": "WL-V6FQG",
+    "code": "WL-X8SEN",
     "date": "2026-10-16",
     "expires_at_local": "End of service day",
     "guest_name": "Ananya Desai",

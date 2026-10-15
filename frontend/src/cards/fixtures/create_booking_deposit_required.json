@@ -1,7 +1,7 @@
 {
   "content": [
     {
-      "text": "A table for six needs a deposit of one thousand five hundred rupees. I've put the payment on your screen, and I'll hold the table for fifteen minutes. This is a simulated payment. Your confirmation code is T T Y 4 W A 9.",
+      "text": "A table for six needs a deposit of one thousand five hundred rupees. I've put the payment on your screen, and I'll hold the table for fifteen minutes. This is a simulated payment. Your confirmation code is T T 5 7 8 8 W.",
       "type": "text"
     }
   ],
@@ -10,8 +10,8 @@
     "alternatives": [],
     "booking": {
       "area": "indoor",
-      "confirmation_code": "TT-Y4WA9",
-      "created_at": "2026-10-14T14:49:45.136776400+00:00",
+      "confirmation_code": "TT-5788W",
+      "created_at": "2026-10-15T00:30:50.424096300+00:00",
       "end_local": "2026-10-16T21:15:00+05:30",
       "guest_name": "Simulated Deposit Guest",
       "party_size": 6,
@@ -29,8 +29,8 @@
         "currency": "INR",
         "display": "₹1500"
       },
-      "checkout_url": "http://localhost:5173/checkout/tt_pay_cc79fd797af742b77b48d13a519c6fe8",
-      "deadline_local": "2026-10-14T20:34:45.136776400+05:30",
+      "checkout_url": "http://localhost:5173/checkout/tt_pay_9de5babe5299dc9b5edec861d08c2eb1",
+      "deadline_local": "2026-10-15T06:15:50.424096300+05:30",
       "minutes_remaining": 15,
       "required": true,
       "simulated": true,

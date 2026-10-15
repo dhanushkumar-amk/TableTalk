@@ -11,7 +11,7 @@
     "hold": {
       "area": "bar",
       "end_local": "22:00",
-      "expires_at_local": "20:24",
+      "expires_at_local": "06:05",
       "hold_id": 1,
       "party_size": 2,
       "seconds_remaining": 300,
@@ -19,7 +19,7 @@
       "table_label": "B01"
     },
     "message": "Table hold successfully placed for 5 minutes. Offer token returned.",
-    "offer_token": "tt_offer_6948e53a9c5edea7c1df75a102a4b337",
+    "offer_token": "tt_offer_f8aafb9e67df31ebc6f2662ef0315e86",
     "status": "held"
   }
 }

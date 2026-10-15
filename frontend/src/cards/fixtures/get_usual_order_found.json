@@ -1,7 +1,7 @@
 {
   "content": [
     {
-      "text": "Welcome back, Priya. You don't have any past orders with us yet. Would you like to check out today's specials or search the menu?",
+      "text": "Welcome back, Priya. Same as last time, the Crisp Palak Chaat, 2 Nebula Dal Makhani? It's one thousand two hundred eighty-one rupees today.",
       "type": "text"
     }
   ],
@@ -12,11 +12,56 @@
     "guest_name": "Priya Patel",
     "needs_allergy_reconfirmation": [],
     "price_changes": [],
-    "status": "no_history",
-    "subtotal": null,
-    "suggested_lines": [],
-    "tax": null,
-    "total": null,
+    "status": "suggested",
+    "subtotal": {
+      "amount_minor": 122000,
+      "currency": "INR",
+      "display": "₹1220"
+    },
+    "suggested_lines": [
+      {
+        "item_id": 1,
+        "item_name": "Crisp Palak Chaat",
+        "line_total": {
+          "amount_minor": 38000,
+          "currency": "INR",
+          "display": "₹380"
+        },
+        "quantity": 1,
+        "unit_price": {
+          "amount_minor": 38000,
+          "currency": "INR",
+          "display": "₹380"
+        },
+        "user_provided_note": null
+      },
+      {
+        "item_id": 13,
+        "item_name": "Nebula Dal Makhani",
+        "line_total": {
+          "amount_minor": 84000,
+          "currency": "INR",
+          "display": "₹840"
+        },
+        "quantity": 2,
+        "unit_price": {
+          "amount_minor": 42000,
+          "currency": "INR",
+          "display": "₹420"
+        },
+        "user_provided_note": null
+      }
+    ],
+    "tax": {
+      "amount_minor": 6100,
+      "currency": "INR",
+      "display": "₹61"
+    },
+    "total": {
+      "amount_minor": 128100,
+      "currency": "INR",
+      "display": "₹1281"
+    },
     "unavailable_items": []
   }
 }
