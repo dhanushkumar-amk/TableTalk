@@ -1,5 +1,6 @@
-import { Flame, Sparkles, Utensils, AlertCircle } from "lucide-react"
+import { Flame, Sparkles, AlertCircle } from "lucide-react"
 import type { MenuItemCard as MenuItemData } from "../types"
+import { DishArtwork } from "@/components/menu/DishArtwork"
 
 interface MenuItemCardProps {
   item: MenuItemData
@@ -26,28 +27,6 @@ function SpiceLevelBadge({ level }: { level: number }) {
 }
 
 /**
- * Local placeholder thumbnail for dishes when no local image is supplied.
- * Uses CSS gradients and clean SVG iconography. No external hotlinks.
- */
-function DishPlaceholder({ name }: { name: string }) {
-  return (
-    <div
-      role="img"
-      aria-label={`Illustration placeholder for ${name}`}
-      className="relative flex h-36 w-full items-center justify-center overflow-hidden rounded-t-xl bg-gradient-to-br from-muted via-accent/30 to-muted/80 text-muted-foreground"
-    >
-      <div className="absolute inset-0 bg-radial from-transparent via-transparent to-black/5" />
-      <div className="flex flex-col items-center gap-1.5 opacity-70">
-        <Utensils className="h-8 w-8 text-foreground/40" aria-hidden="true" />
-        <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">
-          The Saffron Nebula
-        </span>
-      </div>
-    </div>
-  )
-}
-
-/**
  * MenuItemCard renders a single menu item with price, dietary tags, allergens,
  * availability status, chef's special badge, and match reason.
  */
@@ -65,7 +44,7 @@ export function MenuItemCard({ item, className = "" }: MenuItemCardProps) {
     >
       {/* Top Media / Thumbnail */}
       <div className="relative">
-        <DishPlaceholder name={item.name} />
+        <DishArtwork name={item.name} className="h-36 w-full rounded-t-xl" />
 
         {/* Floating Badges */}
         <div className="absolute top-2 left-2 flex flex-wrap gap-1">

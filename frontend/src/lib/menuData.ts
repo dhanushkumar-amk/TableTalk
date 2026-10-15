@@ -12,6 +12,11 @@ export interface MenuItem {
   isChefsSpecial: boolean
   dietaryTags: string[]
   allergens: string[]
+  imageUrl?: string
+}
+
+export function getDishImageUrl(dishId: number): string {
+  return `/images/dishes/${dishId}.jpg`
 }
 
 export const MENU_CATEGORIES = [
