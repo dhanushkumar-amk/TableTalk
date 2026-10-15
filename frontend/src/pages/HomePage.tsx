@@ -21,10 +21,13 @@ import {
   ChevronRight,
   Zap,
   Radio,
+  Layers,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { StatusBadge } from "@/components/primitives/StatusBadge"
 import { CodeBlock } from "@/components/primitives/CodeBlock"
+import { VoiceNebulaOrb } from "@/components/home/VoiceNebulaOrb"
+import { LiveTableRadar } from "@/components/home/LiveTableRadar"
 
 interface Scenario {
   id: string
@@ -36,7 +39,6 @@ interface Scenario {
   detailTitle: string
   detailSub: string
   code: string
-  rpcSnippet?: string
 }
 
 const SCENARIOS: Scenario[] = [
@@ -163,7 +165,7 @@ export function HomePage() {
         {/* ========================================================= */}
         {/* 1. HERO SECTION: HIGH-STATUS KICKER & VALUE PROPOSITION   */}
         {/* ========================================================= */}
-        <section className="text-center max-w-3xl mx-auto space-y-6 pt-4 pb-14 sm:pb-20">
+        <section className="text-center max-w-3xl mx-auto space-y-6 pt-4 pb-12 sm:pb-16">
           {/* Animated Glow Pill Badge */}
           <motion.div
             initial={shouldReduceMotion ? { opacity: 1 } : { opacity: 0, y: -10 }}
@@ -200,6 +202,16 @@ export function HomePage() {
           >
             An intelligent dining assistant that checks live table capacity, negotiates alternatives, and manages pickup orders naturally — powered by the Model Context Protocol.
           </motion.p>
+
+          {/* Animated SVG Voice Nebula Nucleus */}
+          <motion.div
+            initial={shouldReduceMotion ? { opacity: 1 } : { opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.5, delay: 0.12 }}
+            className="pt-2 pb-1"
+          >
+            <VoiceNebulaOrb isSpeaking={true} />
+          </motion.div>
 
           {/* Hero CTAs */}
           <motion.div
@@ -418,7 +430,35 @@ export function HomePage() {
         </section>
 
         {/* ========================================================= */}
-        {/* 4. HOW IT WORKS (3 LINEAR STEPS)                          */}
+        {/* 4. VISUAL RESTAURANT RADAR: 14 INTERACTIVE TABLES         */}
+        {/* ========================================================= */}
+        <section className="mb-20 sm:mb-28 space-y-6">
+          <div className="text-center max-w-xl mx-auto space-y-2 mb-8">
+            <div className="inline-flex items-center gap-1.5 text-xs font-mono font-semibold uppercase tracking-wider text-primary">
+              <Layers className="size-3.5" />
+              <span>SPATIAL TABLE CONCURRENCY</span>
+            </div>
+            <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-foreground">
+              Real-time floorplan & capacity engine
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              Every table has a live concurrency lock. Select any table to inspect current dining status, seating area, and instant booking availability.
+            </p>
+          </div>
+
+          <motion.div
+            initial={shouldReduceMotion ? { opacity: 1 } : { opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-40px" }}
+            transition={{ duration: 0.5 }}
+            className="max-w-4xl mx-auto"
+          >
+            <LiveTableRadar />
+          </motion.div>
+        </section>
+
+        {/* ========================================================= */}
+        {/* 5. HOW IT WORKS (3 LINEAR STEPS)                          */}
         {/* ========================================================= */}
         <section className="mb-20 sm:mb-28 space-y-12">
           <div className="text-center max-w-xl mx-auto space-y-2">
@@ -494,7 +534,7 @@ export function HomePage() {
         </section>
 
         {/* ========================================================= */}
-        {/* 5. VIBE-CODED BENTO FEATURE GRID (6 CELLS WITH VISUALS)   */}
+        {/* 6. VIBE-CODED BENTO FEATURE GRID (6 CELLS WITH VISUALS)   */}
         {/* ========================================================= */}
         <section className="mb-20 sm:mb-28 space-y-12">
           <div className="text-center max-w-xl mx-auto space-y-2">
@@ -682,7 +722,7 @@ export function HomePage() {
         </section>
 
         {/* ========================================================= */}
-        {/* 6. TRUST & SAFETY STRIP                                   */}
+        {/* 7. TRUST & SAFETY STRIP                                   */}
         {/* ========================================================= */}
         <section className="mb-20 sm:mb-28">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4 rounded-2xl border border-border/80 bg-muted/30 px-6 py-4 text-xs text-muted-foreground">
@@ -701,7 +741,7 @@ export function HomePage() {
         </section>
 
         {/* ========================================================= */}
-        {/* 7. GRAND CLOSING HERO                                     */}
+        {/* 8. GRAND CLOSING HERO                                     */}
         {/* ========================================================= */}
         <section className="text-center mb-20 sm:mb-24">
           <motion.div
@@ -730,7 +770,7 @@ export function HomePage() {
         </section>
 
         {/* ========================================================= */}
-        {/* 8. YC STARTUP MINIMALIST FOOTER                           */}
+        {/* 9. YC STARTUP MINIMALIST FOOTER                           */}
         {/* ========================================================= */}
         <footer className="pt-8 border-t border-border/60 text-xs text-muted-foreground">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4 font-mono">
