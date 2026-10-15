@@ -82,4 +82,24 @@ describe("Accessibility & WCAG 2.2 AA Compliance", () => {
     const cancelBtn = screen.getByRole("button", { name: /cancel reservation/i })
     expect(cancelBtn).toBeTruthy()
   })
+
+  it("verifies zero serious or critical axe violations on NotFoundPage", async () => {
+    const { NotFoundPage } = await import("../pages/NotFoundPage")
+    const { MemoryRouter } = await import("react-router-dom")
+
+    const { container } = render(
+      <MemoryRouter>
+        <NotFoundPage />
+      </MemoryRouter>
+    )
+
+    const results = await axe.run(container, {
+      rules: { "color-contrast": { enabled: false } },
+    })
+
+    const seriousOrCritical = results.violations.filter(
+      (v) => v.impact === "serious" || v.impact === "critical"
+    )
+    expect(seriousOrCritical).toHaveLength(0)
+  })
 })

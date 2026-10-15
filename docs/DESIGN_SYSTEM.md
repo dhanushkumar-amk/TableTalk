@@ -110,6 +110,52 @@ All typography is self-hosted via Fontsource npm packages (`@fontsource-variable
 3. **Command Palette (`cmdk`)**:
    - Instant page jumps (`/assistant`, `/menu`, `/reserve`, `/order`, `/manage`, `/privacy`, `/dev/cards`).
    - In-palette theme switching.
-4. **Error Boundary & 404 Route**:
+4. **Error Boundary & System States**:
    - Production error boundary catching unhandled rendering errors with safe reload and return actions.
    - Clean 404 page directing visitors back to the voice assistant.
+   - `OfflineBanner` displaying real-time offline status and reconnection confirmation.
+   - `BackendUnreachable` providing friendly recovery actions when the MCP backend is unreachable.
+
+---
+
+## 8. System Pages & Specialized Experiences
+
+1. **Distraction-Free Checkout (`/checkout/:token`)**:
+   - Minimal header with logo and theme toggle only (main navigation hidden).
+   - Centered 440px card displaying restaurant name, deposit amount (`<Money />`), party size, reservation date, and deadline `<CountdownChip />`.
+   - Prominent `<SimulatedBanner message="SIMULATED PAYMENT — no real money moves" />`.
+   - Three outcome simulator actions: "Simulate success", "Simulate decline", "Simulate extra verification".
+   - Zero credit card fields or financial input forms.
+   - Token is kept in memory and never displayed as text.
+
+2. **Privacy Control Center (`/privacy`)**:
+   - Explicit opt-in memory toggle with legal consent modal requiring checked agreement.
+   - Preference chips with deletion actions. Removing an allergy requires explicit confirmation with kitchen staff notification reminder.
+   - Usual order suggestion re-checked against today's live menu (unavailable items and price changes flagged).
+   - JSON data export.
+   - Danger zone with typed "DELETE" confirmation and data destruction summary.
+
+3. **Developer Card Gallery (`/dev/cards`)**:
+   - Harness for all 33 real server output fixtures across 24 MCP tools.
+   - Viewport simulator (360px mobile, 768px tablet, 100% desktop).
+   - Voice-only audio fallback simulator.
+   - Reduced motion toggle and full design system token integration.
+
+---
+
+## 9. Performance & Bundle Optimization
+
+* **Route-Level Code Splitting**: Every page is dynamically loaded via `React.lazy()` with `<PageSkeleton />` fallbacks.
+* **Initial Bundle Size**: Main index bundle reduced from ~938 kB to **429 kB (134 kB gzipped)**.
+* **Page Chunks**: Individual page chunks range from 1 kB to 26 kB gzipped.
+* **Self-Hosted Assets**: Zero external font or icon CDNs. All fonts are self-hosted `@fontsource-variable/geist` WOFF2 files.
+
+---
+
+## 10. Accessibility & Compliance (WCAG 2.2 AA)
+
+* **Axe Audits**: Zero serious or critical violations across all primary pages and cards.
+* **Contrast**: Meets or exceeds 4.5:1 contrast ratios on text in both light and dark modes.
+* **Touch Targets**: 44px minimum touch targets on all interactive buttons, pills, and inputs.
+* **Screen Readers**: `aria-live="polite"` announcers for assistant messages, accessible switch roles, and screen-reader money labels.
+* **Keyboard Navigation**: Full keyboard navigation across top navigation, tab bars, dropdowns, and the `⌘K` command palette.

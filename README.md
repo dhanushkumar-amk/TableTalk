@@ -544,6 +544,40 @@ Open your browser to: **`http://localhost:5173/dev/cards`**
 
 ---
 
+## Frontend Redesign & Design System (Vite + React + TypeScript)
+
+TableTalk features a startup-grade web application built in `frontend/` adhering to the polish level of Linear, Vercel, Stripe, and Cal.com:
+
+### Design Aesthetics & Tokens
+- **Warm Neutral Palette**: Stone/Zinc scales (`oklch(0.985 0.003 75)` light, `oklch(0.14 0.006 65)` dark).
+- **Deep Terracotta Accent**: `oklch(0.56 0.165 38)` (light) / `oklch(0.68 0.155 38)` (dark), reflecting the clay tandoor and roasted spices of The Saffron Nebula Bistro.
+- **Hairline Precision**: 1px low-contrast borders (`border border-border/80`) with soft elevation reserved for floating overlays.
+- **Self-Hosted Typography**: Geist variable typography via `@fontsource-variable/geist` and `@fontsource-variable/geist-mono` (zero CDNs or remote font calls).
+- **Light & Dark Themes**: Follows OS preference with manual top-nav toggle, persisted with zero flash on load.
+- **Command Palette (`⌘K` / `Ctrl+K`)**: Instant navigation across all pages and theme switching.
+- **Mobile Navigation**: Bottom tab bar with safe-area padding (`pb-safe`) and 44px+ touch targets.
+
+### Route Overview
+| Route | Page | Description |
+|:---|:---|:---|
+| `/` | **Landing Page** | Value proposition hero with self-typing conversation mock, 3-step How It Works, 6-cell Bento feature grid, and trust strip. |
+| `/assistant` | **Voice Assistant** | Simulated voice assistant with centered conversation column, collapsible Live MCP Activity drawer, Web Speech API speech-to-text/text-to-speech, 4-state mic button, and card visualizer. |
+| `/menu` | **Dining Menu** | Fast menu browser with sticky `/` shortcut search, category pills, filter drawer (dietary, allergen exclusions, max price, availability), local SVG artwork, and side sheet with verbatim server allergen notices. |
+| `/reserve` | **Table Booking** | 5-step booking flow (Party & Time, Availability, Guest Details, Deposit Hold, Confirmation) with ranked conflict alternatives, deposit requirement rules, and local `.ics` calendar generation. |
+| `/order` | **Pickup Ordering** | Pickup ordering with in-memory cart, quantity stepper, dynamic prep time calculation, calm allergen conflict modal, and code block confirmation. |
+| `/manage` | **Manage Hub** | 3-tab lookup hub (Booking, Order, Waitlist) with generic security-safe lookup, order status timeline stepper, and waitlist offer countdown. |
+| `/privacy` | **Privacy Center** | Memory switch with explicit consent dialog, preference tag management, allergy removal warnings, live-revalidated usual order, JSON data export, and typed "DELETE" danger zone. |
+| `/checkout/:token` | **Simulated Checkout** | Focused distraction-free checkout with deadline countdown chip, prominent `SimulatedBanner`, outcome simulators (success, decline, step-up verification), and zero card fields. |
+| `/dev/cards` | **Card Gallery** | Developer harness rendering all 33 real server fixtures across 24 tools with viewport and voice-only simulators. |
+
+### System Pages & Robustness
+- **Custom Minimalist SVG Illustrations**: 404 Page, Error Boundary, Offline Banner, and Backend Unreachable component.
+- **Route-Level Code Splitting**: Every page is dynamically loaded via `React.lazy()` with `<PageSkeleton />` fallbacks, keeping the main bundle under 430 kB.
+- **Accessibility (WCAG 2.2 AA)**: Zero critical or serious axe violations, visible focus rings, reduced-motion compliance, and full keyboard navigation.
+- **Test Suite**: 83 automated frontend unit, integration, safety, and accessibility tests passing in Vitest.
+
+---
+
 ## License
 
 This project is licensed under the [MIT License](LICENSE).

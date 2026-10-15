@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import {
   Sun,
   Moon,
@@ -11,6 +11,8 @@ import {
 } from "lucide-react"
 import { renderCard } from "../cards/registry"
 import type { CardEventHandlers } from "../cards/events"
+import { useTheme } from "@/lib/theme"
+import { StatusBadge } from "@/components/primitives/StatusBadge"
 
 // Real fixtures generated directly from server execution against seeded DB
 import searchMenuFound from "../cards/fixtures/search_menu_found.json"
@@ -343,26 +345,16 @@ export const GALLERY_FIXTURES: GalleryItem[] = [
 type ViewportWidth = "360px" | "768px" | "100%"
 
 export default function CardGallery() {
-  const [isDark, setIsDark] = useState(false)
+  const { resolvedTheme, setTheme } = useTheme()
+  const isDark = resolvedTheme === "dark"
   const [viewportWidth, setViewportWidth] = useState<ViewportWidth>("100%")
   const [textOnly, setTextOnly] = useState(false)
   const [reducedMotion, setReducedMotion] = useState(false)
   const [selectedCategory, setSelectedCategory] = useState<string>("All")
   const [lastEvent, setLastEvent] = useState<string | null>(null)
 
-  useEffect(() => {
-    const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches
-    setIsDark(prefersDark)
-    if (prefersDark) document.documentElement.classList.add("dark")
-  }, [])
-
   const toggleTheme = () => {
-    setIsDark((prev) => {
-      const next = !prev
-      if (next) document.documentElement.classList.add("dark")
-      else document.documentElement.classList.remove("dark")
-      return next
-    })
+    setTheme(isDark ? "light" : "dark")
   }
 
   const toggleReducedMotion = () => {
@@ -417,38 +409,38 @@ export default function CardGallery() {
         {/* Toolbar Controls */}
         <div className="flex flex-wrap items-center gap-2 text-xs">
           {/* Viewport Width Controls */}
-          <div className="flex items-center rounded-lg border border-border bg-background p-0.5">
+          <div className="flex items-center rounded-xl border border-border/80 bg-background p-1">
             <button
               type="button"
               onClick={() => setViewportWidth("360px")}
               aria-label="Mobile viewport 360px"
-              className={`flex items-center gap-1 rounded-md px-2 py-1 cursor-pointer transition-colors ${
-                viewportWidth === "360px" ? "bg-muted font-bold text-foreground" : "text-muted-foreground"
+              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 min-h-[40px] cursor-pointer transition-colors ${
+                viewportWidth === "360px" ? "bg-muted font-semibold text-foreground shadow-2xs" : "text-muted-foreground hover:text-foreground"
               }`}
             >
-              <Smartphone className="h-3.5 w-3.5" aria-hidden="true" />
+              <Smartphone className="size-3.5" aria-hidden="true" />
               <span>360px</span>
             </button>
             <button
               type="button"
               onClick={() => setViewportWidth("768px")}
               aria-label="Tablet viewport 768px"
-              className={`flex items-center gap-1 rounded-md px-2 py-1 cursor-pointer transition-colors ${
-                viewportWidth === "768px" ? "bg-muted font-bold text-foreground" : "text-muted-foreground"
+              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 min-h-[40px] cursor-pointer transition-colors ${
+                viewportWidth === "768px" ? "bg-muted font-semibold text-foreground shadow-2xs" : "text-muted-foreground hover:text-foreground"
               }`}
             >
-              <Tablet className="h-3.5 w-3.5" aria-hidden="true" />
+              <Tablet className="size-3.5" aria-hidden="true" />
               <span>768px</span>
             </button>
             <button
               type="button"
               onClick={() => setViewportWidth("100%")}
               aria-label="Desktop viewport full width"
-              className={`flex items-center gap-1 rounded-md px-2 py-1 cursor-pointer transition-colors ${
-                viewportWidth === "100%" ? "bg-muted font-bold text-foreground" : "text-muted-foreground"
+              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 min-h-[40px] cursor-pointer transition-colors ${
+                viewportWidth === "100%" ? "bg-muted font-semibold text-foreground shadow-2xs" : "text-muted-foreground hover:text-foreground"
               }`}
             >
-              <Monitor className="h-3.5 w-3.5" aria-hidden="true" />
+              <Monitor className="size-3.5" aria-hidden="true" />
               <span>Full</span>
             </button>
           </div>
@@ -458,13 +450,13 @@ export default function CardGallery() {
             type="button"
             onClick={() => setTextOnly((prev) => !prev)}
             aria-pressed={textOnly}
-            className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 cursor-pointer transition-colors ${
+            className={`flex items-center gap-1.5 rounded-xl border px-3 py-2 min-h-[44px] cursor-pointer transition-colors ${
               textOnly
                 ? "bg-primary text-primary-foreground border-primary font-semibold"
-                : "border-border bg-background text-muted-foreground hover:bg-muted"
+                : "border-border/80 bg-background text-muted-foreground hover:bg-muted/60 hover:text-foreground"
             }`}
           >
-            <Volume2 className="h-3.5 w-3.5" aria-hidden="true" />
+            <Volume2 className="size-4" aria-hidden="true" />
             <span>Voice-Only Mode</span>
           </button>
 
@@ -473,13 +465,13 @@ export default function CardGallery() {
             type="button"
             onClick={toggleReducedMotion}
             aria-pressed={reducedMotion}
-            className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 cursor-pointer transition-colors ${
+            className={`flex items-center gap-1.5 rounded-xl border px-3 py-2 min-h-[44px] cursor-pointer transition-colors ${
               reducedMotion
                 ? "bg-accent text-accent-foreground border-accent font-semibold"
-                : "border-border bg-background text-muted-foreground hover:bg-muted"
+                : "border-border/80 bg-background text-muted-foreground hover:bg-muted/60 hover:text-foreground"
             }`}
           >
-            <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
+            <RotateCcw className="size-4" aria-hidden="true" />
             <span>Reduced Motion</span>
           </button>
 
@@ -488,16 +480,16 @@ export default function CardGallery() {
             type="button"
             onClick={toggleTheme}
             aria-label="Toggle light/dark theme"
-            className="flex items-center gap-1.5 rounded-lg border border-border bg-background px-2.5 py-1.5 cursor-pointer text-muted-foreground hover:bg-muted transition-colors"
+            className="flex items-center gap-1.5 rounded-xl border border-border/80 bg-background px-3 py-2 min-h-[44px] cursor-pointer text-muted-foreground hover:bg-muted/60 hover:text-foreground transition-colors"
           >
-            {isDark ? <Sun className="h-3.5 w-3.5 text-amber-500" /> : <Moon className="h-3.5 w-3.5" />}
+            {isDark ? <Sun className="size-4 text-amber-500" /> : <Moon className="size-4" />}
             <span>{isDark ? "Light" : "Dark"}</span>
           </button>
         </div>
       </header>
 
       {/* Category Filter Pills & Event Log */}
-      <div className="border-b border-border bg-card/40 px-6 py-2.5 flex flex-wrap items-center justify-between gap-3 text-xs">
+      <div className="border-b border-border/80 bg-card/40 px-6 py-2.5 flex flex-wrap items-center justify-between gap-3 text-xs">
         <div className="flex flex-wrap items-center gap-1.5">
           <span className="font-semibold text-muted-foreground mr-1">Filter:</span>
           {categories.map((cat) => (
@@ -505,10 +497,10 @@ export default function CardGallery() {
               key={cat}
               type="button"
               onClick={() => setSelectedCategory(cat)}
-              className={`rounded-full px-2.5 py-1 cursor-pointer transition-colors ${
+              className={`rounded-full px-3 py-1.5 min-h-[36px] cursor-pointer transition-colors text-xs ${
                 selectedCategory === cat
                   ? "bg-foreground text-background font-semibold"
-                  : "bg-muted/60 text-muted-foreground hover:bg-muted"
+                  : "bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground"
               }`}
             >
               {cat}
@@ -519,7 +511,7 @@ export default function CardGallery() {
         {/* Live event notification badge */}
         {lastEvent && (
           <div className="flex items-center gap-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 px-2.5 py-1 text-[11px] text-emerald-700 dark:text-emerald-300 font-mono">
-            <CheckCircle className="h-3 w-3" aria-hidden="true" />
+            <CheckCircle className="size-3.5" aria-hidden="true" />
             <span>Last Event: {lastEvent}</span>
           </div>
         )}
@@ -534,20 +526,18 @@ export default function CardGallery() {
           {filteredFixtures.map((fixture) => (
             <section
               key={fixture.id}
-              className="space-y-2 rounded-2xl border border-border bg-card/40 p-4 shadow-2xs"
+              className="space-y-3 rounded-2xl border border-border/80 bg-card/60 p-5 shadow-xs"
             >
               {/* Fixture Meta Header */}
-              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/40 pb-2 text-xs">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 pb-3 text-xs">
                 <div>
-                  <span className="font-semibold text-foreground">{fixture.title}</span>
+                  <span className="font-semibold text-foreground text-sm">{fixture.title}</span>
                   <span className="ml-2 font-mono text-[11px] text-muted-foreground">
                     ({fixture.toolName})
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="rounded bg-accent/40 px-2 py-0.5 text-[10px] font-mono text-accent-foreground">
-                    status: {fixture.statusLabel}
-                  </span>
+                  <StatusBadge status="neutral" label={`status: ${fixture.statusLabel}`} />
                 </div>
               </div>
 
