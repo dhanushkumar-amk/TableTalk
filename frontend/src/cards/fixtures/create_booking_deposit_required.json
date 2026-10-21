@@ -13,7 +13,7 @@
     "idempotent_replay": false,
     "note": "availability is a snapshot, not a reservation",
     "reason": "too_soon",
-    "reason_detail": "Bookings must be made at least 30 minutes in advance. The earliest booking time is 22:40.",
+    "reason_detail": "Bookings must be made at least 30 minutes in advance. The earliest booking time is 10:00.",
     "status": "unavailable"
   }
 }

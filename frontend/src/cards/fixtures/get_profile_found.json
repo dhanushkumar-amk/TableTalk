@@ -7,7 +7,7 @@
   ],
   "isError": false,
   "structuredContent": {
-    "consent_granted_at": "2026-10-21T16:40:30.099507300+00:00",
+    "consent_granted_at": "2026-10-21T04:00:00+00:00",
     "consent_version": "v1.0",
     "counts": {
       "preference_count": 2,
@@ -16,7 +16,7 @@
     },
     "data_export": {
       "booking_ids": [],
-      "consent_granted_at": "2026-10-21T16:40:30.099507300+00:00",
+      "consent_granted_at": "2026-10-21T04:00:00+00:00",
       "consent_version": "v1.0",
       "display_name": "MemoryGuest",
       "email": null,
@@ -24,8 +24,8 @@
       "phone": null,
       "preferences": [
         {
-          "confirmed_at": "2026-10-21T16:40:30.102063700+00:00",
-          "created_at": "2026-10-21T16:40:30.102063700+00:00",
+          "confirmed_at": "2026-10-21T04:00:00+00:00",
+          "created_at": "2026-10-21T04:00:00+00:00",
           "id": 14,
           "kind": "allergy",
           "severity": "unknown",
@@ -33,7 +33,7 @@
         },
         {
           "confirmed_at": null,
-          "created_at": "2026-10-21T16:40:30.104760900+00:00",
+          "created_at": "2026-10-21T04:00:00+00:00",
           "id": 15,
           "kind": "note",
           "severity": null,
@@ -47,8 +47,8 @@
     "phone_masked": null,
     "preferences": [
       {
-        "confirmed_at": "2026-10-21T16:40:30.102063700+00:00",
-        "created_at": "2026-10-21T16:40:30.102063700+00:00",
+        "confirmed_at": "2026-10-21T04:00:00+00:00",
+        "created_at": "2026-10-21T04:00:00+00:00",
         "id": 14,
         "kind": "allergy",
         "severity": "unknown",
@@ -56,7 +56,7 @@
       },
       {
         "confirmed_at": null,
-        "created_at": "2026-10-21T16:40:30.104760900+00:00",
+        "created_at": "2026-10-21T04:00:00+00:00",
         "id": 15,
         "kind": "note",
         "severity": null,

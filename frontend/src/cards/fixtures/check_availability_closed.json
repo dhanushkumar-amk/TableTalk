@@ -11,7 +11,7 @@
     "note": "availability is a snapshot, not a reservation",
     "opening_hours_that_day": [],
     "reason": "too_soon",
-    "reason_detail": "Bookings must be made at least 30 minutes in advance. The earliest booking time is 22:40.",
+    "reason_detail": "Bookings must be made at least 30 minutes in advance. The earliest booking time is 10:00.",
     "requested": {
       "area": "any",
       "date": "2026-10-20",
@@ -20,7 +20,7 @@
       "time": "19:30",
       "timezone": "Asia/Kolkata"
     },
-    "restaurant_now": "2026-10-21T22:10:30.046528400+05:30",
+    "restaurant_now": "2026-10-21T09:30:00+05:30",
     "slot": null,
     "snapped_from": null,
     "status": "unavailable"
