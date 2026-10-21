@@ -1,23 +1,19 @@
 {
   "content": [
     {
-      "text": "Your deposit of one thousand five hundred rupees is still pending. You have fifteen minutes to complete the payment.",
+      "text": "I couldn't find a booking with that confirmation code and name. Please check the code and the name on the booking.",
       "type": "text"
     }
   ],
   "isError": false,
   "structuredContent": {
-    "amount": {
-      "amount_minor": 150000,
-      "currency": "INR",
-      "display": "₹1500"
-    },
-    "deadline_local": "2026-10-15T06:15:50.424096300+05:30",
-    "deposit_status": "requires_payment",
-    "message": "Your deposit of one thousand five hundred rupees is still pending. You have fifteen minutes to complete the payment.",
-    "minutes_remaining": 15,
+    "amount": null,
+    "deadline_local": null,
+    "deposit_status": null,
+    "message": "No matching booking found for the provided confirmation code and guest name.",
+    "minutes_remaining": null,
     "refund_if_cancelled_now": null,
-    "required": true,
-    "status": "found"
+    "required": false,
+    "status": "not_found"
   }
 }

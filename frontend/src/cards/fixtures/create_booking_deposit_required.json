@@ -1,43 +1,19 @@
 {
   "content": [
     {
-      "text": "A table for six needs a deposit of one thousand five hundred rupees. I've put the payment on your screen, and I'll hold the table for fifteen minutes. This is a simulated payment. Your confirmation code is T T 5 7 8 8 W.",
+      "text": "I don't have a table available for 6 on Friday the sixteenth around seven thirty in the evening. Would you like to check another day?",
       "type": "text"
     }
   ],
   "isError": false,
   "structuredContent": {
     "alternatives": [],
-    "booking": {
-      "area": "indoor",
-      "confirmation_code": "TT-5788W",
-      "created_at": "2026-10-15T00:30:50.424096300+00:00",
-      "end_local": "2026-10-16T21:15:00+05:30",
-      "guest_name": "Simulated Deposit Guest",
-      "party_size": 6,
-      "special_requests": null,
-      "start_local": "2026-10-16T19:30:00+05:30",
-      "status": "pending",
-      "table_label": "T05"
-    },
-    "cancellation_policy": "Deposit required for this reservation. Full refund if cancelled at least 24 hours before the start time, 50% refund between 2 and 24 hours, no refund less than 2 hours before.",
+    "booking": null,
+    "cancellation_policy": null,
     "idempotent_replay": false,
     "note": "availability is a snapshot, not a reservation",
-    "payment": {
-      "amount": {
-        "amount_minor": 150000,
-        "currency": "INR",
-        "display": "₹1500"
-      },
-      "checkout_url": "http://localhost:5173/checkout/tt_pay_9de5babe5299dc9b5edec861d08c2eb1",
-      "deadline_local": "2026-10-15T06:15:50.424096300+05:30",
-      "minutes_remaining": 15,
-      "required": true,
-      "simulated": true,
-      "status": "requires_payment"
-    },
-    "reason": "deposit_required",
-    "reason_detail": "A simulated deposit of ₹1500 is required. Complete the payment to confirm the reservation.",
-    "status": "pending"
+    "reason": "too_soon",
+    "reason_detail": "Bookings must be made at least 30 minutes in advance. The earliest booking time is 22:40.",
+    "status": "unavailable"
   }
 }

@@ -1,7 +1,7 @@
 {
   "content": [
     {
-      "text": "The restaurant is closed on Tuesday the twentieth. Would you like to check availability for tomorrow?",
+      "text": "I don't have a table available for 2 on Tuesday the twentieth around seven thirty in the evening. Would you like to check another day?",
       "type": "text"
     }
   ],
@@ -10,8 +10,8 @@
     "alternatives": [],
     "note": "availability is a snapshot, not a reservation",
     "opening_hours_that_day": [],
-    "reason": "closed_day",
-    "reason_detail": "The restaurant is closed on Tuesdays.",
+    "reason": "too_soon",
+    "reason_detail": "Bookings must be made at least 30 minutes in advance. The earliest booking time is 22:40.",
     "requested": {
       "area": "any",
       "date": "2026-10-20",
@@ -20,9 +20,9 @@
       "time": "19:30",
       "timezone": "Asia/Kolkata"
     },
-    "restaurant_now": "2026-10-15T06:00:50.390933300+05:30",
+    "restaurant_now": "2026-10-21T22:10:30.046528400+05:30",
     "slot": null,
     "snapped_from": null,
-    "status": "closed"
+    "status": "unavailable"
   }
 }

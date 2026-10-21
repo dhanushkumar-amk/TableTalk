@@ -1,64 +1,18 @@
 {
   "content": [
     {
-      "text": "Seven thirty at the bar, seven thirty indoors, or seven thirty on the patio. Which would you like?",
+      "text": "I don't have any tables available around that time. Would you like to join the waitlist?",
       "type": "text"
     }
   ],
   "isError": false,
   "structuredContent": {
-    "message": "Ranked alternative dining options generated (round 1 of 3).",
+    "message": "No alternative dining options found matching your flexibility criteria. You may join the waitlist.",
     "negotiation_id": 1,
-    "options": [
-      {
-        "area": "bar",
-        "end_local": "21:00",
-        "minutes_from_requested": 0,
-        "option_id": "opt_1",
-        "rank": 1,
-        "score_reasons": [
-          "same_day",
-          "exact_time",
-          "exact_capacity_fit",
-          "comfortable_dining_window"
-        ],
-        "start_local": "19:30",
-        "table_label": "B01"
-      },
-      {
-        "area": "indoor",
-        "end_local": "21:00",
-        "minutes_from_requested": 0,
-        "option_id": "opt_2",
-        "rank": 2,
-        "score_reasons": [
-          "same_day",
-          "exact_time",
-          "exact_capacity_fit",
-          "comfortable_dining_window"
-        ],
-        "start_local": "19:30",
-        "table_label": "T01"
-      },
-      {
-        "area": "patio",
-        "end_local": "21:00",
-        "minutes_from_requested": 0,
-        "option_id": "opt_3",
-        "rank": 3,
-        "score_reasons": [
-          "same_day",
-          "exact_time",
-          "good_capacity_fit",
-          "comfortable_dining_window"
-        ],
-        "start_local": "19:30",
-        "table_label": "P02"
-      }
-    ],
+    "options": [],
     "profile_applied": null,
     "round": 1,
     "slot": null,
-    "status": "alternatives_offered"
+    "status": "no_more_options"
   }
 }

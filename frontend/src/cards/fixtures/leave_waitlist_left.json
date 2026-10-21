@@ -1,15 +1,15 @@
 {
   "content": [
     {
-      "text": "I've removed you from the waitlist.",
+      "text": "I couldn't find a waitlist reservation with those details.",
       "type": "text"
     }
   ],
   "isError": false,
   "structuredContent": {
     "already_cancelled": false,
-    "code": "WL-X8SEN",
-    "message": "You have been successfully removed from the waitlist.",
-    "status": "cancelled"
+    "code": "WL-10001",
+    "message": "Waitlist entry not found or invalid code.",
+    "status": "not_found"
   }
 }

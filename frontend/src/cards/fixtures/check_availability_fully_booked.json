@@ -1,7 +1,7 @@
 {
   "content": [
     {
-      "text": "I have a table for 8 guests on Friday the sixteenth at seven thirty in the evening. Want me to book it?",
+      "text": "I don't have a table available for 8 on Friday the sixteenth around seven thirty in the evening. Would you like to check another day?",
       "type": "text"
     }
   ],
@@ -9,18 +9,9 @@
   "structuredContent": {
     "alternatives": [],
     "note": "availability is a snapshot, not a reservation",
-    "opening_hours_that_day": [
-      {
-        "close": "15:30",
-        "open": "12:00"
-      },
-      {
-        "close": "23:30",
-        "open": "19:00"
-      }
-    ],
-    "reason": null,
-    "reason_detail": null,
+    "opening_hours_that_day": [],
+    "reason": "too_soon",
+    "reason_detail": "Bookings must be made at least 30 minutes in advance. The earliest booking time is 22:40.",
     "requested": {
       "area": "indoor",
       "date": "2026-10-16",
@@ -29,15 +20,9 @@
       "time": "19:30",
       "timezone": "Asia/Kolkata"
     },
-    "restaurant_now": "2026-10-15T06:00:50.387479+05:30",
-    "slot": {
-      "area": "indoor",
-      "capacity": 8,
-      "end_local": "2026-10-16T21:30:00+05:30",
-      "start_local": "2026-10-16T19:30:00+05:30",
-      "table_label": "T06"
-    },
+    "restaurant_now": "2026-10-21T22:10:30.043698700+05:30",
+    "slot": null,
     "snapped_from": null,
-    "status": "available"
+    "status": "unavailable"
   }
 }
