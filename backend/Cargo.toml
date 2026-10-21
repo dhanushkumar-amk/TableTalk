@@ -30,6 +30,7 @@ rand = "0.8"
 dotenvy = "0.15"
 aws-config = { version = "1.5", default-features = false, features = ["behavior-version-latest", "rustls"] }
 aws-sdk-bedrockruntime = { version = "1.60", default-features = false, features = ["rustls"] }
+aws-smithy-types = "1"
 async-trait = "0.1"
 
 [dev-dependencies]

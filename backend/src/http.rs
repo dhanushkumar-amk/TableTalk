@@ -187,6 +187,14 @@ pub fn handle_panic(err: Box<dyn std::any::Any + Send + 'static>) -> Response {
         .into_response()
 }
 
+async fn chat_handler(
+    State(orchestrator): State<Arc<crate::orchestrator::OrchestratorService>>,
+    Json(payload): Json<crate::orchestrator::ChatRequest>,
+) -> Json<crate::orchestrator::ChatResponse> {
+    let resp = orchestrator.process_chat(payload).await;
+    Json(resp)
+}
+
 /// Build the full application router with health check, MCP service, CORS, and security middleware.
 pub fn build_router(config: &Config) -> Router {
     build_router_with_db(config, None)
@@ -194,11 +202,20 @@ pub fn build_router(config: &Config) -> Router {
 
 /// Build the application router with an optional database connection pool wired into TableTalkServer.
 pub fn build_router_with_db(config: &Config, pool: Option<sqlx::SqlitePool>) -> Router {
+    build_router_full(config, pool, None)
+}
+
+/// Build the application router with an optional orchestrator override for tests.
+pub fn build_router_full(
+    config: &Config,
+    pool: Option<sqlx::SqlitePool>,
+    orchestrator_override: Option<Arc<crate::orchestrator::OrchestratorService>>,
+) -> Router {
     let server = match &pool {
         Some(p) => TableTalkServer::with_db(p.clone()),
         None => TableTalkServer::new(),
     };
-    let pool_for_checkout = pool;
+    let pool_for_checkout = pool.clone();
     let session_manager = Arc::new(LocalSessionManager::default());
 
     let mcp_config =
@@ -211,6 +228,43 @@ pub fn build_router_with_db(config: &Config, pool: Option<sqlx::SqlitePool>) -> 
     let ip_rate_limiter = Arc::new(crate::rate_limit::IpRateLimiter::new(
         config.rate_limit_per_minute,
     ));
+
+    // Orchestrator service resolution
+    let orchestrator = match orchestrator_override {
+        Some(orch) => Some(orch),
+        None => pool.map(|p| {
+            let session_mgr = Arc::new(crate::orchestrator::SessionManager::new(
+                config.chat_session_token_budget,
+                config.chat_daily_token_budget,
+            ));
+            let bedrock_client = Arc::new(crate::orchestrator::LazyAwsBedrockClient::new(
+                config.aws_region.clone(),
+            ));
+            Arc::new(crate::orchestrator::OrchestratorService::new(
+                bedrock_client,
+                session_mgr,
+                p.clone(),
+                TableTalkServer::with_db(p),
+                Arc::new(crate::availability::SystemClock),
+                config.clone(),
+            ))
+        }),
+    };
+
+    let chat_rate_limiter = Arc::new(crate::rate_limit::IpRateLimiter::new(
+        config.chat_rate_limit_per_minute,
+    ));
+
+    let chat_endpoint = match orchestrator {
+        Some(orch) => Router::new()
+            .route("/api/chat", axum::routing::post(chat_handler))
+            .layer(from_fn_with_state(
+                chat_rate_limiter,
+                crate::rate_limit::rate_limit_middleware,
+            ))
+            .with_state(orch),
+        None => Router::new(),
+    };
 
     // Restrictive CORS configuration
     let parsed_origins: Vec<HeaderValue> = config
@@ -255,6 +309,7 @@ pub fn build_router_with_db(config: &Config, pool: Option<sqlx::SqlitePool>) -> 
 
     Router::new()
         .route("/health", get(health_handler))
+        .merge(chat_endpoint)
         .merge(protected_endpoints)
         .layer(tower_http::catch_panic::CatchPanicLayer::custom(
             handle_panic,

@@ -35,6 +35,10 @@ impl TableTalkServer {
         }
     }
 
+    pub fn list_registered_tools(&self) -> Vec<rmcp::model::Tool> {
+        self.tool_router.list_all()
+    }
+
     /// Ping the TableTalk restaurant assistant to verify connectivity and get server metadata.
     #[tool(
         description = "Ping the TableTalk restaurant assistant to verify connectivity and retrieve server status",

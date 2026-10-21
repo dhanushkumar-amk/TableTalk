@@ -7,6 +7,7 @@ pub mod http;
 pub mod memory;
 pub mod menu_search;
 pub mod negotiation;
+pub mod orchestrator;
 pub mod ordering;
 pub mod payments;
 pub mod rate_limit;

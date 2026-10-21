@@ -111,6 +111,15 @@ TableTalk backend accepts configuration via environment variables (see `.env.exa
 | `RESTAURANT_TZ` | Establishment IANA timezone override | `Asia/Kolkata` |
 | `RATE_LIMIT_PER_MINUTE` | Max requests per minute per IP on `/mcp` and checkout endpoints | `600` |
 | `REQUEST_TIMEOUT_SECS` | Maximum HTTP request timeout in seconds | `30` |
+| `AWS_REGION` | AWS Region for Amazon Bedrock runtime | `ap-south-1` |
+| `BEDROCK_MODEL_ID` | Amazon Bedrock model / cross-region inference profile | `apac.amazon.nova-lite-v1:0` |
+| `CHAT_MAX_TOKENS` | Maximum tokens per assistant response turn | `500` |
+| `CHAT_SESSION_TOKEN_BUDGET` | Maximum tokens per session before entering demo limit | `10000` |
+| `CHAT_DAILY_TOKEN_BUDGET` | Global daily token budget before fallback mode triggers | `50000` |
+| `CHAT_RATE_LIMIT_PER_MINUTE` | Maximum requests per minute per IP for `/api/chat` | `30` |
+| `CHAT_MAX_MESSAGE_LEN` | Maximum message string length accepted | `1000` |
+
+Credentials come strictly from the default AWS credential chain (`~/.aws/credentials`, SSO, or IAM roles). Never put AWS keys in `.env` or frontend code.
 
 Copy the example configuration:
 ```bash
@@ -152,6 +161,61 @@ cargo run -- seed
 - **Request Timeout**: 30-second timeout on requests (`408 Request Timeout`).
 - **Panic Resilience**: Unhandled panics are caught by `CatchPanicLayer`, logging the incident with a UUID Request ID and returning a generic 500 without crashing the server.
 - **Input Validation**: All 24 tools enforce bounds, ISO dates/times, and sanitized strings. Extra unknown fields are ignored per Postel's Law.
+
+---
+
+## Chat Orchestrator Endpoint (`POST /api/chat`)
+
+TableTalk features an integrated server-side LLM orchestrator backed by **Amazon Bedrock** (Amazon Nova Lite, cross-region inference profile `apac.amazon.nova-lite-v1:0` in `ap-south-1`).
+
+- **Endpoint URL**: `http://localhost:8080/api/chat`
+- **Method**: `POST`
+- **Rate Limiting**: Sliding-window limiter (default 30 req/min per IP, configurable via `CHAT_RATE_LIMIT_PER_MINUTE`).
+- **Safety**: 
+  - Token allowlist ensures only authorized dining tools run.
+  - Destructive tools (`cancel_booking`, `cancel_order`, `forget_me`, `forget_preference`, `leave_waitlist`) require an explicit user confirmation turn before executing.
+  - `profile_token` is held server-side per session and injected into tool calls; it is never sent to Bedrock.
+  - PII (names, phone numbers, emails, tokens) is redacted in logs.
+- **Cost Controls**: Max tokens cap (500), context trimmed to last 8 messages, session (10k) and daily (50k) token budgets with graceful fallback.
+- **Fallback Router**: If Bedrock is throttled, unavailable, or unconfigured, requests are routed to a deterministic keyword router with `"fallback_mode": true`.
+
+### Example Request
+
+```bash
+curl -X POST http://localhost:8080/api/chat \
+  -H "Content-Type: application/json" \
+  -d '{
+    "session_id": "demo-session-123",
+    "messages": [
+      {"role": "user", "content": "Can I get a table for 4 this Friday at 7:30 PM?"}
+    ]
+  }'
+```
+
+### Example Response
+
+```json
+{
+  "session_id": "demo-session-123",
+  "message": {
+    "role": "assistant",
+    "content": "I don't have indoor seating at seven thirty in the evening, but patio is free at seven thirty in the evening, or I have nine in indoor. Would either work for you?"
+  },
+  "structured_contents": [
+    {
+      "status": "unavailable",
+      "reason": "fully_booked",
+      "alternatives": [...]
+    }
+  ],
+  "fallback_mode": false,
+  "token_usage": {
+    "input_tokens": 142,
+    "output_tokens": 38,
+    "total_tokens": 180
+  }
+}
+```
 
 ### Testing with `curl`
 

@@ -10,10 +10,19 @@ pub struct Config {
     pub seed_on_start: bool,
     pub restaurant_tz: String,
     pub rate_limit_per_minute: usize,
+    pub aws_region: String,
+    pub bedrock_model_id: String,
+    pub chat_max_tokens: i32,
+    pub chat_session_token_budget: usize,
+    pub chat_daily_token_budget: usize,
+    pub chat_rate_limit_per_minute: usize,
+    pub chat_max_message_len: usize,
 }
 
 impl Config {
     pub fn from_env() -> Self {
+        dotenvy::dotenv().ok();
+
         let port: u16 = env::var("PORT")
             .ok()
             .and_then(|p| p.parse().ok())
@@ -60,6 +69,36 @@ impl Config {
             .and_then(|r| r.parse().ok())
             .unwrap_or(600);
 
+        let aws_region = env::var("AWS_REGION").unwrap_or_else(|_| "ap-south-1".to_string());
+
+        let bedrock_model_id = env::var("BEDROCK_MODEL_ID")
+            .unwrap_or_else(|_| "apac.amazon.nova-lite-v1:0".to_string());
+
+        let chat_max_tokens: i32 = env::var("CHAT_MAX_TOKENS")
+            .ok()
+            .and_then(|t| t.parse().ok())
+            .unwrap_or(500);
+
+        let chat_session_token_budget: usize = env::var("CHAT_SESSION_TOKEN_BUDGET")
+            .ok()
+            .and_then(|b| b.parse().ok())
+            .unwrap_or(10000);
+
+        let chat_daily_token_budget: usize = env::var("CHAT_DAILY_TOKEN_BUDGET")
+            .ok()
+            .and_then(|b| b.parse().ok())
+            .unwrap_or(50000);
+
+        let chat_rate_limit_per_minute: usize = env::var("CHAT_RATE_LIMIT_PER_MINUTE")
+            .ok()
+            .and_then(|r| r.parse().ok())
+            .unwrap_or(30);
+
+        let chat_max_message_len: usize = env::var("CHAT_MAX_MESSAGE_LEN")
+            .ok()
+            .and_then(|m| m.parse().ok())
+            .unwrap_or(1000);
+
         Self {
             port,
             allowed_origins,
@@ -69,6 +108,13 @@ impl Config {
             seed_on_start,
             restaurant_tz,
             rate_limit_per_minute,
+            aws_region,
+            bedrock_model_id,
+            chat_max_tokens,
+            chat_session_token_budget,
+            chat_daily_token_budget,
+            chat_rate_limit_per_minute,
+            chat_max_message_len,
         }
     }
 }
@@ -89,6 +135,13 @@ impl Default for Config {
             seed_on_start: false,
             restaurant_tz: "Asia/Kolkata".to_string(),
             rate_limit_per_minute: 600,
+            aws_region: "ap-south-1".to_string(),
+            bedrock_model_id: "apac.amazon.nova-lite-v1:0".to_string(),
+            chat_max_tokens: 500,
+            chat_session_token_budget: 10000,
+            chat_daily_token_budget: 50000,
+            chat_rate_limit_per_minute: 30,
+            chat_max_message_len: 1000,
         }
     }
 }

@@ -136,6 +136,22 @@ Feedback and evaluation of core developer tools and platform components used in 
 - **Onboarding experience**: Building the typed React component layer with Tailwind CSS, shadcn/ui primitives, and Vitest/Testing Library was smooth and highly productive.
 - **Would I build with it again**: **Yes** — Driving UI rendering from server-validated `structuredContent` delivers a superior, accessible, and testable developer and user experience compared to embedding volatile iframe widgets into server binaries.
 
+---
 
+## Phase 16: Amazon Bedrock & AWS SDK for Rust (LLM Orchestration)
 
-
+- **AWS Services Used**:
+  - **Amazon Bedrock**: Used as the foundational LLM inference platform for multi-turn conversational tool orchestration via the `Converse` API.
+  - **Amazon Nova Lite (`apac.amazon.nova-lite-v1:0` / `amazon.nova-lite-v1:0`)**: Primary cost-effective conversational model with native tool use (function calling) capabilities deployed across the Asia Pacific cross-region inference profile in `ap-south-1`.
+  - **AWS SDK for Rust (`aws-sdk-bedrockruntime` & `aws-config`)**: Idiomatic Rust client used to communicate with Bedrock Runtime over TLS with asynchronous Tokio integration.
+- **What worked well**:
+  - **Converse API Standard**: The Converse API provides a unified, vendor-neutral structure (`messages`, `system`, `toolConfig`, `inferenceConfig`) that eliminates model-specific prompt engineering hacks.
+  - **Tool Use with Amazon Nova Lite**: Native function calling produces structured `toolUse` output blocks adhering to standard JSON schemas, enabling reliable multi-step workflows (e.g., availability search -> alternative presentation -> booking confirmation).
+  - **Cross-Region Inference Routing (`apac.*`)**: Provides resilience against regional capacity spikes in Mumbai (`ap-south-1`) by automatically balancing traffic across APAC regions while maintaining low latency.
+  - **Pluggable Trait Architecture (`BedrockClient`)**: Abstracting Converse calls behind a Rust trait enabled 100% test coverage with deterministic mocks (`FakeBedrockClient`), allowing tests to run completely hermetically without requiring AWS network access or incurring billable tokens.
+- **What needs work**:
+  - **AWS Smithy Document Mapping**: The AWS SDK for Rust represents tool input schemas using `aws_smithy_types::Document` rather than standard `serde_json::Value`. Converting bidirectional schemas and arguments between Serde and Smithy Document requires custom mapping functions.
+  - **Cross-Region Inference Profile Naming**: Cross-region IDs (`apac.amazon.nova-lite-v1:0`) vs. regional IDs (`amazon.nova-lite-v1:0`) can cause confusion when configuring region parameters. The documentation should provide clearer guidance on which regions allow routing with `apac.` prefixes.
+  - **AWS CLI JSON Escaping on Windows**: Executing Converse tool payloads containing nested JSON arrays through PowerShell requires extensive quote escaping or temporary file payloads.
+- **Onboarding experience**: Adding `aws-sdk-bedrockruntime` and `aws-config` with `rustls` was straightforward and compiled cleanly with Axum 0.8 and Tokio.
+- **Would I build with it again**: **Yes** — Amazon Bedrock's Converse API paired with Nova Lite provides one of the cleanest, fastest, and most cost-effective tool-orchestration backends currently available.

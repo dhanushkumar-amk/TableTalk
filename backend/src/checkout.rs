@@ -160,14 +160,13 @@ async fn get_session(State(state): State<CheckoutState>, Path(token): Path<Strin
         .map(|d| d.with_timezone(&tz).to_rfc3339())
         .unwrap_or_else(|_| session.expires_at.clone());
 
-    let booking_info: Option<(i64, String)> = sqlx::query_as(
-        "SELECT party_size, start_at FROM bookings WHERE id = ?"
-    )
-    .bind(&session.booking_id)
-    .fetch_optional(&state.pool)
-    .await
-    .ok()
-    .flatten();
+    let booking_info: Option<(i64, String)> =
+        sqlx::query_as("SELECT party_size, start_at FROM bookings WHERE id = ?")
+            .bind(&session.booking_id)
+            .fetch_optional(&state.pool)
+            .await
+            .ok()
+            .flatten();
 
     let (booking_party_size, booking_start_at) = match booking_info {
         Some((ps, sa)) => {

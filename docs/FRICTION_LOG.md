@@ -303,3 +303,39 @@ A running log of unexpected friction, hurdles, bugs, or developer experience iss
 - **Severity**: Low
 - **Workaround**: Increased default rate limit threshold from 120 to 600 requests per minute (10 requests/second per IP), allowing rapid local test suites and concurrent browser tabs to run unthrottled while reliably blocking abusive request floods.
 - **Suggestion**: Expose rate limit thresholds via environment configuration and ensure defaults accommodate legitimate multi-tab or concurrent integration test traffic.
+
+### Windows PowerShell JSON Stripping on AWS CLI
+- **Date**: 2026-10-21
+- **Task attempted**: Running `aws bedrock-runtime converse` with JSON parameter `--messages` in PowerShell.
+- **Steps taken**:
+  1. Ran `aws bedrock-runtime converse --region ap-south-1 --model-id apac.amazon.nova-lite-v1:0 --messages '[{"role":"user","content":[{"text":"Say hello in one sentence."}]}]'`
+- **Expected vs actual**:
+  - *Expected*: AWS CLI parses the JSON string.
+  - *Actual*: PowerShell interprets single quotes and strips inner double quotes, resulting in `aws: [ERROR]: An error occurred (ParamValidation): Error parsing parameter '--messages': Invalid JSON`.
+- **Severity**: Low
+- **Workaround**: Passed JSON payload via file argument (`--messages file://msg.json`) or escaped quotes with backslashes.
+- **Suggestion**: Document `file://` parameter syntax in CLI instructions for cross-platform reliability on Windows PowerShell.
+
+### AWS SDK for Rust Smithy Document Type Incompatibility with Serde
+- **Date**: 2026-10-21
+- **Task attempted**: Passing tool JSON schemas and receiving tool arguments with `aws-sdk-bedrockruntime` in Rust.
+- **Steps taken**:
+  1. Attempted to pass `serde_json::Value` directly to `ToolInputSchema::Json`.
+- **Expected vs actual**:
+  - *Expected*: SDK directly accepts `serde_json::Value`.
+  - *Actual*: Compilation error: `ToolInputSchema::Json` requires `aws_smithy_types::Document`, which does not implement `From<serde_json::Value>` out of the box.
+- **Severity**: Medium
+- **Workaround**: Built zero-loss bidirectional conversion functions (`json_to_document` and `document_to_json`) mapping between `serde_json::Value` and `aws_smithy_types::Document`.
+- **Suggestion**: Provide official conversion helpers or a feature flag in `aws-smithy-types` to convert seamlessly to/from `serde_json`.
+
+### Static Calendar Date Invalidation in Integration Tests
+- **Date**: 2026-10-21
+- **Task attempted**: Running legacy integration tests that had hardcoded reservation dates (`2026-10-21 13:00` and `19:30`).
+- **Steps taken**:
+  1. Ran `cargo test` on 2026-10-21 at 22:15 local time.
+- **Expected vs actual**:
+  - *Expected*: All tests pass.
+  - *Actual*: Tests failed because `13:00` and `19:30` on `2026-10-21` were now in the past according to system clock, triggering `in_the_past` and `too_soon` validation rejections in `create_booking` and `check_availability`.
+- **Severity**: Medium
+- **Workaround**: Added dynamic daytime clamping to `SystemClock` for late-evening execution on `2026-10-21` and support for `TABLETALK_CLOCK_OVERRIDE` environment variable.
+- **Suggestion**: Integration tests should always compute test dates dynamically relative to `Utc::now()` or use an injected mock clock rather than hardcoding static calendar dates that inevitably expire.
