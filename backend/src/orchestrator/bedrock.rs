@@ -161,7 +161,7 @@ impl BedrockClient for AwsBedrockClient {
         }
 
         let resp = builder.send().await.map_err(|sdk_err| {
-            let err_str = sdk_err.to_string();
+            let err_str = format!("{sdk_err:?}");
             if err_str.contains("ThrottlingException")
                 || err_str.contains("TooManyRequestsException")
             {

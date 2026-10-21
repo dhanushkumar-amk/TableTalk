@@ -339,3 +339,30 @@ A running log of unexpected friction, hurdles, bugs, or developer experience iss
 - **Severity**: Medium
 - **Workaround**: Added dynamic daytime clamping to `SystemClock` for late-evening execution on `2026-10-21` and support for `TABLETALK_CLOCK_OVERRIDE` environment variable.
 - **Suggestion**: Integration tests should always compute test dates dynamically relative to `Utc::now()` or use an injected mock clock rather than hardcoding static calendar dates that inevitably expire.
+
+### AWS SDK aws-config Missing rt-tokio Feature Panic
+- **Date**: 2026-10-21
+- **Task attempted**: Invoking live Amazon Bedrock Converse API with `aws-config` and `aws-sdk-bedrockruntime` in a Tokio async test.
+- **Steps taken**:
+  1. Added `aws-config` with `default-features = false, features = ["behavior-version-latest", "rustls"]`.
+  2. Executed `cargo test --test mcp_real_bedrock_test`.
+- **Expected vs actual**:
+  - *Expected*: SDK initializes client and dispatches HTTP requests.
+  - *Actual*: Runtime panic: `Invalid client configuration: An async sleep implementation is required for retry to work. Please provide a sleep_impl on the config, or disable timeouts.`
+- **Severity**: High
+- **Workaround**: Added `rt-tokio` feature flag to both `aws-config` and `aws-sdk-bedrockruntime` in `backend/Cargo.toml`, wiring the Tokio async timer/sleep provider into the SDK client.
+- **Suggestion**: Document clearly in AWS SDK for Rust guides that `default-features = false` requires explicit `rt-tokio` whenever retries, credential refreshing, or timeouts are enabled.
+
+### Bedrock ValidationException Operation Not Allowed Pending Model Access
+- **Date**: 2026-10-21
+- **Task attempted**: Executing live `Converse` call against `apac.amazon.nova-lite-v1:0` in `ap-south-1`.
+- **Steps taken**:
+  1. Configured AWS root credentials in `~/.aws/credentials`.
+  2. Executed Converse request via AWS CLI and native Rust client.
+- **Expected vs actual**:
+  - *Expected*: Nova Lite returns generated completion or tool call.
+  - *Actual*: Bedrock returned HTTP 400 `ValidationException: Operation not allowed` (`aws_request_id: 8847a4c1-5c37-4331-81a9-0db388e8eeaf`).
+- **Severity**: Medium
+- **Workaround**: Verified deterministic fallback router engages with `fallback_mode: true` to prevent user downtime, and documented exact Bedrock Console model access activation steps (Amazon Bedrock Console -> Model access -> Modify model access -> Enable Amazon Nova Lite).
+- **Suggestion**: AWS Bedrock could return a more descriptive error code such as `ModelAccessNotGrantedException` rather than generic `ValidationException: Operation not allowed`.
+

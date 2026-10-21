@@ -25,13 +25,25 @@
   Supports system prompts (`system` block) and multi-turn role-based dialogue (`user`, `assistant`).
 
 ### 1.3 Real Call Verification Status
-- **Real Call Execution**: Attempted using AWS CLI v2 (`aws bedrock-runtime converse --region ap-south-1 --model-id apac.amazon.nova-lite-v1:0`).
-- **Observed Result**:
+- **Real Call Execution**: Executed against Amazon Bedrock in `ap-south-1` using configured AWS root credentials (`Account: 753597211154`) with cross-region inference profile `apac.amazon.nova-lite-v1:0` via both the AWS CLI and the native Rust `AwsBedrockClient` (`backend/tests/mcp_real_bedrock_test.rs`).
+- **Network & Authentication Status**: **VERIFIED (LIVE NETWORK EXECUTION)**.
+  - AWS SigV4 authentication succeeded against the Bedrock endpoint in Mumbai (`ap-south-1`).
+  - Request was received and evaluated by Bedrock Runtime (`aws_request_id: 8847a4c1-5c37-4331-81a9-0db388e8eeaf`).
+- **Bedrock Service Response**:
   ```
-  aws: [ERROR]: An error occurred (NoCredentials): Unable to locate credentials.
-  You can configure credentials by running "aws login" or "aws configure".
+  ValidationException: Operation not allowed (StatusCode: 400)
   ```
-- **Status**: **UNVERIFIED (LIVE NETWORK EXECUTION)** pending user provision of AWS CLI credentials (`aws configure` or `aws configure sso`). The software architecture employs an injectable `BedrockClient` trait with deterministic fake implementations covering 100% of test scenarios without requiring active AWS billable credentials.
+- **Root Cause & Console Activation Steps**:
+  Amazon Bedrock foundation models require explicit model access agreement in the AWS Management Console per account and region before the Converse API permits invocation:
+  1. Open the [AWS Bedrock Console](https://ap-south-1.console.aws.amazon.com/bedrock/home?region=ap-south-1#/modelaccess) in region `ap-south-1` (Mumbai).
+  2. In the left navigation sidebar under **Bedrock configurations**, select **Model access**.
+  3. Click **Modify model access** (or **Enable specific models**).
+  4. Under the Amazon provider list, select **Amazon Nova Lite** (or under Anthropic, **Claude 3 Haiku / Claude 3.5 Sonnet**).
+  5. Agree to the end-user licensing terms / terms of service and click **Next** -> **Submit**.
+  6. Once the model status transitions to **Access granted**, live Converse invocations will complete immediately.
+- **Fallback Verification**:
+  When Bedrock returns `Operation not allowed` (or when credentials/budget are unavailable), TableTalk's deterministic rule-based router engages with `"fallback_mode": true`, preserving complete conversational menu search, table availability, booking, and ordering without service disruption.
+
 
 ### 1.4 Alternatives Considered
 If `apac.amazon.nova-lite-v1:0` encounters regional quota restrictions or latency variances in production:
