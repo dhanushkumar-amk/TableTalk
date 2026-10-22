@@ -1,0 +1,16 @@
+# .cargo/audit.toml
+# Cargo Audit configuration for TableTalk
+
+[advisories]
+# Documented upstream advisories originating from AWS SDK dependencies (aws-smithy-http-client)
+# which await upstream releases from AWS.
+ignore = [
+    "RUSTSEC-2026-0258", # h2 0.3.27 in aws-smithy-http-client
+    "RUSTSEC-2023-0071", # rsa 0.9.10 in aws-smithy-runtime
+    "RUSTSEC-2026-0346", # rustls 0.21.12 in aws-smithy-http-client
+    "RUSTSEC-2026-0349", # rustls 0.21.12 in aws-smithy-http-client
+    "RUSTSEC-2026-0098", # rustls-webpki 0.101.7 in aws-smithy-http-client
+    "RUSTSEC-2026-0099", # rustls-webpki 0.101.7 in aws-smithy-http-client
+    "RUSTSEC-2026-0104", # rustls-webpki 0.101.7 in aws-smithy-http-client
+    "RUSTSEC-2026-0382", # rustls-webpki 0.101.7 in aws-smithy-http-client
+]

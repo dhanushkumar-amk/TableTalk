@@ -7,6 +7,35 @@ on:
     branches: [main]
 
 jobs:
+  security-audit:
+    name: Security & Secret Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository (full history for secret scan)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Run Secret Scan
+        run: node scripts/secret-scan.cjs
+
+      - name: Set up Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --locked
+
+      - name: Run cargo audit
+        run: cargo audit
+
   backend:
     name: Backend (Rust)
     runs-on: ubuntu-latest
@@ -28,7 +57,7 @@ jobs:
         run: cargo fmt --check
 
       - name: Clippy lint check
-        run: cargo clippy -- -D warnings
+        run: cargo clippy --all-targets -- -D warnings
 
       - name: Run unit and integration tests
         run: cargo test
@@ -66,5 +95,44 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Run npm audit
+        run: npm audit --audit-level=high
+
+      - name: Lint and typecheck
+        run: npm run lint
+
+      - name: Run unit tests
+        run: npm test -- --run
+
       - name: Build frontend
         run: npm run build
+
+  docker-build:
+    name: Docker Build Validation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Backend Docker Image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: Dockerfile
+          push: false
+          tags: tabletalk-backend:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build Frontend Docker Image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          file: ./frontend/Dockerfile
+          push: false
+          tags: tabletalk-frontend:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
