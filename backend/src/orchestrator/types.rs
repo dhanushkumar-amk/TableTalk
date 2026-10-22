@@ -33,6 +33,8 @@ pub struct ChatResponse {
     pub session_id: String,
     pub message: ChatMessage,
     pub structured_contents: Vec<Value>,
+    #[serde(default)]
+    pub provider: String,
     pub fallback_mode: bool,
     pub token_usage: TokenUsage,
 }
@@ -43,6 +45,9 @@ pub struct BedrockToolSpec {
     pub description: String,
     pub input_schema: Value,
 }
+
+pub type ToolSpec = BedrockToolSpec;
+pub type LlmError = BedrockError;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ToolUseRequest {

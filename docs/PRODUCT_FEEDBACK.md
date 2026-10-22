@@ -155,3 +155,31 @@ Feedback and evaluation of core developer tools and platform components used in 
   - **AWS CLI JSON Escaping on Windows**: Executing Converse tool payloads containing nested JSON arrays through PowerShell requires extensive quote escaping or temporary file payloads.
 - **Onboarding experience**: Adding `aws-sdk-bedrockruntime` and `aws-config` with `rustls` was straightforward and compiled cleanly with Axum 0.8 and Tokio.
 - **Would I build with it again**: **Yes** — Amazon Bedrock's Converse API paired with Nova Lite provides one of the cleanest, fastest, and most cost-effective tool-orchestration backends currently available.
+
+---
+
+## Phase 17: Groq Provider Switch & Demo Video Provider Declaration
+
+### Provider Used in Demo Video
+**Plain Statement**: The TableTalk local demo video used **Groq** (`llama-3.3-70b-versatile`) via `LLM_PROVIDER=groq`.
+
+### Providers and Services Summary
+1. **Groq API**:
+   - **Model**: `llama-3.3-70b-versatile`
+   - **Endpoint**: `https://api.groq.com/openai/v1/chat/completions`
+   - **Protocol**: OpenAI-compatible JSON Schema function calling (`tools: [{"type": "function", ...}]`).
+   - **Role in Demo**: Primary live driver for multi-turn voice chat, MCP tool selection, and speech responses with sub-second time-to-first-token.
+2. **Amazon Bedrock (AWS)**:
+   - **Model**: Amazon Nova Lite (`apac.amazon.nova-lite-v1:0` / `amazon.nova-lite-v1:0`) in `ap-south-1`.
+   - **SDKs**: `aws-sdk-bedrockruntime`, `aws-config`, `aws-sdk-sts` (version 1.x with `rustls-tls`).
+   - **Status**: Implemented behind the shared `LlmClient` trait with hermetic mock coverage (`FakeBedrockClient`). Not exercised against real AWS in this demo video session.
+
+### What Worked Well with Groq
+- **Ultra-low latency**: Sub-250ms time-to-first-token on LPUs makes spoken assistant conversations feel instantaneous and natural.
+- **Accurate Tool Calling**: `llama-3.3-70b-versatile` accurately picked the correct tools (`check_availability`, `search_menu`, `create_booking`, `place_order`) from compact schemas without hallucinations.
+- **Standardized Schema**: OpenAI-compatible format allowed rapid integration with `reqwest` and standard Serde serialization.
+
+### What Needs Work
+- **Free Tier Rate Limits**: The free tier limit (30 requests/minute, 1,000 requests/day, 12,000 tokens/minute) requires defensive backoff and retry handling on HTTP 429.
+- **Streaming Tool Call Assembly**: Tool calling over Server-Sent Events requires assembling streaming JSON argument fragments across chunks. TableTalk avoids this complexity by executing tool turns synchronously with non-streaming JSON completions, which is already fast on Groq (<400ms).
+

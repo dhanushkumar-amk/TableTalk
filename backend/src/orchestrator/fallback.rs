@@ -34,7 +34,10 @@ pub async fn handle_fallback(
 
         let (text, structured, _) = execute_tool(pool, "search_menu", args, profile_token).await;
         let mut structured_contents = Vec::new();
-        if let Some(sc) = structured {
+        if let Some(mut sc) = structured {
+            if sc.is_object() && sc.get("_tool_name").is_none() {
+                sc["_tool_name"] = json!("search_menu");
+            }
             structured_contents.push(sc);
         }
 
@@ -45,6 +48,7 @@ pub async fn handle_fallback(
                 content: text,
             },
             structured_contents,
+            provider: "fallback".to_string(),
             fallback_mode: true,
             token_usage: TokenUsage::default(),
         };
@@ -70,7 +74,10 @@ pub async fn handle_fallback(
 
         let (text, structured, _) = execute_tool(pool, "create_booking", args, profile_token).await;
         let mut structured_contents = Vec::new();
-        if let Some(sc) = structured {
+        if let Some(mut sc) = structured {
+            if sc.is_object() && sc.get("_tool_name").is_none() {
+                sc["_tool_name"] = json!("create_booking");
+            }
             structured_contents.push(sc);
         }
 
@@ -81,6 +88,7 @@ pub async fn handle_fallback(
                 content: text,
             },
             structured_contents,
+            provider: "fallback".to_string(),
             fallback_mode: true,
             token_usage: TokenUsage::default(),
         };
@@ -106,7 +114,10 @@ pub async fn handle_fallback(
         let (text, structured, _) =
             execute_tool(pool, "check_availability", args, profile_token).await;
         let mut structured_contents = Vec::new();
-        if let Some(sc) = structured {
+        if let Some(mut sc) = structured {
+            if sc.is_object() && sc.get("_tool_name").is_none() {
+                sc["_tool_name"] = json!("check_availability");
+            }
             structured_contents.push(sc);
         }
 
@@ -117,6 +128,7 @@ pub async fn handle_fallback(
                 content: text,
             },
             structured_contents,
+            provider: "fallback".to_string(),
             fallback_mode: true,
             token_usage: TokenUsage::default(),
         };
@@ -137,7 +149,10 @@ pub async fn handle_fallback(
 
         let (text, structured, _) = execute_tool(pool, "place_order", args, profile_token).await;
         let mut structured_contents = Vec::new();
-        if let Some(sc) = structured {
+        if let Some(mut sc) = structured {
+            if sc.is_object() && sc.get("_tool_name").is_none() {
+                sc["_tool_name"] = json!("place_order");
+            }
             structured_contents.push(sc);
         }
 
@@ -148,6 +163,7 @@ pub async fn handle_fallback(
                 content: text,
             },
             structured_contents,
+            provider: "fallback".to_string(),
             fallback_mode: true,
             token_usage: TokenUsage::default(),
         };
@@ -161,6 +177,7 @@ pub async fn handle_fallback(
             content: "Welcome to The Saffron Nebula Bistro. Would you like to check our menu, check table availability, or book a reservation?".to_string(),
         },
         structured_contents: Vec::new(),
+        provider: "fallback".to_string(),
         fallback_mode: true,
         token_usage: TokenUsage::default(),
     }

@@ -127,7 +127,7 @@ async fn test_table_for_4_friday_availability_to_booking() {
         })
         .await;
 
-    assert_eq!(response.fallback_mode, false);
+    assert!(!response.fallback_mode);
     assert!(response.message.content.contains("confirmed"));
     assert!(!response.structured_contents.is_empty());
 
@@ -177,7 +177,7 @@ async fn test_iteration_cap_stops_at_5() {
         .await;
 
     // Loop must stop at 5 iterations
-    assert_eq!(response.fallback_mode, false);
+    assert!(!response.fallback_mode);
     assert!(response.message.content.contains("maximum steps"));
     assert_eq!(fake_bedrock.recorded_payloads.lock().await.len(), 5);
 }
@@ -205,7 +205,7 @@ async fn test_throttling_then_fallback() {
         })
         .await;
 
-    assert_eq!(response.fallback_mode, true);
+    assert!(response.fallback_mode);
     assert!(!response.message.content.is_empty());
     assert!(!response.structured_contents.is_empty());
 }
@@ -249,7 +249,7 @@ async fn test_budget_exceeded_fallback() {
         .await;
 
     // First call exceeded budget during recording, second call triggers fallback immediately
-    assert_eq!(response.fallback_mode, true);
+    assert!(response.fallback_mode);
 }
 
 #[tokio::test]
@@ -332,7 +332,7 @@ async fn test_malformed_tool_arguments_self_correction() {
         })
         .await;
 
-    assert_eq!(response.fallback_mode, false);
+    assert!(!response.fallback_mode);
     assert!(response.message.content.contains("Friday at 7:30 PM"));
 
     // Verify the error was fed back in payload to model
@@ -379,7 +379,7 @@ async fn test_injection_string_in_stored_note() {
         })
         .await;
 
-    assert_eq!(response.fallback_mode, false);
+    assert!(!response.fallback_mode);
     // Ensure system prompt always instructs model that notes are untrusted data
     let prompts = fake_bedrock.recorded_system_prompts.lock().await;
     assert!(!prompts.is_empty());
@@ -418,7 +418,7 @@ async fn test_profile_token_absent_from_every_payload_to_fake_model() {
         })
         .await;
 
-    assert_eq!(response.fallback_mode, false);
+    assert!(!response.fallback_mode);
 
     // Verify secret token was redacted from every message sent to the fake model
     let payloads = fake_bedrock.recorded_payloads.lock().await;
@@ -471,7 +471,7 @@ async fn test_destructive_tool_requires_confirmation() {
         .await;
 
     // Must halt and ask user for confirmation before executing cancel_booking
-    assert_eq!(response1.fallback_mode, false);
+    assert!(!response1.fallback_mode);
     assert!(response1
         .message
         .content
@@ -489,7 +489,7 @@ async fn test_destructive_tool_requires_confirmation() {
         .await;
 
     // Destructive tool executed upon confirmation
-    assert_eq!(response2.fallback_mode, false);
+    assert!(!response2.fallback_mode);
 }
 
 #[test]
@@ -520,4 +520,256 @@ fn test_allowlist_and_destructive_inventory() {
     assert!(is_destructive_tool("forget_preference"));
     assert!(is_destructive_tool("leave_waitlist"));
     assert!(!is_destructive_tool("get_booking"));
+}
+
+#[tokio::test]
+async fn test_groq_api_key_absent_from_every_payload_and_redacted_in_logs() {
+    let fake_groq = Arc::new(FakeBedrockClient::with_provider("groq"));
+
+    fake_groq
+        .push_response(Ok(tabletalk_backend::orchestrator::types::ConverseOutput {
+            message: Some(ChatMessage {
+                role: "assistant".to_string(),
+                content: "Your request has been processed securely.".to_string(),
+            }),
+            tool_uses: Vec::new(),
+            token_usage: TokenUsage {
+                input_tokens: 30,
+                output_tokens: 15,
+                total_tokens: 45,
+            },
+        }))
+        .await;
+
+    let (service, _pool) = setup_test_service(fake_groq.clone(), None).await;
+
+    let secret_key = "gsk_superSecretGroqKey1234567890abcdef";
+    let secret_token = "tt_prof_SecretSessionToken1234567890";
+    let response = service
+        .process_chat(ChatRequest {
+            session_id: Some("session_groq_key_check".to_string()),
+            messages: vec![ChatMessage {
+                role: "user".to_string(),
+                content: format!(
+                    "Use key {secret_key} and token {secret_token} to reserve a table"
+                ),
+            }],
+        })
+        .await;
+
+    assert!(!response.fallback_mode);
+    assert_eq!(response.provider, "groq");
+
+    // Verify neither secret key nor token appear in any payload sent to the model
+    let payloads = fake_groq.recorded_payloads.lock().await;
+    for turn_messages in payloads.iter() {
+        for msg in turn_messages {
+            assert!(
+                !msg.content.contains(secret_key),
+                "Payload leaked Groq API key: {}",
+                msg.content
+            );
+            assert!(
+                !msg.content.contains(secret_token),
+                "Payload leaked profile token: {}",
+                msg.content
+            );
+        }
+    }
+
+    // Verify log redaction masks the key and token
+    let test_log = format!("Config loaded key {secret_key} with token {secret_token}");
+    let redacted = redact_for_logging(&test_log);
+    assert!(!redacted.contains(secret_key));
+    assert!(!redacted.contains(secret_token));
+    assert!(redacted.contains("[REDACTED_API_KEY]"));
+    assert!(redacted.contains("[REDACTED_PROFILE_TOKEN]"));
+}
+
+#[tokio::test]
+async fn test_provider_switch_groq_and_bedrock() {
+    // Test Groq provider
+    let fake_groq = Arc::new(FakeBedrockClient::with_provider("groq"));
+    fake_groq
+        .push_response(Ok(tabletalk_backend::orchestrator::types::ConverseOutput {
+            message: Some(ChatMessage {
+                role: "assistant".to_string(),
+                content: "Response from Groq".to_string(),
+            }),
+            tool_uses: Vec::new(),
+            token_usage: TokenUsage::default(),
+        }))
+        .await;
+
+    let (service_groq, _pool) = setup_test_service(fake_groq, None).await;
+    let resp_groq = service_groq
+        .process_chat(ChatRequest {
+            session_id: Some("session_provider_switch_1".to_string()),
+            messages: vec![ChatMessage {
+                role: "user".to_string(),
+                content: "Hello Groq".to_string(),
+            }],
+        })
+        .await;
+
+    assert_eq!(resp_groq.provider, "groq");
+    assert!(!resp_groq.fallback_mode);
+    assert_eq!(resp_groq.message.content, "Response from Groq");
+
+    // Test Bedrock provider
+    let fake_bedrock = Arc::new(FakeBedrockClient::with_provider("bedrock"));
+    fake_bedrock
+        .push_response(Ok(tabletalk_backend::orchestrator::types::ConverseOutput {
+            message: Some(ChatMessage {
+                role: "assistant".to_string(),
+                content: "Response from Bedrock".to_string(),
+            }),
+            tool_uses: Vec::new(),
+            token_usage: TokenUsage::default(),
+        }))
+        .await;
+
+    let (service_bedrock, _pool) = setup_test_service(fake_bedrock, None).await;
+    let resp_bedrock = service_bedrock
+        .process_chat(ChatRequest {
+            session_id: Some("session_provider_switch_2".to_string()),
+            messages: vec![ChatMessage {
+                role: "user".to_string(),
+                content: "Hello Bedrock".to_string(),
+            }],
+        })
+        .await;
+
+    assert_eq!(resp_bedrock.provider, "bedrock");
+    assert!(!resp_bedrock.fallback_mode);
+    assert_eq!(resp_bedrock.message.content, "Response from Bedrock");
+}
+
+#[tokio::test]
+async fn test_groq_client_mock_server_flow_and_429_retry() {
+    use axum::http::StatusCode;
+    use axum::response::IntoResponse;
+    use axum::routing::post;
+    use axum::{Json, Router};
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use tabletalk_backend::orchestrator::client::LlmClient;
+    use tabletalk_backend::orchestrator::groq::GroqClient;
+
+    let call_count = Arc::new(AtomicUsize::new(0));
+    let call_count_clone = call_count.clone();
+
+    // Mock Groq API router
+    let mock_app = Router::new().route(
+        "/chat/completions",
+        post(move |headers: axum::http::HeaderMap, Json(body): Json<serde_json::Value>| {
+            let count_ref = call_count_clone.clone();
+            async move {
+                let current = count_ref.fetch_add(1, Ordering::SeqCst);
+
+                // Verify Bearer token was passed in Authorization header
+                let auth = headers.get("authorization").and_then(|v| v.to_str().ok()).unwrap_or("");
+                assert!(auth.starts_with("Bearer gsk_test_secret_key"));
+
+                // Verify tools were supplied
+                assert!(body.get("tools").is_some());
+
+                // First attempt: simulate 429 Too Many Requests (Rate Limit)
+                if current == 0 {
+                    return (
+                        StatusCode::TOO_MANY_REQUESTS,
+                        Json(serde_json::json!({
+                            "error": {
+                                "message": "Rate limit reached for model llama-3.3-70b-versatile",
+                                "type": "tokens"
+                            }
+                        })),
+                    )
+                        .into_response();
+                }
+
+                // Second attempt after backoff: succeed with tool call
+                (
+                    StatusCode::OK,
+                    Json(serde_json::json!({
+                        "id": "chatcmpl-mock-123",
+                        "choices": [
+                            {
+                                "index": 0,
+                                "message": {
+                                    "role": "assistant",
+                                    "content": null,
+                                    "tool_calls": [
+                                        {
+                                            "id": "call_mock_avail",
+                                            "type": "function",
+                                            "function": {
+                                                "name": "check_availability",
+                                                "arguments": "{\"date\":\"2026-10-23\",\"time\":\"19:30\",\"party_size\":4}"
+                                            }
+                                        }
+                                    ]
+                                },
+                                "finish_reason": "tool_calls"
+                            }
+                        ],
+                        "usage": {
+                            "prompt_tokens": 45,
+                            "completion_tokens": 20,
+                            "total_tokens": 65
+                        }
+                    })),
+                )
+                    .into_response()
+            }
+        }),
+    );
+
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+    tokio::spawn(async move {
+        axum::serve(listener, mock_app).await.unwrap();
+    });
+
+    let mock_base_url = format!("http://{}", addr);
+    let groq_client = GroqClient::with_base_url(
+        "gsk_test_secret_key_123456789".to_string(),
+        "llama-3.3-70b-versatile".to_string(),
+        mock_base_url,
+    );
+
+    let tools = vec![tabletalk_backend::orchestrator::types::BedrockToolSpec {
+        name: "check_availability".to_string(),
+        description: "Check table availability".to_string(),
+        input_schema: serde_json::json!({
+            "type": "object",
+            "properties": {
+                "date": { "type": "string" },
+                "time": { "type": "string" },
+                "party_size": { "type": "integer" }
+            }
+        }),
+    }];
+
+    let messages = vec![ChatMessage {
+        role: "user".to_string(),
+        content: "table for 4 Friday at 7:30".to_string(),
+    }];
+
+    let result = groq_client
+        .converse(
+            "llama-3.3-70b-versatile",
+            "You are a helpful restaurant assistant.",
+            &messages,
+            &tools,
+            500,
+        )
+        .await
+        .unwrap();
+
+    // Verify 429 was retried and succeeded on attempt 2
+    assert_eq!(call_count.load(Ordering::SeqCst), 2);
+    assert_eq!(result.tool_uses.len(), 1);
+    assert_eq!(result.tool_uses[0].name, "check_availability");
+    assert_eq!(result.tool_uses[0].input["party_size"], 4);
+    assert_eq!(result.token_usage.total_tokens, 65);
 }

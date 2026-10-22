@@ -366,3 +366,40 @@ A running log of unexpected friction, hurdles, bugs, or developer experience iss
 - **Workaround**: Verified deterministic fallback router engages with `fallback_mode: true` to prevent user downtime, and documented exact Bedrock Console model access activation steps (Amazon Bedrock Console -> Model access -> Modify model access -> Enable Amazon Nova Lite).
 - **Suggestion**: AWS Bedrock could return a more descriptive error code such as `ModelAccessNotGrantedException` rather than generic `ValidationException: Operation not allowed`.
 
+### SQLx Migration Checksum Mismatch on Database Re-initialization
+- **Date**: 2026-10-22
+- **Task attempted**: Booting Axum backend server with live SQLite database (`data/tabletalk.db`).
+- **Steps taken**:
+  1. Ran `cargo run --bin mcp_tabletalk_backend`.
+- **Expected vs actual**:
+  - *Expected*: Server boots and runs migrations.
+  - *Actual*: Panicked with `Migration error: migration 7 was previously applied but has been modified`.
+- **Severity**: Medium
+- **Workaround**: SQLx verifies SHA-384 checksums of all applied migration scripts against the `_sqlx_migrations` table. Because migration 7 had been modified in an earlier commit after the database was initially created, the checksum failed. Resolved by moving the stale `.db` file to `.db.bak` and booting with `SEED_ON_START=true` to cleanly generate fresh migrations and seed data.
+- **Suggestion**: In local development environments, provide a CLI flag or environment option (`SQLX_OFFLINE_FORCE_REAPPLY=true`) to automatically re-sync modified migration checksums without requiring manual file removal.
+
+### Groq vs Bedrock Multi-Turn Tool Call Serialization Harmony
+- **Date**: 2026-10-22
+- **Task attempted**: Unifying Groq (OpenAI-compatible) and Bedrock (Amazon Converse) tool calling protocols into one shared orchestrator loop.
+- **Steps taken**:
+  1. Built `GroqClient` with tool conversion (`tools: [{"type": "function", ...}]`) and OpenAI response parsing.
+  2. Evaluated whether to feed tool results back with role `"tool"` (Groq/OpenAI specific) or role `"user"` (Bedrock Converse compatible).
+- **Expected vs actual**:
+  - *Expected*: Both providers parse tool output cleanly.
+  - *Actual*: Groq requires `tool_call_id` when using role `"tool"`, whereas Bedrock Converse expects `toolResult` blocks.
+- **Severity**: Medium
+- **Workaround**: Standardized tool execution output into conversational user turns (`Tool '<name>' result: <safe_json>`), allowing both Bedrock and Groq models to digest tool feedback naturally over multiple iterations without protocol divergence or complex state management.
+- **Suggestion**: LLM API standards should align on a common schema representation for multi-turn tool calling across providers.
+
+### Card Gallery Test Fixture Regression
+- **Date**: 2026-10-22
+- **Task attempted**: Running full frontend test suite (`npm test -- --run`).
+- **Steps taken**:
+  1. Executed Vitest across all 12 test files.
+- **Expected vs actual**:
+  - *Expected*: 83 tests pass.
+  - *Actual*: `a11y.test.tsx` failed because `create_booking_confirmed.json` contained `"status": "unavailable"` and `"booking": null` from an accidental earlier commit.
+- **Severity**: Low
+- **Workaround**: Examined `git log -p frontend/src/cards/fixtures/create_booking_confirmed.json`, identified the overwritten payload, and restored the confirmed booking structure with confirmation code and cancellation policy. All 83 tests passed immediately.
+
+

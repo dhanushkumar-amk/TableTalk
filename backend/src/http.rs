@@ -237,11 +237,21 @@ pub fn build_router_full(
                 config.chat_session_token_budget,
                 config.chat_daily_token_budget,
             ));
-            let bedrock_client = Arc::new(crate::orchestrator::LazyAwsBedrockClient::new(
-                config.aws_region.clone(),
-            ));
+            let llm_client: Arc<dyn crate::orchestrator::LlmClient> =
+                match config.llm_provider.as_str() {
+                    "bedrock" => Arc::new(crate::orchestrator::LazyAwsBedrockClient::new(
+                        config.aws_region.clone(),
+                    )),
+                    _ => {
+                        let api_key = config.groq_api_key.clone().unwrap_or_default();
+                        Arc::new(crate::orchestrator::GroqClient::new(
+                            api_key,
+                            config.groq_model.clone(),
+                        ))
+                    }
+                };
             Arc::new(crate::orchestrator::OrchestratorService::new(
-                bedrock_client,
+                llm_client,
                 session_mgr,
                 p.clone(),
                 TableTalkServer::with_db(p),

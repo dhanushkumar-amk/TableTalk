@@ -17,6 +17,9 @@ pub struct Config {
     pub chat_daily_token_budget: usize,
     pub chat_rate_limit_per_minute: usize,
     pub chat_max_message_len: usize,
+    pub llm_provider: String,
+    pub groq_api_key: Option<String>,
+    pub groq_model: String,
 }
 
 impl Config {
@@ -99,6 +102,18 @@ impl Config {
             .and_then(|m| m.parse().ok())
             .unwrap_or(1000);
 
+        let llm_provider = env::var("LLM_PROVIDER")
+            .unwrap_or_else(|_| "groq".to_string())
+            .to_lowercase();
+
+        let groq_api_key = env::var("GROQ_API_KEY")
+            .ok()
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty());
+
+        let groq_model =
+            env::var("GROQ_MODEL").unwrap_or_else(|_| "llama-3.3-70b-versatile".to_string());
+
         Self {
             port,
             allowed_origins,
@@ -115,6 +130,9 @@ impl Config {
             chat_daily_token_budget,
             chat_rate_limit_per_minute,
             chat_max_message_len,
+            llm_provider,
+            groq_api_key,
+            groq_model,
         }
     }
 }
@@ -142,6 +160,9 @@ impl Default for Config {
             chat_daily_token_budget: 50000,
             chat_rate_limit_per_minute: 30,
             chat_max_message_len: 1000,
+            llm_provider: "groq".to_string(),
+            groq_api_key: None,
+            groq_model: "llama-3.3-70b-versatile".to_string(),
         }
     }
 }

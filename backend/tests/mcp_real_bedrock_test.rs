@@ -1,6 +1,6 @@
 use tabletalk_backend::orchestrator::{
     bedrock::{AwsBedrockClient, BedrockClient},
-    types::{ChatMessage, BedrockToolSpec},
+    types::{BedrockToolSpec, ChatMessage},
 };
 
 #[tokio::test]
@@ -9,7 +9,10 @@ async fn test_real_bedrock_call() {
     let model_id = std::env::var("BEDROCK_MODEL_ID")
         .unwrap_or_else(|_| "apac.amazon.nova-lite-v1:0".to_string());
 
-    println!("Testing real AWS Bedrock call with region={} and model_id={}", region, model_id);
+    println!(
+        "Testing real AWS Bedrock call with region={} and model_id={}",
+        region, model_id
+    );
 
     let client = match AwsBedrockClient::from_env(&region).await {
         Ok(c) => c,
@@ -52,6 +55,7 @@ async fn test_real_bedrock_call() {
 
 #[tokio::test]
 async fn test_real_chat_orchestrator_fallback_on_bedrock_unauthorized() {
+    use chrono::{TimeZone, Utc};
     use std::sync::Arc;
     use tabletalk_backend::{
         availability::FixedClock,
@@ -59,7 +63,6 @@ async fn test_real_chat_orchestrator_fallback_on_bedrock_unauthorized() {
         orchestrator::{ChatRequest, OrchestratorService, SessionManager},
         Config, TableTalkServer,
     };
-    use chrono::{TimeZone, Utc};
 
     let pool = init_test_pool().await.unwrap();
     let fixed_now = Utc.with_ymd_and_hms(2026, 10, 21, 4, 0, 0).unwrap();
@@ -87,14 +90,8 @@ async fn test_real_chat_orchestrator_fallback_on_bedrock_unauthorized() {
     let server = TableTalkServer::with_db(pool.clone());
     let clock = Arc::new(FixedClock(fixed_now));
 
-    let service = OrchestratorService::new(
-        client,
-        session_manager,
-        pool.clone(),
-        server,
-        clock,
-        config,
-    );
+    let service =
+        OrchestratorService::new(client, session_manager, pool.clone(), server, clock, config);
 
     // Call chat endpoint with a menu query
     let req = ChatRequest {
@@ -109,9 +106,17 @@ async fn test_real_chat_orchestrator_fallback_on_bedrock_unauthorized() {
     println!("Chat response role: {}", resp.message.role);
     println!("Chat response text: {}", resp.message.content);
     println!("Fallback mode: {}", resp.fallback_mode);
-    println!("Structured contents count: {}", resp.structured_contents.len());
+    println!(
+        "Structured contents count: {}",
+        resp.structured_contents.len()
+    );
 
-    assert_eq!(resp.fallback_mode, true, "Fallback mode should engage when Bedrock encounters Operation not allowed");
-    assert!(!resp.message.content.is_empty(), "Fallback response should provide helpful message");
+    assert_eq!(
+        resp.fallback_mode, true,
+        "Fallback mode should engage when Bedrock encounters Operation not allowed"
+    );
+    assert!(
+        !resp.message.content.is_empty(),
+        "Fallback response should provide helpful message"
+    );
 }
-

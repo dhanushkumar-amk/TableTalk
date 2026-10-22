@@ -34,7 +34,8 @@ import type {
 } from "@/cards/events"
 import {
   sendAssistantMessage,
-  executeCardAction,
+  getToolActivityLabel,
+  type AssistantCardItem,
   type LiveActivityItem,
 } from "@/lib/assistantService"
 import {
@@ -48,14 +49,15 @@ export interface Message {
   sender: "user" | "assistant"
   text: string
   timestamp: string
-  toolActivity?: {
-    toolName: TableTalkToolName
+  toolActivities?: Array<{
+    toolName: TableTalkToolName | string
     label: string
-  }
+  }>
   card?: {
     toolName: TableTalkToolName
     envelope: ToolResponseEnvelope<any>
   }
+  cards?: AssistantCardItem[]
   error?: {
     message: string
     canRetry: boolean
@@ -63,10 +65,23 @@ export interface Message {
 }
 
 const SUGGESTION_CHIPS = [
-  "Table for 4 tomorrow at 7:30",
-  "Vegan options without peanuts",
-  "Order pickup",
-  "Join the waitlist",
+  {
+    display: "Table for 4 Friday at 7:30",
+    alias: "Table for 4 tomorrow at 7:30",
+    query: "Table for 4 tomorrow at 7:30",
+  },
+  {
+    display: "Vegan options without peanuts",
+    query: "Vegan options without peanuts",
+  },
+  {
+    display: "Order pickup",
+    query: "Order pickup",
+  },
+  {
+    display: "Join the waitlist",
+    query: "Join the waitlist",
+  },
 ]
 
 export function AssistantPage() {
@@ -81,6 +96,8 @@ export function AssistantPage() {
   const [liveActivity, setLiveActivity] = useState<LiveActivityItem[]>([])
   const [showActivityDrawer, setShowActivityDrawer] = useState(false)
   const [showScrollBottomPill, setShowScrollBottomPill] = useState(false)
+  const [isFallbackMode, setIsFallbackMode] = useState(false)
+  const [activeProvider, setActiveProvider] = useState<string>("groq")
 
   // In-memory token only (never localStorage)
   const inMemoryProfileTokenRef = useRef<string | null>(null)
@@ -147,7 +164,7 @@ export function AssistantPage() {
     }
   }
 
-  // Send a user prompt
+  // Send a user prompt to the assistant orchestrator
   const handleSend = async (textToSend?: string) => {
     const text = (textToSend ?? inputText).trim()
     if (!text || isThinking) return
@@ -175,18 +192,42 @@ export function AssistantPage() {
       timestamp,
     }
 
+    const currentHistory = messages.map((m) => ({
+      role: m.sender,
+      content: m.text,
+    }))
+
     setMessages((prev) => [...prev, userMsg])
     setIsThinking(true)
-    setActiveToolLabel("Checking live capacity...")
+    setActiveToolLabel("Checking restaurant capacity...")
 
     try {
       const response = await sendAssistantMessage(
         text,
-        inMemoryProfileTokenRef.current
+        inMemoryProfileTokenRef.current,
+        currentHistory
       )
 
       setIsThinking(false)
       setActiveToolLabel(null)
+
+      if (response.fallbackMode) {
+        setIsFallbackMode(true)
+      }
+      if (response.provider) {
+        setActiveProvider(response.provider)
+      }
+
+      // Compute tool activity chips derived from response
+      const toolActivities =
+        response.cards && response.cards.length > 0
+          ? response.cards.map((c) => ({
+              toolName: c.toolName,
+              label: getToolActivityLabel(c.toolName),
+            }))
+          : response.toolName
+            ? [{ toolName: response.toolName, label: getToolActivityLabel(response.toolName) }]
+            : []
 
       const assistantMsg: Message = {
         id: `asst-${Date.now()}`,
@@ -196,36 +237,56 @@ export function AssistantPage() {
           hour: "2-digit",
           minute: "2-digit",
         }),
-        toolActivity: {
-          toolName: response.toolName,
-          label: `Invoked ${response.toolName}`,
-        },
-        card: {
-          toolName: response.toolName,
-          envelope: response.envelope,
-        },
+        toolActivities,
+        cards: response.cards,
+        card: response.envelope && response.toolName
+          ? {
+              toolName: response.toolName,
+              envelope: response.envelope,
+            }
+          : undefined,
       }
 
       setMessages((prev) => [...prev, assistantMsg])
 
       // Record in Live Activity stream
-      setLiveActivity((prev) => [
-        {
-          id: `act-${Date.now()}`,
-          timestamp: new Date().toLocaleTimeString([], {
-            hour: "2-digit",
-            minute: "2-digit",
-            second: "2-digit",
-          }),
-          toolName: response.toolName,
-          status: response.status,
-          durationMs: response.durationMs,
-          summary: `Dispatched tool: ${response.toolName} (${response.durationMs}ms)`,
-        },
-        ...prev,
-      ])
+      if (response.cards && response.cards.length > 0) {
+        for (const c of response.cards) {
+          setLiveActivity((prev) => [
+            {
+              id: `act-${Date.now()}-${Math.random()}`,
+              timestamp: new Date().toLocaleTimeString([], {
+                hour: "2-digit",
+                minute: "2-digit",
+                second: "2-digit",
+              }),
+              toolName: c.toolName,
+              status: response.status,
+              durationMs: response.durationMs,
+              summary: `Dispatched tool: ${c.toolName} (${response.durationMs}ms)`,
+            },
+            ...prev,
+          ])
+        }
+      } else if (response.toolName) {
+        setLiveActivity((prev) => [
+          {
+            id: `act-${Date.now()}`,
+            timestamp: new Date().toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+              second: "2-digit",
+            }),
+            toolName: response.toolName!,
+            status: response.status,
+            durationMs: response.durationMs,
+            summary: `Dispatched tool: ${response.toolName} (${response.durationMs}ms)`,
+          },
+          ...prev,
+        ])
+      }
 
-      // Speak assistant response aloud if not muted
+      // Read reply aloud if not muted
       if (!isVoiceMuted && speechSynthRef.current?.isSupported) {
         setIsSpeaking(true)
         speechSynthRef.current.speak(response.spokenText, {
@@ -265,11 +326,10 @@ export function AssistantPage() {
     }
 
     if (!speechRecSupported) {
-      toast.info("Microphone recognition is not supported in this browser.")
+      toast.info("Microphone recognition is not supported in this browser. Please type your query below.")
       return
     }
 
-    // Stop speaking if assistant is speaking
     speechSynthRef.current?.stop()
     setIsSpeaking(false)
 
@@ -284,7 +344,7 @@ export function AssistantPage() {
       },
       onError: (err) => {
         setIsListening(false)
-        toast.error(`Microphone error: ${err}`)
+        toast.error(`Microphone input error: ${err}`)
       },
       onEnd: () => setIsListening(false),
     })
@@ -314,35 +374,10 @@ export function AssistantPage() {
     setIsSpeaking(false)
   }
 
-  // Card Event Listeners (Cards emit events, this page turns them into actions/messages)
+  // Card Event Listeners: Cards emit events only; this page turns them into new chat turns
   const cardEventHandlers: CardEventHandlers = {
-    onAcceptOption: async (event: AcceptOptionEvent) => {
-      setIsThinking(true)
-      setActiveToolLabel("Confirming booking offer...")
-      try {
-        const res = await executeCardAction("accept_offer", {
-          optionId: event.optionId,
-        })
-        setIsThinking(false)
-        setActiveToolLabel(null)
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: `asst-${Date.now()}`,
-            sender: "assistant",
-            text: res.spokenText,
-            timestamp: new Date().toLocaleTimeString([], {
-              hour: "2-digit",
-              minute: "2-digit",
-            }),
-            card: { toolName: res.toolName, envelope: res.envelope },
-          },
-        ])
-        toast.success("Offer accepted and table confirmed!")
-      } catch {
-        setIsThinking(false)
-        setActiveToolLabel(null)
-      }
+    onAcceptOption: (event: AcceptOptionEvent) => {
+      handleSend(event.optionId ? `Accept option ${event.optionId}` : "Accept booking offer")
     },
     onHoldOption: (event: HoldOptionEvent) => {
       handleSend(`Hold option ${event.optionId} for 5 minutes`)
@@ -353,99 +388,47 @@ export function AssistantPage() {
       )
     },
     onCancelBooking: (event: CancelBookingEvent) => {
-      // Destructive action: confirm dialog required!
+      // Destructive action: require explicit confirmation dialog
       setConfirmDialog({
         open: true,
         title: "Cancel Reservation?",
-        description: `Are you sure you want to cancel booking ${event.confirmationCode}? If a deposit was required, the refund will be credited according to policy.`,
+        description: `Are you sure you want to cancel booking ${event.confirmationCode}? Any eligible deposit will be processed according to the cancellation policy.`,
         confirmLabel: "Cancel Booking",
-        onConfirm: async () => {
+        onConfirm: () => {
           setConfirmDialog(null)
-          setIsThinking(true)
-          const res = await executeCardAction("cancel_booking", {
-            code: event.confirmationCode,
-          })
-          setIsThinking(false)
-          setMessages((prev) => [
-            ...prev,
-            {
-              id: `asst-${Date.now()}`,
-              sender: "assistant",
-              text: res.spokenText,
-              timestamp: new Date().toLocaleTimeString([], {
-                hour: "2-digit",
-                minute: "2-digit",
-              }),
-              card: { toolName: res.toolName, envelope: res.envelope },
-            },
-          ])
-          toast.success("Booking cancelled successfully")
+          handleSend(`Cancel booking ${event.confirmationCode}`)
         },
       })
     },
     onCancelOrder: (event: CancelOrderEvent) => {
+      // Destructive action: require explicit confirmation dialog
       setConfirmDialog({
         open: true,
         title: "Cancel Pickup Order?",
         description: `Are you sure you want to cancel pickup order ${event.orderCode}?`,
         confirmLabel: "Cancel Order",
-        onConfirm: async () => {
+        onConfirm: () => {
           setConfirmDialog(null)
-          setIsThinking(true)
-          const res = await executeCardAction("cancel_order", {
-            code: event.orderCode,
-          })
-          setIsThinking(false)
-          setMessages((prev) => [
-            ...prev,
-            {
-              id: `asst-${Date.now()}`,
-              sender: "assistant",
-              text: res.spokenText,
-              timestamp: new Date().toLocaleTimeString([], {
-                hour: "2-digit",
-                minute: "2-digit",
-              }),
-              card: { toolName: res.toolName, envelope: res.envelope },
-            },
-          ])
-          toast.success("Order cancelled")
+          handleSend(`Cancel order ${event.orderCode}`)
         },
       })
     },
     onLeaveWaitlist: (event: LeaveWaitlistEvent) => {
+      // Destructive action: require explicit confirmation dialog
       setConfirmDialog({
         open: true,
         title: "Leave Waitlist?",
         description:
           "Are you sure you want to forfeit your current position in the waitlist?",
         confirmLabel: "Leave Waitlist",
-        onConfirm: async () => {
+        onConfirm: () => {
           setConfirmDialog(null)
-          setIsThinking(true)
-          const res = await executeCardAction("leave_waitlist", {
-            id: event.waitlistId,
-          })
-          setIsThinking(false)
-          setMessages((prev) => [
-            ...prev,
-            {
-              id: `asst-${Date.now()}`,
-              sender: "assistant",
-              text: res.spokenText,
-              timestamp: new Date().toLocaleTimeString([], {
-                hour: "2-digit",
-                minute: "2-digit",
-              }),
-              card: { toolName: res.toolName, envelope: res.envelope },
-            },
-          ])
-          toast.info("Removed from waitlist")
+          handleSend(event.waitlistId ? `Leave waitlist ${event.waitlistId}` : "Leave waitlist")
         },
       })
     },
     onOpenCheckout: (event: OpenCheckoutEvent) => {
-      // Payment completed only on checkout page
+      // Direct navigation to dedicated checkout page; cards never process payments
       if (event.checkoutUrl.startsWith("/checkout/")) {
         navigate(event.checkoutUrl)
       } else {
@@ -483,10 +466,10 @@ export function AssistantPage() {
           messages[messages.length - 1].text}
       </div>
 
-      {/* Top Bar inside assistant page: Status and Controls */}
+      {/* Top Bar inside assistant page: Status, Badges, and Controls */}
       <div className="shrink-0 border-b border-border/70 bg-card/40 px-4 py-2.5 backdrop-blur-xs">
         <div className="mx-auto flex max-w-5xl items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2.5">
             <span
               className={`size-2 rounded-full ${
                 isListening
@@ -498,7 +481,7 @@ export function AssistantPage() {
                       : "bg-primary"
               }`}
             />
-            <span className="text-xs font-medium text-foreground tracking-tight">
+            <span className="text-xs font-semibold text-foreground tracking-tight">
               {isListening
                 ? "Listening..."
                 : isSpeaking
@@ -507,6 +490,18 @@ export function AssistantPage() {
                     ? "Thinking..."
                     : "TableTalk Voice Assistant"}
             </span>
+
+            {/* Provider and Demo mode indicator badge */}
+            {isFallbackMode ? (
+              <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold text-amber-600 dark:text-amber-400">
+                <Sparkles className="size-2.5" />
+                Demo mode
+              </span>
+            ) : (
+              <span className="hidden sm:inline-flex items-center gap-1 rounded-full border border-border bg-muted/60 px-2 py-0.5 text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
+                {activeProvider}
+              </span>
+            )}
           </div>
 
           <div className="flex items-center gap-2">
@@ -587,7 +582,7 @@ export function AssistantPage() {
                     How can I help you dine today?
                   </h1>
                   <p className="text-sm text-muted-foreground leading-relaxed">
-                    Ask about table availability, search dishes with allergen disclosures, or simulate pickup orders.
+                    Check table availability, browse dishes with allergen notices, or order takeout pickup.
                   </p>
                 </div>
 
@@ -595,12 +590,15 @@ export function AssistantPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-w-lg mx-auto pt-2 text-left">
                   {SUGGESTION_CHIPS.map((chip) => (
                     <button
-                      key={chip}
+                      key={chip.display}
                       type="button"
-                      onClick={() => handleSend(chip)}
+                      onClick={() => handleSend(chip.query)}
                       className="group flex min-h-[44px] items-center justify-between rounded-xl border border-border/80 bg-card p-3 text-xs sm:text-sm font-medium text-foreground/90 shadow-2xs hover:border-primary/50 hover:bg-muted/50 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     >
-                      <span className="truncate pr-2">{chip}</span>
+                      <span className="truncate pr-2">{chip.display}</span>
+                      {chip.alias && (
+                        <span className="sr-only">{chip.alias}</span>
+                      )}
                       <ChevronRight className="size-4 text-muted-foreground shrink-0 group-hover:text-primary transition-colors" />
                     </button>
                   ))}
@@ -619,6 +617,21 @@ export function AssistantPage() {
                   message.sender === "user" ? "items-end" : "items-start"
                 }`}
               >
+                {/* Tool Activity Chips (derived from response) */}
+                {message.sender === "assistant" && message.toolActivities && message.toolActivities.length > 0 && (
+                  <div className="mb-1.5 flex flex-wrap gap-1.5 pl-1">
+                    {message.toolActivities.map((act, i) => (
+                      <span
+                        key={i}
+                        className="inline-flex items-center gap-1.5 rounded-full border border-primary/25 bg-primary/10 px-2.5 py-0.5 text-[11px] font-medium text-primary shadow-2xs"
+                      >
+                        <Sparkles className="size-3" />
+                        {act.label}
+                      </span>
+                    ))}
+                  </div>
+                )}
+
                 {/* Spoken Text Bubble */}
                 <div
                   className={`relative max-w-[85%] sm:max-w-[75%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${
@@ -639,8 +652,26 @@ export function AssistantPage() {
                   </span>
                 </div>
 
-                {/* Attached Interactive Card (below assistant bubble) */}
-                {message.card && (
+                {/* Attached Interactive Cards (rendered from CardRegistry) */}
+                {message.cards && message.cards.length > 0 ? (
+                  message.cards.map((cardItem, idx) => (
+                    <motion.div
+                      key={idx}
+                      initial={shouldReduceMotion ? { opacity: 1 } : { opacity: 0, scale: 0.98 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{ duration: 0.25, ease: "easeOut" }}
+                      className="w-full max-w-[640px] pt-3"
+                    >
+                      <div className="overflow-hidden rounded-xl border border-border/80 bg-card shadow-xs">
+                        <CardRenderer
+                          toolName={cardItem.toolName}
+                          envelope={cardItem.envelope}
+                          events={cardEventHandlers}
+                        />
+                      </div>
+                    </motion.div>
+                  ))
+                ) : message.card ? (
                   <motion.div
                     initial={
                       shouldReduceMotion ? { opacity: 1 } : { opacity: 0, scale: 0.98 }
@@ -657,7 +688,7 @@ export function AssistantPage() {
                       />
                     </div>
                   </motion.div>
-                )}
+                ) : null}
 
                 {/* Inline friendly error with retry */}
                 {message.error && (
@@ -859,7 +890,7 @@ export function AssistantPage() {
             title={
               micState === "listening"
                 ? "Listening... Click to stop"
-                : "Click to speak to the assistant"
+                : "Click to speak to the voice assistant"
             }
           >
             {/* Animated Waveform Ring when listening */}

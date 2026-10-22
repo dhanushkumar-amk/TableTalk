@@ -77,13 +77,15 @@ pub fn is_explicit_confirmation(text: &str) -> bool {
     false
 }
 
-/// Scrub profile tokens and secret keys from a JSON payload before sending to model.
+/// Scrub profile tokens, API keys, and secret keys from a JSON payload before sending to model.
 pub fn scrub_payload_for_model(val: &mut Value) {
     match val {
         Value::Object(map) => {
             map.remove("profile_token");
             map.remove("token");
             map.remove("auth_token");
+            map.remove("api_key");
+            map.remove("groq_api_key");
             for v in map.values_mut() {
                 scrub_payload_for_model(v);
             }
@@ -93,14 +95,14 @@ pub fn scrub_payload_for_model(val: &mut Value) {
                 scrub_payload_for_model(v);
             }
         }
-        Value::String(s) if s.contains("tt_prof_") => {
+        Value::String(s) if s.contains("tt_prof_") || s.contains("gsk_") => {
             *s = redact_tokens(s);
         }
         _ => {}
     }
 }
 
-/// Redact profile tokens matching `tt_prof_...` from strings.
+/// Redact profile tokens matching `tt_prof_...` and API keys matching `gsk_...` from strings.
 pub fn redact_tokens(text: &str) -> String {
     let mut out = String::with_capacity(text.len());
     let mut remaining = text;
@@ -114,7 +116,20 @@ pub fn redact_tokens(text: &str) -> String {
         remaining = &after_prefix[end_idx..];
     }
     out.push_str(remaining);
-    out
+
+    let mut out2 = String::with_capacity(out.len());
+    let mut rem2 = out.as_str();
+    while let Some(pos) = rem2.find("gsk_") {
+        out2.push_str(&rem2[..pos]);
+        out2.push_str("[REDACTED_API_KEY]");
+        let after = &rem2[pos + 4..];
+        let end_idx = after
+            .find(|c: char| !c.is_alphanumeric() && c != '_' && c != '-')
+            .unwrap_or(after.len());
+        rem2 = &after[end_idx..];
+    }
+    out2.push_str(rem2);
+    out2
 }
 
 /// Redact sensitive PII (tokens, emails, phone numbers) for secure application logging.

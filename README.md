@@ -113,20 +113,33 @@ TableTalk backend accepts configuration via environment variables (see `.env.exa
 | `REQUEST_TIMEOUT_SECS` | Maximum HTTP request timeout in seconds | `30` |
 | `AWS_REGION` | AWS Region for Amazon Bedrock runtime | `ap-south-1` |
 | `BEDROCK_MODEL_ID` | Amazon Bedrock model / cross-region inference profile | `apac.amazon.nova-lite-v1:0` |
+| `LLM_PROVIDER` | LLM Orchestrator provider: `groq` or `bedrock` (default `groq`) | `groq` |
+| `GROQ_API_KEY` | Groq API Key (starts with `gsk_...`, kept server-side only, never logged or committed) | *(optional)* |
+| `GROQ_MODEL` | Groq tool-calling model identifier | `llama-3.3-70b-versatile` |
 | `CHAT_MAX_TOKENS` | Maximum tokens per assistant response turn | `500` |
 | `CHAT_SESSION_TOKEN_BUDGET` | Maximum tokens per session before entering demo limit | `10000` |
 | `CHAT_DAILY_TOKEN_BUDGET` | Global daily token budget before fallback mode triggers | `50000` |
 | `CHAT_RATE_LIMIT_PER_MINUTE` | Maximum requests per minute per IP for `/api/chat` | `30` |
 | `CHAT_MAX_MESSAGE_LEN` | Maximum message string length accepted | `1000` |
 
-Credentials come strictly from the default AWS credential chain (`~/.aws/credentials`, SSO, or IAM roles). Never put AWS keys in `.env` or frontend code.
+Credentials come strictly from `.env` (`GROQ_API_KEY`) or the default AWS credential chain (`~/.aws/credentials`, SSO, or IAM roles). Never put AWS keys in `.env` or frontend code.
 
 Copy the example configuration:
 ```bash
 cp .env.example .env
 ```
 
-### 3. Database (SQLite / SQLx)
+### 3. Quickstart Demo (`scripts/demo.sh`)
+
+To launch both the Axum backend and the Vite React frontend with `LLM_PROVIDER=groq`:
+```bash
+chmod +x scripts/demo.sh
+./scripts/demo.sh
+```
+- **Backend**: `http://127.0.0.1:8080`
+- **Voice Assistant**: `http://127.0.0.1:5173/assistant`
+
+### 4. Database (SQLite / SQLx)
 
 TableTalk uses SQLite with Write-Ahead Logging (WAL) and foreign keys enabled. Migrations are embedded and apply automatically on server startup.
 
@@ -141,7 +154,7 @@ Seeding is idempotent—running it multiple times leaves all row counts unchange
 To reset the database to a clean state:
 ```bash
 # Delete the SQLite database file and WAL logs
-rm -f data/tabletalk.db*
+rm -f data/tabletalk.db* backend/data/tabletalk.db*
 
 # Re-run migrations and seed
 cargo run -- seed
@@ -166,7 +179,9 @@ cargo run -- seed
 
 ## Chat Orchestrator Endpoint (`POST /api/chat`)
 
-TableTalk features an integrated server-side LLM orchestrator backed by **Amazon Bedrock** (Amazon Nova Lite, cross-region inference profile `apac.amazon.nova-lite-v1:0` in `ap-south-1`).
+TableTalk features a server-side LLM orchestrator with a pluggable provider switch:
+- **Groq** (`llama-3.3-70b-versatile`): Default provider for ultra-low latency tool calling in local demonstrations.
+- **Amazon Bedrock** (Amazon Nova Lite, cross-region inference profile `apac.amazon.nova-lite-v1:0` in `ap-south-1`): Preserved behind the unified `LlmClient` trait (implemented, not exercised against real AWS in CI without credentials).
 
 - **Endpoint URL**: `http://localhost:8080/api/chat`
 - **Method**: `POST`
@@ -174,10 +189,10 @@ TableTalk features an integrated server-side LLM orchestrator backed by **Amazon
 - **Safety**: 
   - Token allowlist ensures only authorized dining tools run.
   - Destructive tools (`cancel_booking`, `cancel_order`, `forget_me`, `forget_preference`, `leave_waitlist`) require an explicit user confirmation turn before executing.
-  - `profile_token` is held server-side per session and injected into tool calls; it is never sent to Bedrock.
+  - `profile_token` and `GROQ_API_KEY` are held server-side only and never sent to frontend or logged unredacted.
   - PII (names, phone numbers, emails, tokens) is redacted in logs.
 - **Cost Controls**: Max tokens cap (500), context trimmed to last 8 messages, session (10k) and daily (50k) token budgets with graceful fallback.
-- **Fallback Router**: If Bedrock is throttled, unavailable, or unconfigured, requests are routed to a deterministic keyword router with `"fallback_mode": true`.
+- **Fallback Router**: If the LLM provider is throttled, unavailable, or unconfigured, requests are automatically routed to a deterministic rule-based router with `"fallback_mode": true`.
 
 ### Example Request
 

@@ -14,17 +14,8 @@ use crate::orchestrator::types::{
     BedrockError, BedrockToolSpec, ChatMessage, ConverseOutput, TokenUsage, ToolUseRequest,
 };
 
-#[async_trait]
-pub trait BedrockClient: Send + Sync {
-    async fn converse(
-        &self,
-        model_id: &str,
-        system_prompt: &str,
-        messages: &[ChatMessage],
-        tools: &[BedrockToolSpec],
-        max_tokens: i32,
-    ) -> Result<ConverseOutput, BedrockError>;
-}
+pub use crate::orchestrator::client::LlmClient;
+pub use crate::orchestrator::client::LlmClient as BedrockClient;
 
 /// Production AWS Bedrock Runtime client.
 pub struct AwsBedrockClient {
@@ -77,6 +68,10 @@ impl LazyAwsBedrockClient {
 
 #[async_trait]
 impl BedrockClient for LazyAwsBedrockClient {
+    fn provider_name(&self) -> &'static str {
+        "bedrock"
+    }
+
     async fn converse(
         &self,
         model_id: &str,
@@ -94,6 +89,10 @@ impl BedrockClient for LazyAwsBedrockClient {
 
 #[async_trait]
 impl BedrockClient for AwsBedrockClient {
+    fn provider_name(&self) -> &'static str {
+        "bedrock"
+    }
+
     async fn converse(
         &self,
         model_id: &str,
@@ -275,7 +274,10 @@ pub struct FakeBedrockClient {
     responses: Arc<Mutex<VecDeque<Result<ConverseOutput, BedrockError>>>>,
     pub recorded_payloads: Arc<Mutex<Vec<Vec<ChatMessage>>>>,
     pub recorded_system_prompts: Arc<Mutex<Vec<String>>>,
+    pub provider: &'static str,
 }
+
+pub type FakeLlmClient = FakeBedrockClient;
 
 impl Default for FakeBedrockClient {
     fn default() -> Self {
@@ -289,6 +291,16 @@ impl FakeBedrockClient {
             responses: Arc::new(Mutex::new(VecDeque::new())),
             recorded_payloads: Arc::new(Mutex::new(Vec::new())),
             recorded_system_prompts: Arc::new(Mutex::new(Vec::new())),
+            provider: "bedrock",
+        }
+    }
+
+    pub fn with_provider(provider: &'static str) -> Self {
+        Self {
+            responses: Arc::new(Mutex::new(VecDeque::new())),
+            recorded_payloads: Arc::new(Mutex::new(Vec::new())),
+            recorded_system_prompts: Arc::new(Mutex::new(Vec::new())),
+            provider,
         }
     }
 
@@ -297,6 +309,7 @@ impl FakeBedrockClient {
             responses: Arc::new(Mutex::new(VecDeque::from(responses))),
             recorded_payloads: Arc::new(Mutex::new(Vec::new())),
             recorded_system_prompts: Arc::new(Mutex::new(Vec::new())),
+            provider: "bedrock",
         }
     }
 
@@ -307,6 +320,10 @@ impl FakeBedrockClient {
 
 #[async_trait]
 impl BedrockClient for FakeBedrockClient {
+    fn provider_name(&self) -> &'static str {
+        self.provider
+    }
+
     async fn converse(
         &self,
         _model_id: &str,

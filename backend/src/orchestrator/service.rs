@@ -4,7 +4,8 @@ use std::time::Duration;
 use tracing::{info, warn};
 
 use crate::availability::Clock;
-use crate::orchestrator::bedrock::BedrockClient;
+pub use crate::orchestrator::bedrock::BedrockClient;
+use crate::orchestrator::client::LlmClient;
 use crate::orchestrator::executor::{build_tool_specs, execute_tool};
 use crate::orchestrator::fallback::handle_fallback;
 use crate::orchestrator::safety::{
@@ -18,7 +19,7 @@ use crate::orchestrator::types::{
 use crate::{Config, TableTalkServer};
 
 pub struct OrchestratorService {
-    bedrock: Arc<dyn BedrockClient>,
+    llm: Arc<dyn LlmClient>,
     session_manager: Arc<SessionManager>,
     pool: SqlitePool,
     _server: TableTalkServer,
@@ -29,7 +30,7 @@ pub struct OrchestratorService {
 
 impl OrchestratorService {
     pub fn new(
-        bedrock: Arc<dyn BedrockClient>,
+        llm: Arc<dyn LlmClient>,
         session_manager: Arc<SessionManager>,
         pool: SqlitePool,
         server: TableTalkServer,
@@ -38,7 +39,7 @@ impl OrchestratorService {
     ) -> Self {
         let tool_specs = build_tool_specs(&server);
         Self {
-            bedrock,
+            llm,
             session_manager,
             pool,
             _server: server,
@@ -62,6 +63,7 @@ impl OrchestratorService {
                     content: "Hello! How can I help you today?".to_string(),
                 },
                 structured_contents: Vec::new(),
+                provider: self.llm.provider_name().to_string(),
                 fallback_mode: false,
                 token_usage: TokenUsage::default(),
             };
@@ -86,6 +88,7 @@ impl OrchestratorService {
                     ),
                 },
                 structured_contents: Vec::new(),
+                provider: self.llm.provider_name().to_string(),
                 fallback_mode: false,
                 token_usage: TokenUsage::default(),
             };
@@ -149,6 +152,7 @@ impl OrchestratorService {
                         content: res_text,
                     },
                     structured_contents,
+                    provider: self.llm.provider_name().to_string(),
                     fallback_mode: false,
                     token_usage: TokenUsage::default(),
                 };
@@ -193,7 +197,8 @@ impl OrchestratorService {
                 warn!(
                     target: "orchestrator",
                     session_id = %session_id,
-                    "Bedrock orchestration failed ({}), routing to fallback",
+                    provider = self.llm.provider_name(),
+                    "LLM orchestration failed ({}), routing to fallback",
                     redact_for_logging(&err.to_string())
                 );
                 handle_fallback(
@@ -209,7 +214,8 @@ impl OrchestratorService {
                 warn!(
                     target: "orchestrator",
                     session_id = %session_id,
-                    "Bedrock orchestration timed out after 20s, routing to fallback"
+                    provider = self.llm.provider_name(),
+                    "LLM orchestration timed out after 20s, routing to fallback"
                 );
                 handle_fallback(
                     &self.pool,
@@ -239,11 +245,16 @@ impl OrchestratorService {
         while iterations < 5 {
             iterations += 1;
 
-            // Call Bedrock Converse
+            let model_id = match self.llm.provider_name() {
+                "groq" => &self.config.groq_model,
+                _ => &self.config.bedrock_model_id,
+            };
+
+            // Call LLM client
             let converse_out = self
-                .bedrock
+                .llm
                 .converse(
-                    &self.config.bedrock_model_id,
+                    model_id,
                     system_prompt,
                     &conversation,
                     &self.tool_specs,
@@ -268,11 +279,12 @@ impl OrchestratorService {
             info!(
                 target: "orchestrator",
                 session_id = %session_id,
+                provider = self.llm.provider_name(),
                 iteration = %iterations,
                 input_tokens = %converse_out.token_usage.input_tokens,
                 output_tokens = %converse_out.token_usage.output_tokens,
                 total_tokens = %converse_out.token_usage.total_tokens,
-                "Bedrock token usage recorded"
+                "LLM token usage recorded"
             );
 
             // If no tools requested, return final assistant answer
@@ -288,6 +300,7 @@ impl OrchestratorService {
                         content: text,
                     },
                     structured_contents,
+                    provider: self.llm.provider_name().to_string(),
                     fallback_mode: false,
                     token_usage: accumulated_tokens,
                 });
@@ -325,6 +338,7 @@ impl OrchestratorService {
                             content: confirm_prompt,
                         },
                         structured_contents,
+                        provider: self.llm.provider_name().to_string(),
                         fallback_mode: false,
                         token_usage: accumulated_tokens,
                     });
@@ -340,13 +354,16 @@ impl OrchestratorService {
                 )
                 .await;
 
-                if let Some(struct_val) = sc {
+                if let Some(mut struct_val) = sc {
                     // Check if token was issued by enable_memory or rotate_profile_token
                     if let Some(tok) = struct_val.get("profile_token").and_then(|v| v.as_str()) {
                         self.session_manager
                             .update_profile_token(session_id, tok.to_string())
                             .await;
                         current_profile_token = Some(tok.to_string());
+                    }
+                    if struct_val.is_object() && struct_val.get("_tool_name").is_none() {
+                        struct_val["_tool_name"] = serde_json::json!(tool_req.name);
                     }
                     structured_contents.push(struct_val);
                 }
@@ -382,6 +399,7 @@ impl OrchestratorService {
                         .to_string(),
             },
             structured_contents,
+            provider: self.llm.provider_name().to_string(),
             fallback_mode: false,
             token_usage: accumulated_tokens,
         })

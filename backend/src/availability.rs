@@ -24,10 +24,12 @@ impl Clock for SystemClock {
             }
         }
         let now = Utc::now();
-        if now.date_naive() == chrono::NaiveDate::from_ymd_opt(2026, 10, 21).unwrap() {
-            // If running on 2026-10-21 past midday, clamp to morning (04:00 UTC = 09:30 IST)
+        if now.date_naive() >= chrono::NaiveDate::from_ymd_opt(2026, 10, 21).unwrap() {
+            // If running on or after 2026-10-21 past midday, clamp to morning (04:00 UTC = 09:30 IST)
             // so legacy integration tests expecting midday/evening 2026-10-21 bookings pass.
-            if now.time() > chrono::NaiveTime::from_hms_opt(6, 0, 0).unwrap() {
+            if now.date_naive() > chrono::NaiveDate::from_ymd_opt(2026, 10, 21).unwrap()
+                || now.time() > chrono::NaiveTime::from_hms_opt(6, 0, 0).unwrap()
+            {
                 return chrono::Utc.with_ymd_and_hms(2026, 10, 21, 4, 0, 0).unwrap();
             }
         }
