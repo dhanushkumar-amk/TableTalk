@@ -111,8 +111,8 @@ async fn test_real_chat_orchestrator_fallback_on_bedrock_unauthorized() {
         resp.structured_contents.len()
     );
 
-    assert_eq!(
-        resp.fallback_mode, true,
+    assert!(
+        resp.fallback_mode,
         "Fallback mode should engage when Bedrock encounters Operation not allowed"
     );
     assert!(

@@ -210,7 +210,7 @@ fn test_spoken_voice_formatting_rules() {
         score_reasons: vec!["closest_time".to_string()],
         rank: 1,
     };
-    let voice1 = format_spoken_options(&[opt1.clone()]);
+    let voice1 = format_spoken_options(std::slice::from_ref(&opt1));
     assert!(voice1.contains("Eight in the evening indoors"));
     assert!(voice1.contains("Which would you like?"));
 

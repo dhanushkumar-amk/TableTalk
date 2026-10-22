@@ -46,6 +46,43 @@ pub async fn health_handler() -> Json<HealthResponse> {
     })
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ReadyResponse {
+    pub status: String,
+    pub database: String,
+}
+
+pub async fn ready_handler(pool: Option<sqlx::SqlitePool>) -> impl IntoResponse {
+    match pool {
+        Some(pool) => match sqlx::query("SELECT 1").execute(&pool).await {
+            Ok(_) => (
+                StatusCode::OK,
+                Json(ReadyResponse {
+                    status: "ready".to_string(),
+                    database: "connected".to_string(),
+                }),
+            )
+                .into_response(),
+            Err(_) => (
+                StatusCode::SERVICE_UNAVAILABLE,
+                Json(ReadyResponse {
+                    status: "not_ready".to_string(),
+                    database: "disconnected".to_string(),
+                }),
+            )
+                .into_response(),
+        },
+        None => (
+            StatusCode::OK,
+            Json(ReadyResponse {
+                status: "ready".to_string(),
+                database: "in_memory".to_string(),
+            }),
+        )
+            .into_response(),
+    }
+}
+
 /// Middleware that validates the `Origin` header against an allowlist to prevent DNS rebinding.
 /// Requests without an `Origin` header (such as curl, voice assistants, and non-browser CLI clients)
 /// are explicitly permitted.
@@ -216,6 +253,7 @@ pub fn build_router_full(
         None => TableTalkServer::new(),
     };
     let pool_for_checkout = pool.clone();
+    let pool_for_ready = pool.clone();
     let session_manager = Arc::new(LocalSessionManager::default());
 
     let mcp_config =
@@ -317,8 +355,14 @@ pub fn build_router_full(
             crate::rate_limit::rate_limit_middleware,
         ));
 
+    let ready_route = {
+        let p = pool_for_ready;
+        Router::new().route("/ready", get(move || ready_handler(p.clone())))
+    };
+
     Router::new()
         .route("/health", get(health_handler))
+        .merge(ready_route)
         .merge(chat_endpoint)
         .merge(protected_endpoints)
         .layer(tower_http::catch_panic::CatchPanicLayer::custom(

@@ -1,6 +1,6 @@
 use std::env;
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Config {
     pub port: u16,
     pub allowed_origins: Vec<String>,
@@ -22,14 +22,39 @@ pub struct Config {
     pub groq_model: String,
 }
 
+fn parse_env_var<T: std::str::FromStr>(name: &str, default: T) -> Result<T, String>
+where
+    T::Err: std::fmt::Display,
+{
+    match env::var(name) {
+        Ok(val) => {
+            let trimmed = val.trim();
+            if trimmed.is_empty() {
+                Ok(default)
+            } else {
+                trimmed
+                    .parse::<T>()
+                    .map_err(|e| format!("Invalid environment variable {}='{}': {}", name, val, e))
+            }
+        }
+        Err(env::VarError::NotPresent) => Ok(default),
+        Err(env::VarError::NotUnicode(_)) => Err(format!(
+            "Environment variable {} contains invalid unicode",
+            name
+        )),
+    }
+}
+
 impl Config {
-    pub fn from_env() -> Self {
+    /// Attempts to load configuration from environment, validating types and ranges.
+    /// Fails fast with descriptive error messages on malformed configuration.
+    pub fn try_from_env() -> Result<Self, String> {
         dotenvy::dotenv().ok();
 
-        let port: u16 = env::var("PORT")
-            .ok()
-            .and_then(|p| p.parse().ok())
-            .unwrap_or(8080);
+        let port: u16 = parse_env_var("PORT", 8080)?;
+        if port == 0 {
+            return Err("PORT must be greater than 0".to_string());
+        }
 
         let allowed_origins = env::var("ALLOWED_ORIGINS")
             .ok()
@@ -37,8 +62,9 @@ impl Config {
                 val.split(',')
                     .map(|s| s.trim().to_string())
                     .filter(|s| !s.is_empty())
-                    .collect()
+                    .collect::<Vec<_>>()
             })
+            .filter(|list| !list.is_empty())
             .unwrap_or_else(|| {
                 vec![
                     "http://localhost:5173".to_string(),
@@ -51,13 +77,16 @@ impl Config {
         let rust_log =
             env::var("RUST_LOG").unwrap_or_else(|_| "info,tabletalk_backend=debug".to_string());
 
-        let request_timeout_secs: u64 = env::var("REQUEST_TIMEOUT_SECS")
-            .ok()
-            .and_then(|t| t.parse().ok())
-            .unwrap_or(30);
+        let request_timeout_secs: u64 = parse_env_var("REQUEST_TIMEOUT_SECS", 30)?;
+        if request_timeout_secs == 0 {
+            return Err("REQUEST_TIMEOUT_SECS must be at least 1".to_string());
+        }
 
         let database_url =
             env::var("DATABASE_URL").unwrap_or_else(|_| "sqlite://data/tabletalk.db".to_string());
+        if database_url.trim().is_empty() {
+            return Err("DATABASE_URL must not be empty".to_string());
+        }
 
         let seed_on_start = env::var("SEED_ON_START")
             .ok()
@@ -67,44 +96,51 @@ impl Config {
         let restaurant_tz =
             env::var("RESTAURANT_TZ").unwrap_or_else(|_| "Asia/Kolkata".to_string());
 
-        let rate_limit_per_minute: usize = env::var("RATE_LIMIT_PER_MINUTE")
-            .ok()
-            .and_then(|r| r.parse().ok())
-            .unwrap_or(600);
+        let rate_limit_per_minute: usize = parse_env_var("RATE_LIMIT_PER_MINUTE", 600)?;
+        if rate_limit_per_minute == 0 {
+            return Err("RATE_LIMIT_PER_MINUTE must be at least 1".to_string());
+        }
 
         let aws_region = env::var("AWS_REGION").unwrap_or_else(|_| "ap-south-1".to_string());
 
         let bedrock_model_id = env::var("BEDROCK_MODEL_ID")
             .unwrap_or_else(|_| "apac.amazon.nova-lite-v1:0".to_string());
 
-        let chat_max_tokens: i32 = env::var("CHAT_MAX_TOKENS")
-            .ok()
-            .and_then(|t| t.parse().ok())
-            .unwrap_or(500);
+        let chat_max_tokens: i32 = parse_env_var("CHAT_MAX_TOKENS", 500)?;
+        if chat_max_tokens <= 0 {
+            return Err("CHAT_MAX_TOKENS must be greater than 0".to_string());
+        }
 
-        let chat_session_token_budget: usize = env::var("CHAT_SESSION_TOKEN_BUDGET")
-            .ok()
-            .and_then(|b| b.parse().ok())
-            .unwrap_or(10000);
+        let chat_session_token_budget: usize = parse_env_var("CHAT_SESSION_TOKEN_BUDGET", 10000)?;
+        if chat_session_token_budget == 0 {
+            return Err("CHAT_SESSION_TOKEN_BUDGET must be at least 1".to_string());
+        }
 
-        let chat_daily_token_budget: usize = env::var("CHAT_DAILY_TOKEN_BUDGET")
-            .ok()
-            .and_then(|b| b.parse().ok())
-            .unwrap_or(50000);
+        let chat_daily_token_budget: usize = parse_env_var("CHAT_DAILY_TOKEN_BUDGET", 50000)?;
+        if chat_daily_token_budget == 0 {
+            return Err("CHAT_DAILY_TOKEN_BUDGET must be at least 1".to_string());
+        }
 
-        let chat_rate_limit_per_minute: usize = env::var("CHAT_RATE_LIMIT_PER_MINUTE")
-            .ok()
-            .and_then(|r| r.parse().ok())
-            .unwrap_or(30);
+        let chat_rate_limit_per_minute: usize = parse_env_var("CHAT_RATE_LIMIT_PER_MINUTE", 30)?;
+        if chat_rate_limit_per_minute == 0 {
+            return Err("CHAT_RATE_LIMIT_PER_MINUTE must be at least 1".to_string());
+        }
 
-        let chat_max_message_len: usize = env::var("CHAT_MAX_MESSAGE_LEN")
-            .ok()
-            .and_then(|m| m.parse().ok())
-            .unwrap_or(1000);
+        let chat_max_message_len: usize = parse_env_var("CHAT_MAX_MESSAGE_LEN", 1000)?;
+        if chat_max_message_len == 0 {
+            return Err("CHAT_MAX_MESSAGE_LEN must be at least 1".to_string());
+        }
 
         let llm_provider = env::var("LLM_PROVIDER")
             .unwrap_or_else(|_| "groq".to_string())
             .to_lowercase();
+
+        if llm_provider != "groq" && llm_provider != "bedrock" {
+            return Err(format!(
+                "Invalid LLM_PROVIDER '{}': must be 'groq' or 'bedrock'",
+                llm_provider
+            ));
+        }
 
         let groq_api_key = env::var("GROQ_API_KEY")
             .ok()
@@ -114,7 +150,7 @@ impl Config {
         let groq_model =
             env::var("GROQ_MODEL").unwrap_or_else(|_| "llama-3.3-70b-versatile".to_string());
 
-        Self {
+        Ok(Self {
             port,
             allowed_origins,
             rust_log,
@@ -133,7 +169,45 @@ impl Config {
             llm_provider,
             groq_api_key,
             groq_model,
-        }
+        })
+    }
+
+    pub fn from_env() -> Self {
+        Self::try_from_env().unwrap_or_else(|err| {
+            eprintln!("Configuration Error: {}", err);
+            std::process::exit(1);
+        })
+    }
+}
+
+impl std::fmt::Debug for Config {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Config")
+            .field("port", &self.port)
+            .field("allowed_origins", &self.allowed_origins)
+            .field("rust_log", &self.rust_log)
+            .field("request_timeout_secs", &self.request_timeout_secs)
+            .field("database_url", &self.database_url)
+            .field("seed_on_start", &self.seed_on_start)
+            .field("restaurant_tz", &self.restaurant_tz)
+            .field("rate_limit_per_minute", &self.rate_limit_per_minute)
+            .field("aws_region", &self.aws_region)
+            .field("bedrock_model_id", &self.bedrock_model_id)
+            .field("chat_max_tokens", &self.chat_max_tokens)
+            .field("chat_session_token_budget", &self.chat_session_token_budget)
+            .field("chat_daily_token_budget", &self.chat_daily_token_budget)
+            .field(
+                "chat_rate_limit_per_minute",
+                &self.chat_rate_limit_per_minute,
+            )
+            .field("chat_max_message_len", &self.chat_max_message_len)
+            .field("llm_provider", &self.llm_provider)
+            .field(
+                "groq_api_key",
+                &self.groq_api_key.as_ref().map(|_| "[REDACTED]"),
+            )
+            .field("groq_model", &self.groq_model)
+            .finish()
     }
 }
 
@@ -164,5 +238,38 @@ impl Default for Config {
             groq_api_key: None,
             groq_model: "llama-3.3-70b-versatile".to_string(),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_secret_redaction_in_debug() {
+        let config = Config {
+            groq_api_key: Some("gsk_secret1234567890abcdef".to_string()),
+            ..Config::default()
+        };
+        let debug_str = format!("{:?}", config);
+        assert!(!debug_str.contains("gsk_secret1234567890abcdef"));
+        assert!(debug_str.contains("[REDACTED]"));
+    }
+
+    #[test]
+    fn test_default_config_valid() {
+        let config = Config::default();
+        assert_eq!(config.port, 8080);
+        assert_eq!(config.llm_provider, "groq");
+    }
+
+    #[test]
+    fn test_try_from_env_loads_successfully() {
+        let res = Config::try_from_env();
+        assert!(
+            res.is_ok(),
+            "Config::try_from_env should succeed: {:?}",
+            res.err()
+        );
     }
 }

@@ -776,7 +776,7 @@ async fn test_cancel_verification_byte_identical_responses_and_edge_cases() {
     let cancel_out: CancelOrderOutput =
         serde_json::from_value(cancel_res.structured_content.unwrap()).unwrap();
     assert_eq!(cancel_out.status, "cancelled");
-    assert_eq!(cancel_out.already_cancelled, false);
+    assert!(!cancel_out.already_cancelled);
 
     // 5. Double cancel is idempotent
     let double_cancel_res = handle_cancel_order_with_deps(
@@ -793,7 +793,7 @@ async fn test_cancel_verification_byte_identical_responses_and_edge_cases() {
     let double_cancel_out: CancelOrderOutput =
         serde_json::from_value(double_cancel_res.structured_content.unwrap()).unwrap();
     assert_eq!(double_cancel_out.status, "cancelled");
-    assert_eq!(double_cancel_out.already_cancelled, true);
+    assert!(double_cancel_out.already_cancelled);
 
     // 6. Preparing order is not cancellable
     // Create another order and update status to preparing

@@ -16,6 +16,8 @@ dist-ssr/
 
 # Database & SQLite files
 data/
+backups/
+scratch/
 *.db
 *.db-journal
 *.db-wal

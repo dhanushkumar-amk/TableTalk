@@ -71,6 +71,66 @@ async fn test_health_endpoint() {
 }
 
 #[tokio::test]
+async fn test_ready_endpoint() {
+    let (base_url, server_handle) = spawn_test_server().await;
+    let client = reqwest::Client::new();
+
+    let resp = client
+        .get(format!("{}/ready", base_url))
+        .send()
+        .await
+        .expect("Ready request failed");
+
+    assert_eq!(resp.status(), reqwest::StatusCode::OK);
+    let body: Value = resp.json().await.expect("Failed to parse ready JSON");
+    assert_eq!(body["status"], "ready");
+    assert_eq!(body["database"], "in_memory");
+
+    server_handle.abort();
+}
+
+#[tokio::test]
+async fn test_ready_endpoint_with_database() {
+    let pool = tabletalk_backend::db::init_test_pool()
+        .await
+        .expect("Failed to init test pool");
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+    let base_url = format!("http://{}", addr);
+
+    let config = Config {
+        port: addr.port(),
+        allowed_origins: vec![
+            "http://localhost:5173".to_string(),
+            "http://127.0.0.1:5173".to_string(),
+        ],
+        request_timeout_secs: 30,
+        ..Config::default()
+    };
+
+    let router = tabletalk_backend::build_router_with_db(&config, Some(pool));
+    let handle = tokio::spawn(async move {
+        axum::serve(listener, router).await.unwrap();
+    });
+
+    tokio::time::sleep(Duration::from_millis(50)).await;
+
+    let client = reqwest::Client::new();
+    let resp = client
+        .get(format!("{}/ready", base_url))
+        .send()
+        .await
+        .expect("Ready request with DB failed");
+
+    assert_eq!(resp.status(), reqwest::StatusCode::OK);
+    let body: Value = resp.json().await.expect("Failed to parse ready JSON");
+    assert_eq!(body["status"], "ready");
+    assert_eq!(body["database"], "connected");
+
+    handle.abort();
+}
+
+#[tokio::test]
 async fn test_disallowed_origin_rejected_with_403() {
     let (base_url, server_handle) = spawn_test_server().await;
     let client = reqwest::Client::new();
