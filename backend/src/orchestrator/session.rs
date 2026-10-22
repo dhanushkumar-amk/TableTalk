@@ -3,6 +3,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
+use crate::orchestrator::router::ScriptedDemoState;
 use crate::orchestrator::types::ToolUseRequest;
 
 #[derive(Debug, Clone)]
@@ -11,6 +12,19 @@ pub struct SessionState {
     pub tokens_used: usize,
     pub pending_destructive_tool: Option<ToolUseRequest>,
     pub last_active_utc: chrono::DateTime<chrono::Utc>,
+    pub demo_state: ScriptedDemoState,
+}
+
+impl Default for SessionState {
+    fn default() -> Self {
+        Self {
+            profile_token: None,
+            tokens_used: 0,
+            pending_destructive_tool: None,
+            last_active_utc: chrono::Utc::now(),
+            demo_state: ScriptedDemoState::default(),
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -34,13 +48,26 @@ impl SessionManager {
     pub async fn get_or_create(&self, session_id: &str) -> SessionState {
         let mut map = self.sessions.write().await;
         map.entry(session_id.to_string())
-            .or_insert_with(|| SessionState {
-                profile_token: None,
-                tokens_used: 0,
-                pending_destructive_tool: None,
-                last_active_utc: chrono::Utc::now(),
-            })
+            .or_insert_with(SessionState::default)
             .clone()
+    }
+
+    pub async fn get_demo_state(&self, session_id: &str) -> ScriptedDemoState {
+        let mut map = self.sessions.write().await;
+        map.entry(session_id.to_string())
+            .or_insert_with(SessionState::default)
+            .demo_state
+            .clone()
+    }
+
+    pub async fn update_demo_state<F>(&self, session_id: &str, f: F)
+    where
+        F: FnOnce(&mut ScriptedDemoState),
+    {
+        let mut map = self.sessions.write().await;
+        let sess = map.entry(session_id.to_string()).or_insert_with(SessionState::default);
+        f(&mut sess.demo_state);
+        sess.last_active_utc = chrono::Utc::now();
     }
 
     pub async fn update_profile_token(&self, session_id: &str, token: String) {
@@ -68,12 +95,7 @@ impl SessionManager {
         let mut map = self.sessions.write().await;
         let sess = map
             .entry(session_id.to_string())
-            .or_insert_with(|| SessionState {
-                profile_token: None,
-                tokens_used: 0,
-                pending_destructive_tool: None,
-                last_active_utc: chrono::Utc::now(),
-            });
+            .or_insert_with(SessionState::default);
 
         sess.tokens_used += tokens;
         sess.last_active_utc = chrono::Utc::now();

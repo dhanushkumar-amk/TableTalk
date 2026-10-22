@@ -116,10 +116,12 @@ impl OrchestratorService {
             );
             return handle_fallback(
                 &self.pool,
+                &self.session_manager,
+                self.clock.as_ref(),
+                tz,
                 &session_id,
                 &last_user_msg,
                 profile_token.as_deref(),
-                &restaurant_now,
             )
             .await;
         }
@@ -203,10 +205,12 @@ impl OrchestratorService {
                 );
                 handle_fallback(
                     &self.pool,
+                    &self.session_manager,
+                    self.clock.as_ref(),
+                    tz,
                     &session_id,
                     &last_user_msg,
                     profile_token.as_deref(),
-                    &restaurant_now,
                 )
                 .await
             }
@@ -219,10 +223,12 @@ impl OrchestratorService {
                 );
                 handle_fallback(
                     &self.pool,
+                    &self.session_manager,
+                    self.clock.as_ref(),
+                    tz,
                     &session_id,
                     &last_user_msg,
                     profile_token.as_deref(),
-                    &restaurant_now,
                 )
                 .await
             }

@@ -3,6 +3,7 @@ pub mod client;
 pub mod executor;
 pub mod fallback;
 pub mod groq;
+pub mod router;
 pub mod safety;
 pub mod service;
 pub mod session;

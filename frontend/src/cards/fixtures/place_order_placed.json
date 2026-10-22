@@ -1,7 +1,7 @@
 {
   "content": [
     {
-      "text": "I've placed your pickup order for 2 items totaling seven hundred ninety-eight rupees, ready at seven thirty in the evening. Your order code is T O 4 Z Q G 9. Pay at pickup. Please let us know if you have any allergies.",
+      "text": "I've placed your pickup order for 2 items totaling seven hundred ninety-eight rupees, ready at seven thirty in the evening. Your order code is T O N C V Q S. Pay at pickup. Please let us know if you have any allergies.",
       "type": "text"
     }
   ],
@@ -41,7 +41,7 @@
           }
         }
       ],
-      "order_code": "TO-4ZQG9",
+      "order_code": "TO-NCVQS",
       "payment_status": "unpaid_pay_at_pickup",
       "pickup_time_local": "2026-10-21T19:30:00+05:30",
       "stated_allergens": null,
