@@ -34,6 +34,8 @@ TableTalk is a production-hardened restaurant server implementing the **Model Co
 
 ## Architecture
 
+![TableTalk Architecture](docs/images/tabletalk_architecture.jpg)
+
 ```mermaid
 flowchart LR
     subgraph Client["Client Tier"]

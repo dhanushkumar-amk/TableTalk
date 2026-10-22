@@ -8,6 +8,8 @@
 
 TableTalk is built as a single-binary, high-performance restaurant Model Context Protocol (MCP) server written in Rust (Axum, Tokio, rmcp) paired with a responsive React frontend client (Vite, TypeScript, Tailwind CSS, shadcn/ui).
 
+![TableTalk Handwritten Architecture Diagram](images/tabletalk_architecture.jpg)
+
 ```mermaid
 flowchart TD
     subgraph Client["Client Tier"]
