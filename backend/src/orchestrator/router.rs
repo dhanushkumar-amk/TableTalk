@@ -526,6 +526,9 @@ pub async fn handle_scripted_chat(
     let now_utc = clock.now();
     let now_local = now_utc.with_timezone(&tz);
 
+    let sess_token = session_mgr.get_or_create(session_id).await.profile_token;
+    let effective_token = profile_token.or(sess_token.as_deref());
+
     let mut state = session_mgr.get_demo_state(session_id).await;
 
     // Helper to package response
@@ -616,9 +619,13 @@ pub async fn handle_scripted_chat(
                     return make_response(spoken, contents);
                 }
                 PendingAction::ForgetMe => {
-                    let args = json!({});
+                    let token_str = effective_token.unwrap_or_default();
+                    let args = json!({
+                        "profile_token": token_str,
+                        "confirm": true,
+                    });
                     let (spoken, sc, _) =
-                        execute_tool(pool, "forget_me", args, profile_token).await;
+                        execute_tool(pool, "forget_me", args, effective_token).await;
                     let mut contents = Vec::new();
                     if let Some(mut c) = sc {
                         if c.is_object() && c.get("_tool_name").is_none() {
@@ -627,11 +634,15 @@ pub async fn handle_scripted_chat(
                         contents.push(c);
                     }
                     session_mgr.update_demo_state(session_id, |s| *s = ScriptedDemoState::default()).await;
+                    session_mgr.update_profile_token(session_id, String::new()).await;
                     return make_response(spoken, contents);
                 }
                 PendingAction::EnableMemory { preference } => {
                     // Turn 2 of S12: Enable memory & remember preference
-                    let enable_args = json!({ "display_name": state.guest_name.as_deref().unwrap_or("Dining Guest") });
+                    let enable_args = json!({
+                        "guest_name": state.guest_name.as_deref().unwrap_or("Dining Guest"),
+                        "consent_acknowledged": true,
+                    });
                     let (_, enable_sc, _) =
                         execute_tool(pool, "enable_memory", enable_args, None).await;
 
@@ -855,8 +866,12 @@ pub async fn handle_scripted_chat(
     // SCENARIO S8: Waitlist
     // -------------------------------------------------------------
     if norm.contains("check my waitlist") || norm.contains("waitlist status") {
-        let code = state.last_waitlist_code.as_deref().unwrap_or("W-1001");
-        let args = json!({ "waitlist_code": code });
+        let code = state.last_waitlist_code.as_deref().unwrap_or("WL-UFTLD");
+        let guest_name = state.guest_name.as_deref().unwrap_or("Ravi");
+        let args = json!({
+            "code": code,
+            "guest_name": guest_name,
+        });
         let (spoken, sc, _) =
             execute_tool(pool, "get_waitlist_status", args, profile_token).await;
         let mut contents = Vec::new();
@@ -877,18 +892,24 @@ pub async fn handle_scripted_chat(
             .unwrap_or_else(|| resolve_date("friday", clock, tz, None));
         let time = state.pending_time.clone().unwrap_or_else(|| "19:30".to_string());
         let guest_name = state.guest_name.clone().unwrap_or_else(|| "Ravi".to_string());
+        let (window_start, window_end) = if time.starts_with("19") || time.starts_with("20") {
+            ("19:00", "20:30")
+        } else {
+            ("12:00", "14:00")
+        };
 
         let args = json!({
             "party_size": party_size,
             "guest_name": guest_name,
             "date": date,
-            "window_start": "19:00",
-            "window_end": "20:30",
+            "window_start": window_start,
+            "window_end": window_end,
             "area": "any",
         });
 
-        let (spoken, sc, _) =
+        let (spoken, sc, is_error) =
             execute_tool(pool, "join_waitlist", args, profile_token).await;
+        eprintln!("JOIN WAITLIST: spoken={}, sc={:?}, is_err={}", spoken, sc, is_error);
         let mut contents = Vec::new();
         if let Some(mut c) = sc {
             if c.is_object() && c.get("_tool_name").is_none() {
@@ -1015,10 +1036,15 @@ pub async fn handle_scripted_chat(
         }).cloned().or_else(|| state.last_offered_alternatives.first().cloned()) {
             state.chosen_alternative = Some(alt.clone());
             session_mgr.update_demo_state(session_id, |s| *s = state.clone()).await;
+            let area_label = if alt.area.to_lowercase() == "patio" || alt.area.to_lowercase() == "outdoor" {
+                "Patio"
+            } else {
+                "Indoor"
+            };
             return make_response(
                 format!(
                     "I have selected the {} table at {} for {} guests. Would you like me to hold this table for 5 minutes, or confirm the booking?",
-                    alt.area, alt.time, state.pending_party_size.unwrap_or(4)
+                    area_label, alt.time, state.pending_party_size.unwrap_or(4)
                 ),
                 Vec::new(),
             );
@@ -1308,7 +1334,7 @@ pub async fn handle_scripted_chat(
         || norm == "goodbye"
     {
         return make_response(
-            "Thank you for contacting The Saffron Nebula Bistro. We look forward to welcoming you soon. Have a wonderful day!".to_string(),
+            "You're very welcome! Thank you for contacting The Saffron Nebula Bistro. Have a wonderful day!".to_string(),
             Vec::new(),
         );
     }
