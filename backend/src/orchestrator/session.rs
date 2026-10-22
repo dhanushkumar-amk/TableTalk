@@ -65,7 +65,9 @@ impl SessionManager {
         F: FnOnce(&mut ScriptedDemoState),
     {
         let mut map = self.sessions.write().await;
-        let sess = map.entry(session_id.to_string()).or_insert_with(SessionState::default);
+        let sess = map
+            .entry(session_id.to_string())
+            .or_insert_with(SessionState::default);
         f(&mut sess.demo_state);
         sess.last_active_utc = chrono::Utc::now();
     }

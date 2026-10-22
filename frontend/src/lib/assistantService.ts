@@ -4,7 +4,6 @@ import type { TableTalkToolName, ToolResponseEnvelope } from "@/cards/types"
 import checkAvailabilityFixture from "@/cards/fixtures/check_availability_available.json"
 import searchMenuFixture from "@/cards/fixtures/search_menu_found.json"
 import placeOrderFixture from "@/cards/fixtures/place_order_placed.json"
-import joinWaitlistFixture from "@/cards/fixtures/join_waitlist_joined.json"
 import depositRequiredFixture from "@/cards/fixtures/create_booking_deposit_required.json"
 import bookingConfirmedFixture from "@/cards/fixtures/create_booking_confirmed.json"
 import negotiateOptionsFixture from "@/cards/fixtures/negotiate_booking_options.json"
@@ -223,13 +222,47 @@ function simulateOfflineResponse(
       const normalized = query.toLowerCase().trim()
       const durationMs = Math.round(performance.now() - startTime)
 
+      // Greeting / capabilities
+      if (
+        normalized === "hi" ||
+        normalized === "hello" ||
+        normalized === "hey" ||
+        normalized.includes("what can you do") ||
+        normalized === "help"
+      ) {
+        resolve({
+          spokenText:
+            "Welcome to The Saffron Nebula Bistro. I can help you reserve a table, browse our menu with allergen notices, or order takeout pickup.",
+          durationMs,
+          status: "success",
+          provider: "fallback",
+          fallbackMode: true,
+        })
+        return
+      }
+
       // Waitlist
       if (normalized.includes("waitlist") || normalized.includes("queue")) {
         const toolName = "join_waitlist"
-        const envelope = joinWaitlistFixture as unknown as ToolResponseEnvelope<any>
+        const envelope: ToolResponseEnvelope<any> = {
+          content: [
+            {
+              type: "text",
+              text: "I've added you to the waitlist at position 2 for an indoor table. I'll notify you as soon as a party cancels.",
+            },
+          ],
+          isError: false,
+          structuredContent: {
+            status: "added",
+            code: "WL-UFTLD",
+            queue_position: 2,
+            estimated_wait_minutes: 25,
+            guest_name: "Ravi",
+            party_size: 4,
+          },
+        }
         resolve({
           spokenText:
-            (joinWaitlistFixture.content?.[0] as { text: string })?.text ||
             "I've added you to the waitlist at position 2 for an indoor table. I'll notify you as soon as a party cancels.",
           toolName,
           envelope,
@@ -316,11 +349,30 @@ function simulateOfflineResponse(
         return
       }
 
-      // Alternative options / negotiation
+      // Pick alternative or hold
+      if (
+        normalized.includes("patio") ||
+        normalized.includes("second") ||
+        normalized.includes("hold")
+      ) {
+        resolve({
+          spokenText:
+            "I've placed a temporary hold on the patio table at 7:30 PM for 5 minutes. Would you like to confirm the booking under your name?",
+          durationMs,
+          status: "success",
+          provider: "fallback",
+          fallbackMode: true,
+        })
+        return
+      }
+
+      // Alternative options / negotiation / hero flow table query
       if (
         normalized.includes("alternative") ||
         normalized.includes("options") ||
-        normalized.includes("conflict")
+        normalized.includes("conflict") ||
+        normalized.includes("friday at 7:30") ||
+        normalized.includes("table for 4")
       ) {
         const toolName = "negotiate_booking"
         const envelope = negotiateOptionsFixture as unknown as ToolResponseEnvelope<any>

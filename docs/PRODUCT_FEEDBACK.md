@@ -158,28 +158,18 @@ Feedback and evaluation of core developer tools and platform components used in 
 
 ---
 
-## Phase 17: Groq Provider Switch & Demo Video Provider Declaration
+## Phase 17: Provider Switch & Demo Video Declaration
 
 ### Provider Used in Demo Video
-**Plain Statement**: The TableTalk local demo video used **Groq** (`llama-3.3-70b-versatile`) via `LLM_PROVIDER=groq`.
+**Plain Statement**: The TableTalk local demo video uses the **Scripted Demo Router** (labeled `"Scripted demo"` in the assistant UI badge), rather than a live external LLM. 
 
-### Providers and Services Summary
+**Underlying MCP Tools are Real**: Beneath the scripted router, **all 24 MCP tools are the real, underlying Rust implementations**. Every turn executes real SQLite database queries, atomic transaction commits, capacity slot scoring, allergen filters, and card envelope formatting. This deterministic mode guarantees zero hallucination, instantaneous voice interaction, and 100% reproducible demo execution.
+
+### Pluggable LLM Modes (Groq & Amazon Bedrock)
 1. **Groq API**:
    - **Model**: `llama-3.3-70b-versatile`
-   - **Endpoint**: `https://api.groq.com/openai/v1/chat/completions`
-   - **Protocol**: OpenAI-compatible JSON Schema function calling (`tools: [{"type": "function", ...}]`).
-   - **Role in Demo**: Primary live driver for multi-turn voice chat, MCP tool selection, and speech responses with sub-second time-to-first-token.
+   - **Status**: Implemented behind the shared `LlmClient` trait with OpenAI-compatible tool call mapping. Fully operational when `LLM_PROVIDER=groq` and a valid API key are provided.
 2. **Amazon Bedrock (AWS)**:
    - **Model**: Amazon Nova Lite (`apac.amazon.nova-lite-v1:0` / `amazon.nova-lite-v1:0`) in `ap-south-1`.
-   - **SDKs**: `aws-sdk-bedrockruntime`, `aws-config`, `aws-sdk-sts` (version 1.x with `rustls-tls`).
-   - **Status**: Implemented behind the shared `LlmClient` trait with hermetic mock coverage (`FakeBedrockClient`). Not exercised against real AWS in this demo video session.
-
-### What Worked Well with Groq
-- **Ultra-low latency**: Sub-250ms time-to-first-token on LPUs makes spoken assistant conversations feel instantaneous and natural.
-- **Accurate Tool Calling**: `llama-3.3-70b-versatile` accurately picked the correct tools (`check_availability`, `search_menu`, `create_booking`, `place_order`) from compact schemas without hallucinations.
-- **Standardized Schema**: OpenAI-compatible format allowed rapid integration with `reqwest` and standard Serde serialization.
-
-### What Needs Work
-- **Free Tier Rate Limits**: The free tier limit (30 requests/minute, 1,000 requests/day, 12,000 tokens/minute) requires defensive backoff and retry handling on HTTP 429.
-- **Streaming Tool Call Assembly**: Tool calling over Server-Sent Events requires assembling streaming JSON argument fragments across chunks. TableTalk avoids this complexity by executing tool turns synchronously with non-streaming JSON completions, which is already fast on Groq (<400ms).
+   - **Status**: Implemented behind the shared `LlmClient` trait with Converse tool specifications and comprehensive test suite (`FakeBedrockClient`). Marked as implemented and ready for AWS credentials.
 

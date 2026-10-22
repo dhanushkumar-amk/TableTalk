@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react"
+import React, { useState, useEffect, useRef, useMemo } from "react"
 import { useNavigate } from "react-router-dom"
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion"
 import {
@@ -64,6 +64,27 @@ export interface Message {
   }
 }
 
+const HERO_FLOW_CHIPS = [
+  "table for 4 Friday at 7:30",
+  "the patio one",
+  "hold it",
+  "yes book it",
+  "my name is Ravi",
+]
+
+function getNextHeroSuggestion(msgs: Message[]): string {
+  const userTexts = msgs
+    .filter((m) => m.sender === "user")
+    .map((m) => m.text.toLowerCase())
+  if (userTexts.length === 0) return HERO_FLOW_CHIPS[0]
+  const last = userTexts[userTexts.length - 1]
+  if (last.includes("table for 4") || last.includes("7:30")) return HERO_FLOW_CHIPS[1]
+  if (last.includes("patio") || last.includes("second") || last.includes("7 pm")) return HERO_FLOW_CHIPS[2]
+  if (last.includes("hold")) return HERO_FLOW_CHIPS[3]
+  if (last.includes("book it") || last.includes("confirm")) return HERO_FLOW_CHIPS[4]
+  return HERO_FLOW_CHIPS[0]
+}
+
 const SUGGESTION_CHIPS = [
   {
     display: "Table for 4 Friday at 7:30",
@@ -98,6 +119,8 @@ export function AssistantPage() {
   const [showScrollBottomPill, setShowScrollBottomPill] = useState(false)
   const [isFallbackMode, setIsFallbackMode] = useState(false)
   const [activeProvider, setActiveProvider] = useState<string>("groq")
+
+  const nextHeroSuggestion = useMemo(() => getNextHeroSuggestion(messages), [messages])
 
   // In-memory token only (never localStorage)
   const inMemoryProfileTokenRef = useRef<string | null>(null)
@@ -199,7 +222,7 @@ export function AssistantPage() {
 
     setMessages((prev) => [...prev, userMsg])
     setIsThinking(true)
-    setActiveToolLabel("Checking restaurant capacity...")
+    setActiveToolLabel(null)
 
     try {
       const response = await sendAssistantMessage(
@@ -495,7 +518,7 @@ export function AssistantPage() {
             {isFallbackMode ? (
               <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold text-amber-600 dark:text-amber-400">
                 <Sparkles className="size-2.5" />
-                Demo mode
+                Scripted demo
               </span>
             ) : (
               <span className="hidden sm:inline-flex items-center gap-1 rounded-full border border-border bg-muted/60 px-2 py-0.5 text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
@@ -866,6 +889,23 @@ export function AssistantPage() {
 
       {/* Bottom Composer Bar (Sticks above tab bar, safe area) */}
       <div className="shrink-0 border-t border-border/80 bg-background/95 backdrop-blur-md px-4 py-3 pb-safe">
+        {/* Try saying chip row for Hero Flow */}
+        {messages.length > 0 && (
+          <div className="mx-auto max-w-[720px] pb-2 flex items-center gap-1.5 overflow-x-auto no-scrollbar text-xs">
+            <span className="text-[11px] font-semibold text-muted-foreground shrink-0 flex items-center gap-1">
+              <Sparkles className="size-3 text-primary" />
+              Try saying:
+            </span>
+            <button
+              type="button"
+              onClick={() => handleSend(nextHeroSuggestion)}
+              className="inline-flex items-center rounded-full border border-primary/40 bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary hover:bg-primary/20 transition-all shrink-0 shadow-2xs"
+            >
+              "{nextHeroSuggestion}"
+            </button>
+          </div>
+        )}
+
         <div className="mx-auto max-w-[720px] flex items-end gap-2.5">
           {/* Main Large Voice Mic Button */}
           <button

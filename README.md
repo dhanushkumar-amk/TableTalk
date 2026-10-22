@@ -29,6 +29,7 @@ TableTalk is a production-hardened restaurant server implementing the **Model Co
 - **Privacy-Preserving Memory**: Remembers dining preferences only with explicit consent; stores profile tokens as SHA-256 hashes; provides permanent "Forget Me" hard deletion.
 - **The Human-Confirms Payment Rule**: The AI assistant *never* handles card data or approves payments; all deposits require human confirmation through secure links.
 - **Dual LLM Provider Support**: Native tool calling with Groq Llama 3.3 70B (sub-300ms time-to-first-token) and Amazon Bedrock with Amazon Nova Lite (`apac.amazon.nova-lite-v1:0`).
+- **Reliable Scripted Demo Router**: When running locally without live LLM API keys (labeled "Scripted demo" in the UI), TableTalk operates via a deterministic, multi-turn scripted router. It executes the **real, underlying Rust MCP tools**, SQLite transactions, allergen checks, and card payloads under the hood—ensuring zero video hallucination and reproducible test coverage.
 
 ---
 

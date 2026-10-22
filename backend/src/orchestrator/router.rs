@@ -70,10 +70,7 @@ pub fn normalize_text(text: &str) -> String {
             cleaned.push(' ');
         }
     }
-    cleaned
-        .split_whitespace()
-        .collect::<Vec<_>>()
-        .join(" ")
+    cleaned.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
 /// Words to digits mapping
@@ -139,7 +136,9 @@ pub fn extract_party_size(text: &str) -> Option<i64> {
 
     // Check for "X people" or "X guests"
     for i in 0..words.len() {
-        if i + 1 < words.len() && (words[i + 1].starts_with("people") || words[i + 1].starts_with("guest")) {
+        if i + 1 < words.len()
+            && (words[i + 1].starts_with("people") || words[i + 1].starts_with("guest"))
+        {
             let cur = words[i].trim_matches(|c: char| !c.is_alphanumeric());
             if let Ok(n) = cur.parse::<i64>() {
                 if (1..=12).contains(&n) {
@@ -183,20 +182,18 @@ pub fn extract_time(text: &str) -> Option<NaiveTime> {
     let words: Vec<&str> = lower.split_whitespace().collect();
     for i in 0..words.len() {
         let w = words[i].trim_matches(|c: char| !c.is_alphanumeric() && c != ':' && c != '.');
-        let has_pm = lower.contains("pm") || (i + 1 < words.len() && words[i + 1].starts_with("pm"));
-        let has_am = lower.contains("am") || (i + 1 < words.len() && words[i + 1].starts_with("am"));
+        let has_pm =
+            lower.contains("pm") || (i + 1 < words.len() && words[i + 1].starts_with("pm"));
+        let has_am =
+            lower.contains("am") || (i + 1 < words.len() && words[i + 1].starts_with("am"));
 
         if let Some((h_str, m_str)) = w.split_once(':').or_else(|| w.split_once('.')) {
             if let (Ok(h), Ok(m)) = (h_str.parse::<u32>(), m_str.parse::<u32>()) {
                 if m < 60 {
                     let mut hour = h;
-                    if (has_pm || (hour >= 1 && hour <= 11 && !has_am && hour < 12)) && hour < 12 {
+                    if (has_pm || ((1..=11).contains(&hour) && !has_am && hour < 12)) && hour < 12 {
                         // Typical restaurant dinner hours: 6pm to 11pm, lunch 12 to 3pm
-                        if hour <= 4 {
-                            hour += 12; // 1pm-4pm lunch
-                        } else if hour >= 6 && hour <= 11 {
-                            hour += 12; // 6pm-11pm dinner
-                        } else if has_pm {
+                        if hour <= 4 || (6..=11).contains(&hour) || has_pm {
                             hour += 12;
                         }
                     }
@@ -212,9 +209,7 @@ pub fn extract_time(text: &str) -> Option<NaiveTime> {
             let next_w = words[i + 1].trim_matches(|c: char| !c.is_alphanumeric());
             if let Ok(mut h) = next_w.parse::<u32>() {
                 if h <= 12 {
-                    if h <= 4 {
-                        h += 12;
-                    } else if h >= 6 && h <= 11 {
+                    if h <= 4 || (6..=11).contains(&h) {
                         h += 12;
                     }
                     return NaiveTime::from_hms_opt(h, 0, 0);
@@ -230,12 +225,7 @@ pub fn extract_time(text: &str) -> Option<NaiveTime> {
 
 /// Resolves date from text relative to injected Clock and restaurant timezone.
 /// Guaranteed to never produce a past date.
-pub fn resolve_date(
-    text: &str,
-    clock: &dyn Clock,
-    tz: Tz,
-    req_time: Option<NaiveTime>,
-) -> String {
+pub fn resolve_date(text: &str, clock: &dyn Clock, tz: Tz, req_time: Option<NaiveTime>) -> String {
     let lower = text.to_lowercase();
     let now_utc = clock.now();
     let now_local = now_utc.with_timezone(&tz);
@@ -291,8 +281,13 @@ pub fn resolve_date(
                     7
                 }
             } else {
-                let diff = (target_dow.num_days_from_monday() + 7 - cur_dow.num_days_from_monday()) % 7;
-                if diff == 0 { 7 } else { diff }
+                let diff =
+                    (target_dow.num_days_from_monday() + 7 - cur_dow.num_days_from_monday()) % 7;
+                if diff == 0 {
+                    7
+                } else {
+                    diff
+                }
             };
 
             let resolved = today + Duration::days(days_ahead as i64);
@@ -312,11 +307,16 @@ pub fn resolve_date(
 /// Extracts seating area from query text.
 pub fn extract_area(text: &str) -> Option<String> {
     let lower = text.to_lowercase();
-    if lower.contains("patio") || lower.contains("outdoor") || lower.contains("outside") || lower.contains("terrace") {
+    if lower.contains("patio")
+        || lower.contains("outdoor")
+        || lower.contains("outside")
+        || lower.contains("terrace")
+    {
         Some("patio".to_string())
     } else if lower.contains("bar") || lower.contains("counter") {
         Some("bar".to_string())
-    } else if lower.contains("indoor") || lower.contains("inside") || lower.contains("dining room") {
+    } else if lower.contains("indoor") || lower.contains("inside") || lower.contains("dining room")
+    {
         Some("indoor".to_string())
     } else {
         None
@@ -358,10 +358,17 @@ pub fn extract_guest_name(text: &str) -> Option<String> {
 pub fn extract_confirmation_code(text: &str) -> Option<String> {
     for word in text.split_whitespace() {
         let clean = word.trim_matches(|c: char| !c.is_alphanumeric() && c != '-');
-        if clean.starts_with("TT-") || clean.starts_with("TO-") || clean.starts_with("BK-") || clean.starts_with("W-") {
+        if clean.starts_with("TT-")
+            || clean.starts_with("TO-")
+            || clean.starts_with("BK-")
+            || clean.starts_with("W-")
+        {
             return Some(clean.to_uppercase());
         }
-        if clean.len() == 6 && clean.chars().all(|c| c.is_ascii_alphanumeric()) && clean.chars().any(|c| c.is_ascii_digit()) {
+        if clean.len() == 6
+            && clean.chars().all(|c| c.is_ascii_alphanumeric())
+            && clean.chars().any(|c| c.is_ascii_digit())
+        {
             return Some(clean.to_uppercase());
         }
     }
@@ -461,7 +468,8 @@ pub fn format_natural_spoken_datetime(now: DateTime<Tz>) -> String {
     };
 
     let hour_words = [
-        "twelve", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve",
+        "twelve", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten",
+        "eleven", "twelve",
     ];
     let hour_word = hour_words[hour_12 as usize];
 
@@ -494,7 +502,10 @@ pub fn sanitize_spoken_safety(text: &str) -> String {
         ("allergy-free", "listed as not containing allergens"),
         ("allergy free", "listed as not containing allergens"),
         ("guaranteed safe", "reviewed against allergen tags"),
-        ("safe to eat", "listed as not containing the specified allergens"),
+        (
+            "safe to eat",
+            "listed as not containing the specified allergens",
+        ),
         ("is safe", "is listed without those allergens"),
         ("are safe", "are listed without those allergens"),
         ("safe", "suitable"),
@@ -587,7 +598,9 @@ pub async fn handle_scripted_chat(
                         }
                         contents.push(c);
                     }
-                    session_mgr.update_demo_state(session_id, |s| *s = state.clone()).await;
+                    session_mgr
+                        .update_demo_state(session_id, |s| *s = state.clone())
+                        .await;
                     return make_response(spoken, contents);
                 }
                 PendingAction::CancelOrder { order_code } => {
@@ -601,7 +614,9 @@ pub async fn handle_scripted_chat(
                         }
                         contents.push(c);
                     }
-                    session_mgr.update_demo_state(session_id, |s| *s = state.clone()).await;
+                    session_mgr
+                        .update_demo_state(session_id, |s| *s = state.clone())
+                        .await;
                     return make_response(spoken, contents);
                 }
                 PendingAction::LeaveWaitlist { waitlist_code } => {
@@ -615,7 +630,9 @@ pub async fn handle_scripted_chat(
                         }
                         contents.push(c);
                     }
-                    session_mgr.update_demo_state(session_id, |s| *s = state.clone()).await;
+                    session_mgr
+                        .update_demo_state(session_id, |s| *s = state.clone())
+                        .await;
                     return make_response(spoken, contents);
                 }
                 PendingAction::ForgetMe => {
@@ -633,8 +650,12 @@ pub async fn handle_scripted_chat(
                         }
                         contents.push(c);
                     }
-                    session_mgr.update_demo_state(session_id, |s| *s = ScriptedDemoState::default()).await;
-                    session_mgr.update_profile_token(session_id, String::new()).await;
+                    session_mgr
+                        .update_demo_state(session_id, |s| *s = ScriptedDemoState::default())
+                        .await;
+                    session_mgr
+                        .update_profile_token(session_id, String::new())
+                        .await;
                     return make_response(spoken, contents);
                 }
                 PendingAction::EnableMemory { preference } => {
@@ -661,7 +682,8 @@ pub async fn handle_scripted_chat(
                         "value": preference,
                     });
                     let (pref_spoken, pref_sc, _) =
-                        execute_tool(pool, "remember_preference", pref_args, new_token.as_deref()).await;
+                        execute_tool(pool, "remember_preference", pref_args, new_token.as_deref())
+                            .await;
 
                     let mut contents = Vec::new();
                     if let Some(mut c) = pref_sc {
@@ -670,11 +692,10 @@ pub async fn handle_scripted_chat(
                         }
                         contents.push(c);
                     }
-                    session_mgr.update_demo_state(session_id, |s| *s = state.clone()).await;
-                    return make_response(
-                        format!("Memory enabled! {}", pref_spoken),
-                        contents,
-                    );
+                    session_mgr
+                        .update_demo_state(session_id, |s| *s = state.clone())
+                        .await;
+                    return make_response(format!("Memory enabled! {}", pref_spoken), contents);
                 }
                 PendingAction::ConfirmBooking {
                     party_size,
@@ -682,7 +703,10 @@ pub async fn handle_scripted_chat(
                     time,
                     area,
                 } => {
-                    let guest_name = state.guest_name.clone().unwrap_or_else(|| "Ravi".to_string());
+                    let guest_name = state
+                        .guest_name
+                        .clone()
+                        .unwrap_or_else(|| "Ravi".to_string());
                     let args = json!({
                         "date": date,
                         "time": time,
@@ -697,25 +721,36 @@ pub async fn handle_scripted_chat(
                         if c.is_object() && c.get("_tool_name").is_none() {
                             c["_tool_name"] = json!("create_booking");
                         }
-                        if let Some(code) = c.get("booking").and_then(|b| b.get("confirmation_code")).and_then(|k| k.as_str()) {
+                        if let Some(code) = c
+                            .get("booking")
+                            .and_then(|b| b.get("confirmation_code"))
+                            .and_then(|k| k.as_str())
+                        {
                             state.last_booking_code = Some(code.to_string());
                         }
                         contents.push(c);
                     }
-                    session_mgr.update_demo_state(session_id, |s| *s = state.clone()).await;
+                    session_mgr
+                        .update_demo_state(session_id, |s| *s = state.clone())
+                        .await;
                     return make_response(spoken, contents);
                 }
             }
         } else if is_no {
-            session_mgr.update_demo_state(session_id, |s| *s = state.clone()).await;
+            session_mgr
+                .update_demo_state(session_id, |s| *s = state.clone())
+                .await;
             return make_response(
-                "Understood, I've cancelled that action. How else may I assist you today?".to_string(),
+                "Understood, I've cancelled that action. How else may I assist you today?"
+                    .to_string(),
                 Vec::new(),
             );
         } else {
             // Re-prompt if pending action exists
             state.pending_action = Some(pending);
-            session_mgr.update_demo_state(session_id, |s| *s = state.clone()).await;
+            session_mgr
+                .update_demo_state(session_id, |s| *s = state.clone())
+                .await;
             return make_response(
                 "Please say or type yes to confirm this action, or no to cancel.".to_string(),
                 Vec::new(),
@@ -772,7 +807,8 @@ pub async fn handle_scripted_chat(
             );
         } else if norm.contains("tuesday") {
             return make_response(
-                "We are closed on Tuesdays for culinary development and facility maintenance.".to_string(),
+                "We are closed on Tuesdays for culinary development and facility maintenance."
+                    .to_string(),
                 Vec::new(),
             );
         } else {
@@ -794,7 +830,9 @@ pub async fn handle_scripted_chat(
             confirmation_code: code.clone(),
             guest_name: name.clone(),
         });
-        session_mgr.update_demo_state(session_id, |s| *s = state.clone()).await;
+        session_mgr
+            .update_demo_state(session_id, |s| *s = state.clone())
+            .await;
 
         return make_response(
             format!(
@@ -810,7 +848,9 @@ pub async fn handle_scripted_chat(
     // -------------------------------------------------------------
     if norm == "forget me" || norm == "forget my data" || norm == "delete my profile" {
         state.pending_action = Some(PendingAction::ForgetMe);
-        session_mgr.update_demo_state(session_id, |s| *s = state.clone()).await;
+        session_mgr
+            .update_demo_state(session_id, |s| *s = state.clone())
+            .await;
 
         return make_response(
             "Are you sure you want me to forget all your saved preferences and profile data? Please say or type yes to confirm.".to_string(),
@@ -826,7 +866,9 @@ pub async fn handle_scripted_chat(
         state.pending_action = Some(PendingAction::EnableMemory {
             preference: "peanuts".to_string(),
         });
-        session_mgr.update_demo_state(session_id, |s| *s = state.clone()).await;
+        session_mgr
+            .update_demo_state(session_id, |s| *s = state.clone())
+            .await;
 
         return make_response(
             "Would you like me to remember your peanut allergy for future visits and recommendations? Please say yes to confirm.".to_string(),
@@ -836,8 +878,7 @@ pub async fn handle_scripted_chat(
 
     if norm.contains("what's my usual order") || norm.contains("usual order") {
         let args = json!({});
-        let (spoken, sc, _) =
-            execute_tool(pool, "get_usual_order", args, profile_token).await;
+        let (spoken, sc, _) = execute_tool(pool, "get_usual_order", args, profile_token).await;
         let mut contents = Vec::new();
         if let Some(mut c) = sc {
             if c.is_object() && c.get("_tool_name").is_none() {
@@ -850,8 +891,7 @@ pub async fn handle_scripted_chat(
 
     if norm.contains("what do you remember about me") || norm.contains("what do you remember") {
         let args = json!({});
-        let (spoken, sc, _) =
-            execute_tool(pool, "get_profile", args, profile_token).await;
+        let (spoken, sc, _) = execute_tool(pool, "get_profile", args, profile_token).await;
         let mut contents = Vec::new();
         if let Some(mut c) = sc {
             if c.is_object() && c.get("_tool_name").is_none() {
@@ -872,8 +912,7 @@ pub async fn handle_scripted_chat(
             "code": code,
             "guest_name": guest_name,
         });
-        let (spoken, sc, _) =
-            execute_tool(pool, "get_waitlist_status", args, profile_token).await;
+        let (spoken, sc, _) = execute_tool(pool, "get_waitlist_status", args, profile_token).await;
         let mut contents = Vec::new();
         if let Some(mut c) = sc {
             if c.is_object() && c.get("_tool_name").is_none() {
@@ -890,8 +929,14 @@ pub async fn handle_scripted_chat(
             .pending_date
             .clone()
             .unwrap_or_else(|| resolve_date("friday", clock, tz, None));
-        let time = state.pending_time.clone().unwrap_or_else(|| "19:30".to_string());
-        let guest_name = state.guest_name.clone().unwrap_or_else(|| "Ravi".to_string());
+        let time = state
+            .pending_time
+            .clone()
+            .unwrap_or_else(|| "19:30".to_string());
+        let guest_name = state
+            .guest_name
+            .clone()
+            .unwrap_or_else(|| "Ravi".to_string());
         let (window_start, window_end) = if time.starts_with("19") || time.starts_with("20") {
             ("19:00", "20:30")
         } else {
@@ -907,9 +952,11 @@ pub async fn handle_scripted_chat(
             "area": "any",
         });
 
-        let (spoken, sc, is_error) =
-            execute_tool(pool, "join_waitlist", args, profile_token).await;
-        eprintln!("JOIN WAITLIST: spoken={}, sc={:?}, is_err={}", spoken, sc, is_error);
+        let (spoken, sc, is_error) = execute_tool(pool, "join_waitlist", args, profile_token).await;
+        eprintln!(
+            "JOIN WAITLIST: spoken={}, sc={:?}, is_err={}",
+            spoken, sc, is_error
+        );
         let mut contents = Vec::new();
         if let Some(mut c) = sc {
             if c.is_object() && c.get("_tool_name").is_none() {
@@ -920,7 +967,9 @@ pub async fn handle_scripted_chat(
             }
             contents.push(c);
         }
-        session_mgr.update_demo_state(session_id, |s| *s = state.clone()).await;
+        session_mgr
+            .update_demo_state(session_id, |s| *s = state.clone())
+            .await;
         return make_response(spoken, contents);
     }
 
@@ -970,7 +1019,8 @@ pub async fn handle_scripted_chat(
         // Check for ambiguous or unknown dish like "order pizza"
         if norm.contains("pizza") || norm.contains("burger") || norm.contains("pasta") {
             return make_response(
-                "We don't serve that item. Did you mean Paneer Tikka or Bhatti Ka Murgh?".to_string(),
+                "We don't serve that item. Did you mean Paneer Tikka or Bhatti Ka Murgh?"
+                    .to_string(),
                 Vec::new(),
             );
         }
@@ -1005,12 +1055,18 @@ pub async fn handle_scripted_chat(
             if c.is_object() && c.get("_tool_name").is_none() {
                 c["_tool_name"] = json!("place_order");
             }
-            if let Some(code) = c.get("order").and_then(|o| o.get("order_code")).and_then(|k| k.as_str()) {
+            if let Some(code) = c
+                .get("order")
+                .and_then(|o| o.get("order_code"))
+                .and_then(|k| k.as_str())
+            {
                 state.last_order_code = Some(code.to_string());
             }
             contents.push(c);
         }
-        session_mgr.update_demo_state(session_id, |s| *s = state.clone()).await;
+        session_mgr
+            .update_demo_state(session_id, |s| *s = state.clone())
+            .await;
         return make_response(spoken, contents);
     }
 
@@ -1025,22 +1081,31 @@ pub async fn handle_scripted_chat(
         || norm.contains("patio")
         || (norm.contains("7 pm") && state.last_offered_alternatives.len() > 1)
     {
-        if let Some(alt) = state.last_offered_alternatives.iter().find(|a| {
-            if norm.contains("patio") {
-                a.area.to_lowercase() == "patio"
-            } else if norm.contains("second") || norm.contains("2") {
-                a.option_id == "opt_2"
-            } else {
-                a.time.starts_with("19:")
-            }
-        }).cloned().or_else(|| state.last_offered_alternatives.first().cloned()) {
+        if let Some(alt) = state
+            .last_offered_alternatives
+            .iter()
+            .find(|a| {
+                if norm.contains("patio") {
+                    a.area.to_lowercase() == "patio"
+                } else if norm.contains("second") || norm.contains("2") {
+                    a.option_id == "opt_2"
+                } else {
+                    a.time.starts_with("19:")
+                }
+            })
+            .cloned()
+            .or_else(|| state.last_offered_alternatives.first().cloned())
+        {
             state.chosen_alternative = Some(alt.clone());
-            session_mgr.update_demo_state(session_id, |s| *s = state.clone()).await;
-            let area_label = if alt.area.to_lowercase() == "patio" || alt.area.to_lowercase() == "outdoor" {
-                "Patio"
-            } else {
-                "Indoor"
-            };
+            session_mgr
+                .update_demo_state(session_id, |s| *s = state.clone())
+                .await;
+            let area_label =
+                if alt.area.to_lowercase() == "patio" || alt.area.to_lowercase() == "outdoor" {
+                    "Patio"
+                } else {
+                    "Indoor"
+                };
             return make_response(
                 format!(
                     "I have selected the {} table at {} for {} guests. Would you like me to hold this table for 5 minutes, or confirm the booking?",
@@ -1060,7 +1125,11 @@ pub async fn handle_scripted_chat(
     }
 
     // Case 3: Book it / Confirm -> Ask name if missing, or create booking
-    if norm.contains("book it") || norm.contains("confirm booking") || norm == "confirm" || norm == "yes book it" {
+    if norm.contains("book it")
+        || norm.contains("confirm booking")
+        || norm == "confirm"
+        || norm == "yes book it"
+    {
         if state.guest_name.is_none() {
             return make_response(
                 "May I have your name to complete the reservation?".to_string(),
@@ -1073,8 +1142,15 @@ pub async fn handle_scripted_chat(
                 .pending_date
                 .clone()
                 .unwrap_or_else(|| resolve_date("friday", clock, tz, None));
-            let time = state.pending_time.clone().unwrap_or_else(|| "19:30".to_string());
-            let area = state.chosen_alternative.as_ref().map(|a| a.area.clone()).unwrap_or_else(|| "patio".to_string());
+            let time = state
+                .pending_time
+                .clone()
+                .unwrap_or_else(|| "19:30".to_string());
+            let area = state
+                .chosen_alternative
+                .as_ref()
+                .map(|a| a.area.clone())
+                .unwrap_or_else(|| "patio".to_string());
 
             let args = json!({
                 "date": date,
@@ -1091,7 +1167,11 @@ pub async fn handle_scripted_chat(
                 if c.is_object() && c.get("_tool_name").is_none() {
                     c["_tool_name"] = json!("create_booking");
                 }
-                if let Some(code) = c.get("booking").and_then(|b| b.get("confirmation_code")).and_then(|k| k.as_str()) {
+                if let Some(code) = c
+                    .get("booking")
+                    .and_then(|b| b.get("confirmation_code"))
+                    .and_then(|k| k.as_str())
+                {
                     let spaced = format_spaced_code(code);
                     confirmation_spoken = format!(
                         "Your reservation is confirmed! Confirmation code is {} under {}.",
@@ -1113,7 +1193,10 @@ pub async fn handle_scripted_chat(
             .pending_date
             .clone()
             .unwrap_or_else(|| resolve_date("friday", clock, tz, None));
-        let time = state.pending_time.clone().unwrap_or_else(|| "19:30".to_string());
+        let time = state
+            .pending_time
+            .clone()
+            .unwrap_or_else(|| "19:30".to_string());
         let area = state
             .chosen_alternative
             .as_ref()
@@ -1135,7 +1218,11 @@ pub async fn handle_scripted_chat(
             if c.is_object() && c.get("_tool_name").is_none() {
                 c["_tool_name"] = json!("create_booking");
             }
-            if let Some(code) = c.get("booking").and_then(|b| b.get("confirmation_code")).and_then(|k| k.as_str()) {
+            if let Some(code) = c
+                .get("booking")
+                .and_then(|b| b.get("confirmation_code"))
+                .and_then(|k| k.as_str())
+            {
                 let spaced = format_spaced_code(code);
                 confirmation_spoken = format!(
                     "Your reservation is confirmed! Confirmation code is {} under {}.",
@@ -1151,13 +1238,17 @@ pub async fn handle_scripted_chat(
     // -------------------------------------------------------------
     // SCENARIO S9: Large Party Deposit (party of 8)
     // -------------------------------------------------------------
-    if (norm.contains("table for 8") || norm.contains("table for eight") || norm.contains("party of 8"))
+    if (norm.contains("table for 8")
+        || norm.contains("table for eight")
+        || norm.contains("party of 8"))
         || (extract_party_size(raw_trimmed) == Some(8))
     {
         let party_size = 8;
         let req_time = extract_time(raw_trimmed).or_else(|| NaiveTime::from_hms_opt(20, 0, 0));
         let date = resolve_date(raw_trimmed, clock, tz, req_time);
-        let time = req_time.map(|t| t.format("%H:%M").to_string()).unwrap_or_else(|| "20:00".to_string());
+        let time = req_time
+            .map(|t| t.format("%H:%M").to_string())
+            .unwrap_or_else(|| "20:00".to_string());
         let guest_name = extract_guest_name(raw_trimmed)
             .or_else(|| state.guest_name.clone())
             .unwrap_or_else(|| "Dining Guest".to_string());
@@ -1186,11 +1277,17 @@ pub async fn handle_scripted_chat(
     // -------------------------------------------------------------
     // SCENARIO S6: The Hero Flow / Check Availability
     // -------------------------------------------------------------
-    if norm.contains("table") || norm.contains("availability") || norm.contains("seat") || norm.contains("reservation") {
+    if norm.contains("table")
+        || norm.contains("availability")
+        || norm.contains("seat")
+        || norm.contains("reservation")
+    {
         let party_size = extract_party_size(raw_trimmed).unwrap_or(4);
         let req_time = extract_time(raw_trimmed).or_else(|| NaiveTime::from_hms_opt(19, 30, 0));
         let date = resolve_date(raw_trimmed, clock, tz, req_time);
-        let time = req_time.map(|t| t.format("%H:%M").to_string()).unwrap_or_else(|| "19:30".to_string());
+        let time = req_time
+            .map(|t| t.format("%H:%M").to_string())
+            .unwrap_or_else(|| "19:30".to_string());
         let area = extract_area(raw_trimmed).unwrap_or_else(|| "indoor".to_string());
 
         state.pending_party_size = Some(party_size);
@@ -1216,9 +1313,21 @@ pub async fn handle_scripted_chat(
             let mut alts = Vec::new();
             if let Some(arr) = c.get("alternatives").and_then(|a| a.as_array()) {
                 for (idx, item) in arr.iter().enumerate() {
-                    let d = item.get("date").and_then(|v| v.as_str()).unwrap_or(&date).to_string();
-                    let t = item.get("time").and_then(|v| v.as_str()).unwrap_or("19:30").to_string();
-                    let a = item.get("area").and_then(|v| v.as_str()).unwrap_or("patio").to_string();
+                    let d = item
+                        .get("date")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or(&date)
+                        .to_string();
+                    let t = item
+                        .get("time")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("19:30")
+                        .to_string();
+                    let a = item
+                        .get("area")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("patio")
+                        .to_string();
                     alts.push(OfferedAlternative {
                         option_id: format!("opt_{}", idx + 1),
                         date: d,
@@ -1249,7 +1358,9 @@ pub async fn handle_scripted_chat(
             contents.push(c);
         }
 
-        session_mgr.update_demo_state(session_id, |s| *s = state.clone()).await;
+        session_mgr
+            .update_demo_state(session_id, |s| *s = state.clone())
+            .await;
         return make_response(spoken, contents);
     }
 
@@ -1313,7 +1424,8 @@ pub async fn handle_scripted_chat(
             args_obj.insert("chefs_special_only".to_string(), json!(true));
         }
 
-        let (spoken, sc, _) = execute_tool(pool, "search_menu", Value::Object(args_obj), profile_token).await;
+        let (spoken, sc, _) =
+            execute_tool(pool, "search_menu", Value::Object(args_obj), profile_token).await;
         let mut contents = Vec::new();
         if let Some(mut c) = sc {
             if c.is_object() && c.get("_tool_name").is_none() {

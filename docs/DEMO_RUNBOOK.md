@@ -1,37 +1,27 @@
 # TableTalk — 3-Minute Local Demo Video Runbook
 
-This runbook provides an exact, second-by-second click-and-say script for recording a 3-minute demo video of TableTalk using Groq LLM tool orchestration (`llama-3.3-70b-versatile`) and the interactive React frontend cards.
+This runbook provides the exact, second-by-second click-and-say script for recording a 3-minute demo video of TableTalk using the deterministic **Scripted Demo Router** (`Scripted demo` badge) and the interactive React frontend cards.
+
+> **DEMO MODE DECLARATION**: This demo video operates via TableTalk's deterministic **Scripted Demo Router**, not an external live LLM. Underneath, **every scenario calls the real, underlying Rust MCP tools** (`check_availability`, `create_booking`, `search_menu`, `place_order`, `join_waitlist`, `forget_me`, etc.) against SQLite with full database transaction integrity and live card UI generation.
 
 ---
 
 ## Pre-Recording Checklist
 
-1. **Environment Setup**:
-   - Ensure `.env` contains:
-     ```bash
-     LLM_PROVIDER=groq
-     GROQ_API_KEY=gsk_your_api_key_here
-     GROQ_MODEL=llama-3.3-70b-versatile
-     ```
-   - If recording offline without an external API key, the built-in deterministic fallback engine will handle all 5 turns automatically (`fallback_mode: true` with `"Demo mode"` badge).
-2. **Screen & Privacy Protection**:
-   - Keep `.env` and terminal windows displaying environment variables off screen during recording.
-   - Do NOT display real personal phone numbers, addresses, or actual payment credentials on screen.
-   - Rotate any demo Groq or test API keys immediately after the video recording concludes.
-3. **Start Services**:
+1. **Start Services**:
    ```bash
-   # Terminal 1: Backend
-   cargo run --manifest-path backend/Cargo.toml --bin mcp_tabletalk_backend
+   # Terminal 1: Backend Server (Must be running on port 8080)
+   cargo run --bin mcp_tabletalk_backend
 
-   # Terminal 2: Frontend
+   # Terminal 2: Frontend Dev Server (Port 5173)
    cd frontend && npm run dev
    ```
-   - Backend runs on `http://127.0.0.1:8080`
-   - Frontend runs on `http://127.0.0.1:5173/assistant`
-4. **Browser Setup**:
-   - Open Chrome or Edge to `http://127.0.0.1:5173/assistant` (ensure microphone permissions are granted).
-   - Set zoom level to 100% or 110% for crisp UI readability.
-   - Confirm audio input/output devices are tested.
+2. **Verify Backend Connection**:
+   - Run `bash scripts/demo-transcript.sh` to confirm all 15 scenarios respond with real MCP tools.
+3. **Browser Setup**:
+   - Open Chrome or Edge to `http://127.0.0.1:5173/assistant`.
+   - Verify the top badge displays `"Scripted demo"` with the sparkles icon.
+   - Set zoom level to 100% or 110% for crisp card readability.
 
 ---
 
@@ -40,139 +30,172 @@ This runbook provides an exact, second-by-second click-and-say script for record
 ```
 +--------------------------------------------------------------------------------------------------+
 | TIMELINE OVERVIEW                                                                                |
-| 0:00 - 0:30 | Hook: Voice Negotiation on Fully Booked Slot & Ranked Alternatives                 |
-| 0:30 - 1:00 | Table Confirmation & Interactive Booking Card                                     |
-| 1:00 - 1:45 | Allergy-Aware Menu Search (Vegan & Peanut Exclusion with Transparent Disclosures)  |
-| 1:45 - 2:25 | Pickup Order Placement & Live Prep Tracking                                       |
-| 2:25 - 2:50 | Privacy & "Forget Me" Hard Memory Scrubbing                                        |
-| 2:50 - 3:00 | Architecture & Wrap-Up (Groq + Axum Rust MCP Server)                              |
+| 0:00 - 1:00 | Act 1: THE HERO FLOW — Conflict Negotiation, Hold, & Confirmed Booking (60s)       |
+| 1:00 - 1:35 | Act 2: Allergy-Aware Menu Search (Never "Safe" + Staff Confirmation) (35s)         |
+| 1:35 - 2:10 | Act 3: Pickup Order & Stated Allergen Conflict Warning (35s)                       |
+| 2:10 - 2:35 | Act 4: Large Party Deposit (Simulated Payment Banner) & Waitlist (25s)             |
+| 2:35 - 2:55 | Act 5: Consent-Driven Memory & Hard "Forget Me" Data Erasure (20s)                 |
+| 2:55 - 3:00 | Act 6: Architecture Sign-Off & Closing (5s)                                        |
 +--------------------------------------------------------------------------------------------------+
 ```
 
 ---
 
-### [0:00 – 0:30] Act 1: The Hook — Fully Booked Conflict & Ranked Alternatives (30s)
+### [0:00 – 1:00] Act 1: THE HERO FLOW (Multi-Turn Table Negotiation) (60s)
 
-*Goal: Hook the viewer immediately with a realistic dining conflict handled smoothly through voice and visual cards.*
+*Goal: Hook the viewer immediately with a real dining capacity conflict handled smoothly through spoken turns and interactive UI cards.*
 
-- **Action**:
-  - Open `/assistant`. The clean greeting "How can I help you dine today?" is visible with 4 suggestion chips.
-  - Click the **Microphone** button (or click the suggestion chip `"Table for 4 Friday at 7:30"`).
+#### Turn 1: Check Availability (Fully Booked Conflict)
 - **Spoken Voice (User)**:
-  > *"Hey, can I get a table for 4 this Friday at 7:30 PM?"*
+  > *"Table for 4 Friday at 7:30"*
+- **Tool Executed**: `check_availability`
+- **Assistant Spoken Response**:
+  > *"I don't have indoor seating at seven thirty in the evening, but patio is free at seven thirty in the evening, or I have nine in indoor. Would either work for you?"*
 - **Visuals on Screen**:
-  - Mic pulses red with animated waveform ring (`Listening...`).
-  - Assistant enters thinking state (`Thinking...`).
   - Tool activity chip appears: `[✨ Checking availability...]`.
-  - Assistant responds with natural speech:
-    > *"That exact slot is booked, but I found three ranked alternatives nearby. I can hold any of these for 5 minutes."*
-  - The **NegotiationOptionsCard** renders dynamically below the assistant bubble showing:
-    - Ranked option 1: 7:00 PM Patio (Score: 92)
-    - Ranked option 2: 8:00 PM Indoor (Score: 88)
-    - Ranked option 3: 8:15 PM Patio (Score: 78)
-    - Action buttons: `[Hold 5 min]`, `[Book 8:00 PM Indoor]`
+  - The **Table Availability Card** renders with status `UNAVAILABLE` and shows ranked alternative slots (Patio 7:30 PM, Indoor 9:00 PM).
+  - The "Try saying" chip row above the composer updates to: `Try saying: "the patio one"`.
 
----
-
-### [0:30 – 1:00] Act 2: Table Confirmation & Booking Card (30s)
-
-*Goal: Demonstrate card-emitted events turning into chat turns and rendering confirmed booking data.*
-
-- **Action**:
-  - Click `[Book 8:00 PM Indoor]` on the card (or speak into the mic: *"Let's take the 8:00 PM indoor table for Aarav Sharma"*).
+#### Turn 2: Pick Alternative
 - **Spoken Voice (User)**:
-  > *"Let's take the 8:00 PM indoor table under Aarav Sharma."*
+  > *"The patio one"* (or click the `"the patio one"` chip)
+- **Tool Executed**: None (Resolved from session state)
+- **Assistant Spoken Response**:
+  > *"I have selected the Patio table at 19:30 for 4 guests. Would you like me to hold this table for 5 minutes, or confirm the booking?"*
+- **Visuals on Screen**:
+  - The "Try saying" chip row advances to: `Try saying: "hold it"`.
+
+#### Turn 3: Temporary Hold
+- **Spoken Voice (User)**:
+  > *"Hold it"*
+- **Tool Executed**: None (Session state hold)
+- **Assistant Spoken Response**:
+  > *"I've placed a temporary hold on the patio table at 7:30 PM for 5 minutes. Would you like to confirm the booking under your name?"*
+- **Visuals on Screen**:
+  - The "Try saying" chip row advances to: `Try saying: "yes book it"`.
+
+#### Turn 4: Initiate Booking
+- **Spoken Voice (User)**:
+  > *"Yes book it"*
+- **Tool Executed**: None (Prompts for missing name)
+- **Assistant Spoken Response**:
+  > *"May I have your name to complete the reservation?"*
+- **Visuals on Screen**:
+  - The "Try saying" chip row advances to: `Try saying: "my name is Ravi"`.
+
+#### Turn 5: Confirm Booking
+- **Spoken Voice (User)**:
+  > *"My name is Ravi"*
+- **Tool Executed**: `create_booking` (Real database booking created!)
+- **Assistant Spoken Response**:
+  > *"Your reservation is confirmed! Confirmation code is T T hyphen [CODE] under Ravi."*
 - **Visuals on Screen**:
   - Tool activity chip: `[✨ Reserving table...]`.
-  - Assistant replies aloud:
-    > *"You're all set! I've booked Table T03 for 4 guests on Friday at 8:00 PM under Aarav Sharma. Your confirmation code is TT-784920."*
-  - The **BookingConfirmationCard** appears in real time:
-    - Confirmed green badge `CONFIRMED`.
-    - Date & Time: `Friday, 8:00 PM – 9:30 PM (Indoor Table T03)`.
-    - Monospace confirmation code block with copy button `[Copy TT-784920]`.
-    - Cancellation policy notice (`Free cancellation up to 6 hours prior`).
+  - The **Booking Confirmation Card** appears with green badge `CONFIRMED`, table `P02`, and the spaced confirmation code.
 
 ---
 
-### [1:00 – 1:45] Act 3: Allergy-Aware Menu Search (45s)
+### [1:00 – 1:35] Act 2: Allergy-Aware Menu Search (35s)
 
 *Goal: Highlight uncompromising allergen safety — zero false safety promises and transparent ingredient disclosures.*
 
-- **Action**:
-  - Click the microphone button or type into the auto-growing composer:
 - **Spoken Voice (User)**:
-  > *"What vegan options do you have that don't contain peanuts?"*
+  > *"I'm allergic to peanuts, what can I eat"*
+- **Tool Executed**: `search_menu`
+- **Assistant Spoken Response**:
+  > *"These dishes are listed as not containing peanuts. Please confirm with our staff before dining if you have severe sensitivities."*
 - **Visuals on Screen**:
   - Tool activity chip: `[✨ Searching menu...]`.
-  - Assistant voice response:
-    > *"Here are our vegan dishes prepared without peanut ingredients. We note cross-contact risk for all items since peanuts are used in our kitchen."*
-  - The **MenuCarousel** card animates in:
-    - **Tandoori Roti** (₹60) — Vegan chip, Gluten disclosure.
-    - **Dal Tadka** (₹280) — Vegan chip, Garlic/Onion disclosure.
-    - **Yellow Lentil Curry** (₹310) — Vegan chip, Verified allergen row.
-  - Click **Arrow Right** or drag carousel to show smooth keyboard accessibility and swipe navigation.
-  - Notice the permanent disclaimer in the card: *"Cross-contact risk is actively monitored; no item is guaranteed 100% allergen-free."*
+  - The **Menu Carousel Card** displays peanut-free items (e.g. *Tandoori Roti*, *Crisp Palak Chaat*).
+  - Point out that the assistant **never** claims food is "safe" or "guaranteed", always stating "listed as not containing peanuts" and directing guests to verify with staff.
 
 ---
 
-### [1:45 – 2:25] Act 4: Pickup Order Placement (40s)
+### [1:35 – 2:10] Act 3: Pickup Order & Allergen Conflict (35s)
 
-*Goal: Show conversational ordering with price totals and live prep tracking without client payment execution.*
+*Goal: Demonstrate pickup order placement, item calculation, and active allergen conflict blocking.*
 
-- **Action**:
-  - Speak into the mic or click the suggestion chip `"Order pickup"`:
+#### Part A: Allergen Conflict Warning
 - **Spoken Voice (User)**:
-  > *"I'd like to place a pickup order for 2 Dal Tadka and 4 Tandoori Roti under Aarav."*
+  > *"Order the satay, I'm allergic to peanuts"*
+- **Tool Executed**: `place_order` (detects allergen conflict)
+- **Assistant Spoken Response**:
+  > *"The Banarasi Baingan Bharta is listed as containing peanuts, which you asked to avoid. Would you like to try the Crisp Palak Chaat instead?"*
+- **Visuals on Screen**:
+  - The assistant refuses to silently place an unsafe dish, transparently naming the conflict and offering an alternative.
+
+#### Part B: Successful Takeout Placement
+- **Spoken Voice (User)**:
+  > *"Order paneer tikka and two garlic naan for pickup at 8, name Ravi"*
+- **Tool Executed**: `place_order`
+- **Assistant Spoken Response**:
+  > *"I've placed your pickup order for 3 items totaling eight hundred eighty-two rupees, ready at eight in the evening. Your order code is [CODE]. Pay at pickup."*
 - **Visuals on Screen**:
   - Tool activity chip: `[✨ Placing pickup order...]`.
-  - Assistant voice response:
-    > *"Your pickup order has been placed for Aarav. Estimated prep time is 25 minutes. Total is eight hundred and forty rupees, payable at pickup."*
-  - The **OrderSummaryCard** renders:
-    - Order Code: `ORD-92841` with one-tap copy button.
-    - Item breakdown with unit prices, quantity multipliers, and line totals.
-    - Subtotal, Tax, and Grand Total (`₹840.00`).
-    - Status badge: `Placed — Ready in 25 mins`.
-    - `Pay at Pickup` confirmed (cards never process credit card transactions directly).
+  - The **Pickup Order Card** displays item quantities, prices in integer rupees, and pickup time.
 
 ---
 
-### [2:25 – 2:50] Act 5: Privacy & "Forget Me" Data Erasure (25s)
+### [2:10 – 2:35] Act 4: Large Party Deposit & Waitlist (25s)
 
-*Goal: Demonstrate server-side profile token protection and hard PII scrubbing with confirmation modal.*
+*Goal: Show high-capacity deposit rules (The Human-Confirms Payment Rule) and waitlist queuing.*
 
-- **Action**:
-  - Type or say: *"Please forget all my data and preferences."*
+#### Part A: Large Party Deposit
 - **Spoken Voice (User)**:
-  > *"Please forget me and erase my profile."*
+  > *"Table for 8 Saturday at 8"*
+- **Tool Executed**: `create_booking` (returns `deposit_required`)
+- **Assistant Spoken Response**:
+  > *"For parties of 8 on Saturday at 8:00 PM, a refundable deposit of 2000 rupees is required to confirm your reservation. Please use the simulated checkout card below to complete payment. I cannot process payments directly."*
 - **Visuals on Screen**:
-  - Destructive action confirmation modal appears:
-    - Title: `Erase Guest Profile?`
-    - Description: *"This will permanently delete your stored preferences, profile token, and personal notes from the server database."*
-  - Click the red button `[Forget Me]`.
-  - Tool activity chip: `[✨ Erasing guest profile...]`.
-  - Assistant confirms:
-    > *"All saved preferences, contact information, and personal data have been permanently erased from our systems."*
-  - The **StatusCard** displays a blue privacy shield badge: `PRIVACY: DATA ERASED`.
+  - The **Payment Required Card** appears with the prominent `SIMULATED` banner and a button pointing to mock checkout. Assistant never approves payments directly.
+
+#### Part B: Waitlist
+- **Spoken Voice (User)**:
+  > *"Put me on the waitlist"*
+- **Tool Executed**: `join_waitlist`
+- **Assistant Spoken Response**:
+  > *"You're on the waitlist at position 1 for Friday, October 23 between 7:00 pm and 8:30 pm. Your code is W L - [CODE]."*
+- **Visuals on Screen**:
+  - The **Waitlist Card** shows queue position 1 and estimated wait time.
 
 ---
 
-### [2:50 – 3:00] Act 6: Architecture & Closing (10s)
+### [2:35 – 2:55] Act 5: Consent Memory & "Forget Me" Hard Erasure (20s)
 
-*Goal: Concise engineering sign-off highlighting the dual-provider architecture.*
+*Goal: Prove privacy-first guest memory: explicit opt-in and permanent data deletion.*
+
+#### Part A: Explicit Consent
+- **Spoken Voice (User)**:
+  > *"Remember I'm allergic to peanuts"*
+- **Assistant**: *"Would you like me to remember your peanut allergy for future visits and recommendations? Please say yes to confirm."*
+- **User**: *"Yes"*
+- **Tool Executed**: `remember_preference` (Server stores hash; profile token never logged in plaintext)
+
+#### Part B: Destructive "Forget Me" Confirmation
+- **Spoken Voice (User)**:
+  > *"Forget me"*
+- **Assistant**: *"Are you sure you want me to forget all your saved preferences and profile data? Please say or type yes to confirm."*
+- **User**: *"Yes"*
+- **Tool Executed**: `forget_me`
+- **Assistant**:
+  > *"I have completely removed your profile and preferences. Your historical orders and bookings have been anonymized for business records."*
+
+---
+
+### [2:55 – 3:00] Act 6: Architecture Sign-Off & Closing (5s)
 
 - **Action**:
-  - Briefly click the top right `[Live Activity]` button to show the full stream of executed MCP tool calls and latencies (12ms - 45ms).
+  - Click the **Live Activity** drawer at top right to reveal the full audit trail of executed MCP tools.
 - **Spoken Voice (Narrator)**:
-  > *"TableTalk combines high-speed Rust Axum MCP tools with Groq Llama 3.3 orchestration and accessible React cards for a fast, reliable, voice-first dining assistant. Thank you!"*
+  > *"TableTalk combines deterministic Rust Axum MCP tools with rich React cards for an uncompromising, voice-first dining assistant. Thank you!"*
 
 ---
 
-## Troubleshooting & Demo Fallback Tips
+## What to Say If a Reply Is Off (Recovery Guidance)
 
-1. **Groq Rate Limit (HTTP 429) or Network Outage**:
-   - The backend automatically catches 429 or network errors, engages exponential backoff, and switches to the embedded rule-based fallback router (`fallback_mode: true`).
-   - The UI displays an amber `"Demo mode"` badge in the header, and all flows (availability check, booking, menu search, pickup orders) continue to respond deterministically.
-2. **Browser Microphone Permissions**:
-   - If the browser blocks microphone access, click the Composer textarea to type queries. The mic button displays an informational toast indicating speech recognition fallback.
-3. **Audio Narration Mute**:
-   - Click the Speaker icon in the top header at any time to toggle voice synthesis on/off during recording.
+1. **If Speech Recognition Mishears a Word**:
+   - Click the **"Try saying"** chip pill directly above the input bar! It immediately dispatches the exact canonical phrase into the chat.
+2. **If You Want to Reset the Conversation**:
+   - Refresh the page (`F5`) or say *"Hi"* to restart cleanly.
+3. **If You Want to Cancel an Action**:
+   - Say *"No"* or *"Never mind"* during any confirmation turn (`cancel booking`, `forget me`). The assistant will reply: *"Understood, I've cancelled that action."*
