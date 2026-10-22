@@ -14,14 +14,21 @@ This runbook provides an exact, second-by-second click-and-say script for record
      GROQ_MODEL=llama-3.3-70b-versatile
      ```
    - If recording offline without an external API key, the built-in deterministic fallback engine will handle all 5 turns automatically (`fallback_mode: true` with `"Demo mode"` badge).
-2. **Start Services**:
+2. **Screen & Privacy Protection**:
+   - Keep `.env` and terminal windows displaying environment variables off screen during recording.
+   - Do NOT display real personal phone numbers, addresses, or actual payment credentials on screen.
+   - Rotate any demo Groq or test API keys immediately after the video recording concludes.
+3. **Start Services**:
    ```bash
-   chmod +x scripts/demo.sh
-   ./scripts/demo.sh
+   # Terminal 1: Backend
+   cargo run --manifest-path backend/Cargo.toml --bin mcp_tabletalk_backend
+
+   # Terminal 2: Frontend
+   cd frontend && npm run dev
    ```
    - Backend runs on `http://127.0.0.1:8080`
    - Frontend runs on `http://127.0.0.1:5173/assistant`
-3. **Browser Setup**:
+4. **Browser Setup**:
    - Open Chrome or Edge to `http://127.0.0.1:5173/assistant` (ensure microphone permissions are granted).
    - Set zoom level to 100% or 110% for crisp UI readability.
    - Confirm audio input/output devices are tested.
