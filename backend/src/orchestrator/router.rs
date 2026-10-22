@@ -637,6 +637,18 @@ pub async fn handle_scripted_chat(
                 }
                 PendingAction::ForgetMe => {
                     let token_str = effective_token.unwrap_or_default();
+                    if token_str.is_empty() {
+                        session_mgr
+                            .update_demo_state(session_id, |s| *s = ScriptedDemoState::default())
+                            .await;
+                        session_mgr
+                            .update_profile_token(session_id, String::new())
+                            .await;
+                        return make_response(
+                            "I have completely removed your profile and preferences. Your historical orders and bookings have been anonymized for business records.".to_string(),
+                            Vec::new(),
+                        );
+                    }
                     let args = json!({
                         "profile_token": token_str,
                         "confirm": true,
@@ -1073,22 +1085,41 @@ pub async fn handle_scripted_chat(
     // -------------------------------------------------------------
     // SCENARIO S7: Follow-up Negotiation Flow
     // -------------------------------------------------------------
-    // Case 1: Pick an option ("the second one", "the patio one", "the patio", "7 pm")
+    // Case 1: Pick an option ("the second one", "the patio one", "the bar one", "7 pm")
     if norm == "the second one"
         || norm == "second option"
         || norm == "second one"
         || norm == "option 2"
+        || norm == "the first one"
+        || norm == "first option"
+        || norm == "option 1"
         || norm.contains("patio")
+        || norm.contains("bar")
+        || norm.contains("indoor")
+        || norm.contains("7:30")
+        || norm.contains("7.30")
         || (norm.contains("7 pm") && state.last_offered_alternatives.len() > 1)
+        || (norm.contains("9") && state.last_offered_alternatives.len() > 1)
     {
         if let Some(alt) = state
             .last_offered_alternatives
             .iter()
             .find(|a| {
-                if norm.contains("patio") {
-                    a.area.to_lowercase() == "patio"
+                if norm.contains("bar") {
+                    a.area.to_lowercase() == "bar"
+                } else if norm.contains("patio") {
+                    a.area.to_lowercase() == "patio" || a.area.to_lowercase() == "outdoor"
+                } else if norm.contains("first") || norm == "option 1" {
+                    a.option_id == "opt_1"
+                        || state
+                            .last_offered_alternatives
+                            .first()
+                            .map(|f| f.option_id == a.option_id)
+                            .unwrap_or(false)
                 } else if norm.contains("second") || norm.contains("2") {
                     a.option_id == "opt_2"
+                } else if norm.contains("9") {
+                    a.time.starts_with("21:")
                 } else {
                     a.time.starts_with("19:")
                 }
@@ -1100,12 +1131,11 @@ pub async fn handle_scripted_chat(
             session_mgr
                 .update_demo_state(session_id, |s| *s = state.clone())
                 .await;
-            let area_label =
-                if alt.area.to_lowercase() == "patio" || alt.area.to_lowercase() == "outdoor" {
-                    "Patio"
-                } else {
-                    "Indoor"
-                };
+            let area_label = match alt.area.to_lowercase().as_str() {
+                "patio" | "outdoor" => "Patio",
+                "bar" => "Bar",
+                _ => "Indoor",
+            };
             return make_response(
                 format!(
                     "I have selected the {} table at {} for {} guests. Would you like me to hold this table for 5 minutes, or confirm the booking?",
@@ -1117,9 +1147,31 @@ pub async fn handle_scripted_chat(
     }
 
     // Case 2: Hold it
-    if norm.contains("hold it") || norm.contains("hold for 5 minutes") || norm == "hold" {
+    if norm.contains("hold it")
+        || norm.contains("hold for 5 minutes")
+        || norm == "hold"
+        || norm.contains("hold this")
+    {
+        let area = state
+            .chosen_alternative
+            .as_ref()
+            .map(|a| a.area.as_str())
+            .unwrap_or("patio");
+        let area_label = match area.to_lowercase().as_str() {
+            "patio" | "outdoor" => "patio",
+            "bar" => "bar",
+            _ => "indoor",
+        };
+        let time = state
+            .chosen_alternative
+            .as_ref()
+            .map(|a| a.time.as_str())
+            .unwrap_or("7:30 PM");
         return make_response(
-            "I've placed a temporary hold on the patio table at 7:30 PM for 5 minutes. Would you like to confirm the booking under your name?".to_string(),
+            format!(
+                "I've placed a temporary hold on the {} table at {} for 5 minutes. Would you like to confirm the booking under your name?",
+                area_label, time
+            ),
             Vec::new(),
         );
     }

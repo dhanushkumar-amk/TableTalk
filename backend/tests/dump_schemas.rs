@@ -379,6 +379,15 @@ async fn test_dump_schemas_and_generate_fixtures() {
             "Tool {} result must be an object",
             tool_name
         );
+        if file_name == "create_booking_confirmed.json"
+            && result["structuredContent"]["status"] != "confirmed"
+        {
+            println!(
+                "Skipping overwriting {} because status is not confirmed",
+                file_name
+            );
+            continue;
+        }
         let path = fixtures_dir.join(file_name);
         fs::write(&path, serde_json::to_string_pretty(&result).unwrap()).unwrap();
         println!("Generated fixture: {}", file_name);

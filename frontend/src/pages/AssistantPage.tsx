@@ -78,10 +78,34 @@ function getNextHeroSuggestion(msgs: Message[]): string {
     .map((m) => m.text.toLowerCase())
   if (userTexts.length === 0) return HERO_FLOW_CHIPS[0]
   const last = userTexts[userTexts.length - 1]
-  if (last.includes("table for 4") || last.includes("7:30")) return HERO_FLOW_CHIPS[1]
-  if (last.includes("patio") || last.includes("second") || last.includes("7 pm")) return HERO_FLOW_CHIPS[2]
-  if (last.includes("hold")) return HERO_FLOW_CHIPS[3]
-  if (last.includes("book it") || last.includes("confirm")) return HERO_FLOW_CHIPS[4]
+
+  // If previous turn was a confirmation prompt (forget me, cancel, memory consent):
+  if (last.includes("forget") || last.includes("cancel") || last.includes("remember")) {
+    return "yes"
+  }
+
+  // Hero flow progression:
+  if (last.includes("table for 4") || last.includes("7:30") || last.includes("friday")) {
+    const lastAsst = msgs.slice().reverse().find((m) => m.sender === "assistant")
+    if (lastAsst && lastAsst.text.toLowerCase().includes("bar")) {
+      return "the bar one"
+    }
+    return "the patio one"
+  }
+  if (
+    last.includes("patio") ||
+    last.includes("bar") ||
+    last.includes("second") ||
+    last.includes("first") ||
+    last.includes("indoor") ||
+    last.includes("7 pm") ||
+    last.includes("9")
+  ) {
+    return "hold it"
+  }
+  if (last.includes("hold")) return "yes book it"
+  if (last.includes("book it") || last.includes("confirm")) return "my name is Ravi"
+
   return HERO_FLOW_CHIPS[0]
 }
 
