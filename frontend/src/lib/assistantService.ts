@@ -156,7 +156,10 @@ export async function sendAssistantMessage(
     const controller = new AbortController()
     const timeoutId = setTimeout(() => controller.abort(), 18000)
 
-    const res = await fetch("/api/chat", {
+    const apiBase = (typeof import.meta !== "undefined" && import.meta.env?.VITE_API_URL) 
+      ? String(import.meta.env.VITE_API_URL).replace(/\/$/, '') 
+      : ""
+    const res = await fetch(`${apiBase}/api/chat`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
