@@ -10,12 +10,25 @@ TableTalk is a production-hardened restaurant server implementing the **Model Co
 
 ---
 
-## Screenshots
+## Architecture & System Design
 
-| Voice Assistant & Negotiation | Allergen-Safe Menu Discovery |
-| :---: | :---: |
-| ![Assistant & Negotiation](https://placehold.co/600x400/18181b/ffffff?text=TableTalk+Negotiation+UI) | ![Allergen Menu Discovery](https://placehold.co/600x400/18181b/ffffff?text=Allergen-Safe+Menu+Carousel) |
-| *Ranked alternatives and short-lived table holds* | *Transparent ingredient and cross-contact disclosures* |
+TableTalk features complete High-Level Design (HLD), Low-Level Concurrency Architecture (LLD), Sequence Flows, and User Journeys. A publication-ready 6-page landscape PDF is available at:
+👉 **[TableTalk_System_Design_Specification.pdf](docs/TableTalk_System_Design_Specification.pdf)** (also documented in [docs/SYSTEM_DESIGN_SPECIFICATION.md](docs/SYSTEM_DESIGN_SPECIFICATION.md))
+
+### High-Level Design (HLD)
+![TableTalk High-Level Design](docs/images/tabletalk_hld.jpg)
+
+### Low-Level Design & Concurrency Controller (LLD)
+![TableTalk Low-Level Design](docs/images/tabletalk_lld.jpg)
+
+### Conversational Sequence Flow
+![TableTalk Sequence Flow](docs/images/tabletalk_sequence.jpg)
+
+### User Flow & Dining Journey
+![TableTalk User Flow](docs/images/tabletalk_user_flow.jpg)
+
+### User Stories & Persona Journey Maps
+![TableTalk User Stories](docs/images/tabletalk_user_stories.jpg)
 
 ---
 
@@ -30,43 +43,6 @@ TableTalk is a production-hardened restaurant server implementing the **Model Co
 - **The Human-Confirms Payment Rule**: The AI assistant *never* handles card data or approves payments; all deposits require human confirmation through secure links.
 - **Dual LLM Provider Support**: Native tool calling with Groq Llama 3.3 70B (sub-300ms time-to-first-token) and Amazon Bedrock with Amazon Nova Lite (`apac.amazon.nova-lite-v1:0`).
 - **Reliable Scripted Demo Router**: When running locally without live LLM API keys (labeled "Scripted demo" in the UI), TableTalk operates via a deterministic, multi-turn scripted router. It executes the **real, underlying Rust MCP tools**, SQLite transactions, allergen checks, and card payloads under the hood—ensuring zero video hallucination and reproducible test coverage.
-
----
-
-## Architecture
-
-![TableTalk Architecture](docs/images/tabletalk_architecture.jpg)
-
-```mermaid
-flowchart LR
-    subgraph Client["Client Tier"]
-        Voice["Alexa+ / Voice"]
-        Web["React + Vite UI"]
-    end
-
-    subgraph Server["TableTalk MCP Server (Rust / Axum)"]
-        Streamable["Streamable HTTP (/mcp)"]
-        Chat["Chat Orchestrator (/api/chat)"]
-        Tools["24 MCP Domain Tools"]
-        DB[(SQLite WAL)]
-    end
-
-    subgraph LLM["Inference Tier"]
-        Groq["Groq (Llama 3.3 70B)"]
-        Bedrock["Amazon Bedrock (Nova Lite)"]
-    end
-
-    Voice <--> Streamable
-    Web <--> Chat
-    Web <--> Streamable
-    Chat <--> Groq
-    Chat -.-> Bedrock
-    Chat --> Tools
-    Streamable --> Tools
-    Tools <--> DB
-```
-
-Detailed architecture specifications, sequence flows, and concurrency models are available in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ---
 
@@ -112,6 +88,18 @@ docker compose up --build
 ```
 - Backend: [http://localhost:8080](http://localhost:8080)
 - Frontend: [http://localhost:5173](http://localhost:5173)
+
+---
+
+### Option C: Inspecting Tools via MCP Inspector
+
+Launch the official Model Context Protocol Inspector:
+```bash
+npx --yes @modelcontextprotocol/inspector
+```
+1. Open the inspector URL displayed in terminal (e.g. `http://127.0.0.1:6274`).
+2. Add server: Transport: **Streamable HTTP**, URL: `http://127.0.0.1:8080/mcp`.
+3. Test all 24 tools live!
 
 ---
 
@@ -218,9 +206,10 @@ Follow the step-by-step 3-minute recording script in [docs/DEMO_RUNBOOK.md](docs
 
 ---
 
-## Hackathon Submission Details
+## Hackathon Submission & Technical Documentation
 
 - **Event**: Amazon Developer Hackathon (Alexa+ Track)
+- **Architecture & System Design**: Complete HLD, LLD, and user journeys in [docs/SYSTEM_DESIGN_SPECIFICATION.md](docs/SYSTEM_DESIGN_SPECIFICATION.md) and [docs/TableTalk_System_Design_Specification.pdf](docs/TableTalk_System_Design_Specification.pdf).
 - **Submission Document**: Complete copy-paste submission kit available in [docs/SUBMISSION.md](docs/SUBMISSION.md).
 - **Product Feedback**: Full five-question platform feedback for the Rust MCP SDK, Streamable HTTP, SQLx, and AWS Bedrock available in [docs/PRODUCT_FEEDBACK.md](docs/PRODUCT_FEEDBACK.md).
 - **Friction Log**: Chronological engineering obstacles and workarounds in [docs/FRICTION_LOG.md](docs/FRICTION_LOG.md).
@@ -239,5 +228,5 @@ Follow the step-by-step 3-minute recording script in [docs/DEMO_RUNBOOK.md](docs
 
 ## License
 
-This project is licensed under the [MIT License](LICENSE).
-Copyright (c) 2026 [YOUR NAME / TABLETALK AUTHORS - REPLACE WITH YOUR NAME]
+This project is licensed under the [MIT License](LICENSE).  
+Copyright (c) 2026 Dhanush Kumar (TableTalk Contributors)
