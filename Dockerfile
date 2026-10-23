@@ -1,6 +1,6 @@
 # Multi-stage non-root Dockerfile for TableTalk Backend
 # Stage 1: Build binary
-FROM rust:1.85-slim-bookworm AS builder
+FROM rust:slim-bookworm AS builder
 
 WORKDIR /usr/src/tabletalk
 
@@ -11,7 +11,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy cargo manifest and lockfile
+# Copy cargo workspace manifests and lockfile
+COPY Cargo.toml ./Cargo.toml
 COPY Cargo.lock ./Cargo.lock
 COPY backend/Cargo.toml ./backend/Cargo.toml
 
